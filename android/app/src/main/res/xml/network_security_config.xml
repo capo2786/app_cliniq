@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Tráfico sin cifrar permitido SOLO hacia el servidor actual de la API.
+
+    La API todavía responde por http://195.7.5.134 (puertos 3000 y 4500), y
+    Android 9+ bloquea el HTTP plano por defecto: sin esta excepción, todas
+    las peticiones fallan con «Cleartext HTTP traffic not permitted». Se
+    limita a esa dirección para no abrir la puerta a cualquier otro sitio.
+
+    Cuando la API pase a HTTPS hay que BORRAR este archivo y el atributo
+    android:networkSecurityConfig del AndroidManifest.xml.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">195.7.5.134</domain>
+    </domain-config>
+</network-security-config>

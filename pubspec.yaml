@@ -1,0 +1,48 @@
+name: app_cliniq
+description: "Cliniq: la aplicación del paciente para agendar y seguir sus citas."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Estado y red
+  flutter_bloc: ^9.1.1
+  bloc: ^9.2.1
+  equatable: ^2.0.8
+  dio: ^5.9.2
+
+  # Almacenamiento
+  flutter_secure_storage: ^10.3.1
+  hive_ce_flutter: ^2.3.4
+
+  # Dispositivo y seguridad
+  local_auth: ^3.0.1
+  package_info_plus: ^10.1.0
+  url_launcher: ^6.3.2
+
+  # Fechas y recordatorios. La versión de flutter_local_notifications importa:
+  # es la misma que usa UCEBell y la que ya se sabe que compila con este SDK.
+  intl: ^0.20.2
+  flutter_local_notifications: ^22.3.0
+  timezone: ^0.11.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  bloc_test: ^10.0.0
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.8
+
+flutter:
+  uses-material-design: true

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    El icono de las notificaciones se busca por su nombre en tiempo de
+    ejecución, así que ninguna herramienta ve que se usa. Si algún día se
+    enciende el recortador de recursos, sin esto lo borraría del APK y los
+    recordatorios fallarían solo en release.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_notificacion" />

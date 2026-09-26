@@ -1,0 +1,22 @@
+<!--
+    El icono de los recordatorios de cita: la cruz de la marca, en silueta.
+
+    Va aquí y no se reutiliza el del lanzador por dos motivos. Uno, Android
+    pinta el icono pequeño de una notificación como silueta: un icono a color
+    se ve como un cuadrado blanco. Y dos, el complemento de notificaciones
+    busca el recurso en `drawable`, no en `mipmap`.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24"
+    android:tint="#FFFFFFFF">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,1.5A10.5,10.5 0,1 0,22.5 12,10.5 10.5,0 0,0 12,1.5ZM12,3.5A8.5,8.5 0,1 1,3.5 12,8.5 8.5,0 0,1 12,3.5Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M10.4,6.8h3.2v3.6h3.6v3.2h-3.6v3.6h-3.2v-3.6h-3.6v-3.2h3.6z" />
+</vector>
