@@ -46,3 +46,55 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  # Sin recursos empaquetados: el logotipo se dibuja con código
+  # (PintorLogoCliniq) y los PNG de assets/images solo sirven para generar el
+  # icono y el arranque nativos.
+
+# Icono de la aplicación.
+#
+# Los PNG salen del mismo `PintorLogoCliniq` que dibuja el logotipo en la
+# aplicación (ver tool/generar_iconos_test.dart). Tras cambiar el logotipo:
+#   flutter test tool/generar_iconos_test.dart
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/icono_app.png"
+  # iOS no admite transparencia en el icono: el PNG ya viene con fondo.
+  remove_alpha_ios: true
+  # Android 8+: icono adaptable, con el logotipo en la zona segura.
+  adaptive_icon_background: "#F4EFEA"
+  adaptive_icon_foreground: "assets/images/icono_primer_plano.png"
+  min_sdk_android: 21
+  web:
+    generate: true
+    image_path: "assets/images/icono_app.png"
+    background_color: "#0F171A"
+    theme_color: "#5A6E73"
+
+# Pantalla de arranque.
+#
+# El mismo fondo profundo de la aplicación, para que el paso a la pantalla de
+# arranque de Flutter no se note, y la misma pastilla clara del logotipo que
+# se ve en el acceso. Tras cambiar algo de aquí:
+#   dart run flutter_native_splash:create
+flutter_native_splash:
+  color: "#0B1113"
+  image: "assets/images/splash_logo.png"
+  color_dark: "#0B1113"
+  image_dark: "assets/images/splash_logo.png"
+
+  android_12:
+    # Android 12+ recorta el icono a un círculo sobre este fondo: va el
+    # logotipo solo, sobre el claro cálido del icono.
+    image: "assets/images/splash_android12.png"
+    icon_background_color: "#F4EFEA"
+    color: "#0B1113"
+    image_dark: "assets/images/splash_android12.png"
+    icon_background_color_dark: "#F4EFEA"
+    color_dark: "#0B1113"
+
+  android: true
+  ios: true
+  web: true
