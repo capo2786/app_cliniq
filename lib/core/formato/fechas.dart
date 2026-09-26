@@ -1,0 +1,115 @@
+// lib/core/formato/fechas.dart
+
+/// Cómo se enseñan las fechas en Cliniq, en español.
+///
+/// Todo pasa por aquí y no por formatos sueltos en cada pantalla. Los nombres
+/// de días y meses van en una tabla propia y no en `DateFormat('…', 'es')`:
+/// las abreviaturas del locale cambian entre versiones de los datos de idioma
+/// («sep» pasó a «sept.», con punto), y en una tira de días o en una hoja de
+/// calendario eso descuadra el diseño. Una sola tabla, aquí, se escribe una
+/// vez y se lee igual en todas las pantallas.
+///
+/// Las horas van en veinticuatro horas, como en el panel web: «09:30» ocupa
+/// siempre lo mismo y no deja dudas entre la mañana y la noche.
+class FormatoFecha {
+  const FormatoFecha._();
+
+  static const List<String> _dias = [
+    'lunes',
+    'martes',
+    'miércoles',
+    'jueves',
+    'viernes',
+    'sábado',
+    'domingo',
+  ];
+
+  static const List<String> _diasCortos = [
+    'lun',
+    'mar',
+    'mié',
+    'jue',
+    'vie',
+    'sáb',
+    'dom',
+  ];
+
+  static const List<String> _meses = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
+
+  static const List<String> _mesesCortos = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+
+  static String _dos(int n) => n.toString().padLeft(2, '0');
+
+  /// «lunes»
+  static String nombreDia(DateTime f) => _dias[f.weekday - 1];
+
+  /// «Lun»
+  static String diaCorto(DateTime f) => capitalizar(_diasCortos[f.weekday - 1]);
+
+  /// «SEP», para la hoja de calendario de las tarjetas.
+  static String mesCortoMayusculas(DateTime f) =>
+      _mesesCortos[f.month - 1].toUpperCase();
+
+  /// «Lunes 28 de septiembre»
+  static String diaLargo(DateTime f) =>
+      capitalizar('${nombreDia(f)} ${f.day} de ${_meses[f.month - 1]}');
+
+  /// «Lunes 28 de septiembre de 2026»
+  static String diaLargoConAnio(DateTime f) => '${diaLargo(f)} de ${f.year}';
+
+  /// «Lun 28 sep»
+  static String diaMedio(DateTime f) =>
+      '${diaCorto(f)} ${f.day} ${_mesesCortos[f.month - 1]}';
+
+  /// «28 sep 2026»
+  static String fechaMedia(DateTime f) =>
+      '${f.day} ${_mesesCortos[f.month - 1]} ${f.year}';
+
+  /// «09:30»
+  static String hora(DateTime f) => '${_dos(f.hour)}:${_dos(f.minute)}';
+
+  /// «09:30 – 10:00»
+  static String rangoHoras(DateTime inicio, DateTime fin) =>
+      '${hora(inicio)} – ${hora(fin)}';
+
+  /// «28/09/2026»
+  static String corta(DateTime f) =>
+      '${_dos(f.day)}/${_dos(f.month)}/${f.year}';
+
+  /// «28/09/2026 · 09:30», para sellos de registro.
+  static String cortaConHora(DateTime f) => '${corta(f)} · ${hora(f)}';
+
+  /// La primera letra en mayúscula: el locale devuelve días y meses en
+  /// minúscula, y en un título eso se lee mal.
+  static String capitalizar(String texto) {
+    if (texto.isEmpty) return texto;
+
+    return texto[0].toUpperCase() + texto.substring(1);
+  }
+}
