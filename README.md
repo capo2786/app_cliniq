@@ -16,8 +16,8 @@ la aplicación salen del mismo cálculo, portado línea a línea.
 
 | Herramienta | Versión |
 | --- | --- |
-| Flutter | 3.44.1 (fijada en `.fvmrc`) |
-| Dart SDK | ^3.12.1 |
+| Flutter | 3.47.5 (fijada en `.fvmrc`) |
+| Dart SDK | ^3.13.4 |
 | Java | 17 (compilación de Android) |
 | Xcode | Solo para compilar iOS |
 
@@ -117,7 +117,7 @@ incompatible y `pub get` no resuelve.
 **Android** (`android/app/src/main/AndroidManifest.xml`): `INTERNET`,
 `USE_BIOMETRIC`, `POST_NOTIFICATIONS` y `RECEIVE_BOOT_COMPLETED`, más el
 receptor que reprograma los recordatorios tras reiniciar el teléfono. El
-identificador es `ec.cliniq.app` y el nombre visible, «Cliniq».
+identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
 
 - **Adjuntos sin permisos nuevos.** La cámara se abre con la aplicación de
   cámara del teléfono (intento `IMAGE_CAPTURE`), así que **no** se declara
@@ -149,7 +149,7 @@ identificador es `ec.cliniq.app` y el nombre visible, «Cliniq».
 (`NSFaceIDUsageDescription`), de la cámara (`NSCameraUsageDescription`) y de
 la fototeca (`NSPhotoLibraryUsageDescription`), en español, y solo
 orientación vertical en teléfono. El
-identificador es `ec.cliniq.app`. El `AppDelegate` se registra como delegado
+identificador es `ec.cliniq.sage.app`. El `AppDelegate` se registra como delegado
 del centro de notificaciones para que los recordatorios se vean también con
 la aplicación abierta.
 

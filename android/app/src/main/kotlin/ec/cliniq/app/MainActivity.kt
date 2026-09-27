@@ -1,4 +1,4 @@
-package ec.cliniq.app
+package ec.cliniq.sage.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 
