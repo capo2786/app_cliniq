@@ -25,10 +25,13 @@ import '../../citas/providers/citas_event.dart';
 import '../../citas/providers/citas_state.dart';
 import '../../consultas/dominio/reglas_consultas.dart';
 import '../../consultas/providers/consultas_bloc.dart';
+import '../../encuestas/presentacion/widgets/aviso_encuestas.dart';
+import '../../encuestas/providers/encuestas_cubit.dart';
 import '../../navegacion/data/menu_service.dart';
 import '../../navegacion/dominio/destinos.dart';
 import 'widgets/proxima_cita.dart';
 import '../../../core/configuracion/en_contexto.dart';
+import '../../avisos/presentacion/widgets/boton_campana.dart';
 
 /// La portada: quién eres, cuál es tu próxima cita y los accesos rápidos.
 ///
@@ -39,7 +42,7 @@ class InicioPage extends StatefulWidget {
   final ValueChanged<EnlaceMenu> alAbrirEnlace;
 
   /// Abre una pantalla de la aplicación (agendar, desde la próxima cita).
-  final ValueChanged<PantallaNativa> alAbrir;
+  final ValueChanged<DestinoNativo> alAbrir;
 
   const InicioPage({
     super.key,
@@ -80,10 +83,12 @@ class _InicioPageState extends State<InicioPage> {
     auth.add(const AuthPerfilRefrescado());
 
     final citas = context.read<CitasBloc>()..add(CitasSolicitadas(usuario.uid));
+    final encuestas = context.read<EncuestasCubit>().cargar(usuario.uid);
 
     await citas.stream
         .firstWhere((s) => !s.cargando)
         .timeout(const Duration(seconds: 15), onTimeout: () => citas.state);
+    await encuestas;
 
     if (mounted) setState(() => _ahora = Servicios.reloj.ahora());
   }
@@ -129,7 +134,11 @@ class _InicioPageState extends State<InicioPage> {
             ),
           ],
         ),
-        actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+        actions: const [
+          BotonCampana(),
+          BotonCerrarSesion(),
+          SizedBox(width: 6),
+        ],
       ),
       body: FondoDegradado(
         child: RefreshIndicator(
@@ -179,14 +188,22 @@ class _InicioPageState extends State<InicioPage> {
                                 : 'Agenda con el médico que necesites, para '
                                       'ti o para alguien a tu cargo.',
                             accion: 'Agendar una cita',
-                            alPulsar: () =>
-                                widget.alAbrir(PantallaNativa.agendar),
+                            alPulsar: () => widget.alAbrir(
+                              const DestinoNativo(PantallaNativa.agendar),
+                            ),
                           )
                         else
                           TarjetaProximaCita(
                             cita: proximas.first,
                             ahora: _ahora,
                           ),
+                        AvisoEncuestas(
+                          alResponder: (citaId) => widget.alAbrir(
+                            DestinoNativo(PantallaNativa.encuesta, {
+                              'citaId': citaId,
+                            }),
+                          ),
+                        ),
                         if (widget.accesos.isNotEmpty) ...[
                           const SizedBox(height: 26),
                           const EtiquetaSeccion('Accesos rápidos'),
@@ -567,8 +584,9 @@ class _AccesoConsultas extends StatelessWidget {
 }
 
 /// Los enlaces del menú que no caben en la barra: consultas en línea a lo
-/// ancho (con sus respuestas por leer) y los demás en una rejilla. Los que
-/// se abren en el navegador llevan su marca.
+/// ancho (con sus respuestas por leer) y los demás en una rejilla. Los
+/// externos (una página que puso el administrador) llevan su marca: se abren
+/// en el navegador integrado, sin salir de la aplicación.
 class _AccesosRapidos extends StatelessWidget {
   final List<EnlaceMenu> enlaces;
   final bool puedeConsultas;
@@ -634,7 +652,7 @@ class _Acceso extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = colorDelServidor(enlace.color) ?? AppColors.primarioClaro;
-    final enElNavegador = destinoDe(enlace) is DestinoWeb;
+    final externo = destinoDe(enlace) is DestinoWeb;
 
     return TarjetaTranslucida(
       key: Key('acceso-${enlace.key}'),
@@ -661,9 +679,9 @@ class _Acceso extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (enElNavegador)
+              if (externo)
                 const Tooltip(
-                  message: 'Se abre en el navegador',
+                  message: 'Página externa',
                   child: Icon(
                     Icons.open_in_new_rounded,
                     size: 16,

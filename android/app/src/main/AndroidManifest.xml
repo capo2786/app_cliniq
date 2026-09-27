@@ -13,6 +13,15 @@
     <!-- Entrar con huella o rostro -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
+    <!--
+        La videoconsulta dentro de la aplicación (SDK de Jitsi): la cámara y
+        el micrófono. El SDK también los trae en su manifiesto; se declaran
+        aquí para que se vea qué pide la aplicación. Se piden al entrar a la
+        sala, no antes.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Recordatorios locales 24 h y 1 h antes de cada cita -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -21,9 +30,9 @@
         Adjuntos de las consultas en línea: no hace falta pedir ningún permiso.
 
         - La cámara se abre con la aplicación de cámara del teléfono
-          (image_picker, intento IMAGE_CAPTURE). Por eso NO se declara
-          android.permission.CAMERA: si se declarara, Android exigiría
-          concederlo antes de abrir esa cámara.
+          (image_picker, intento IMAGE_CAPTURE). Como la videoconsulta ya
+          declara android.permission.CAMERA, Android exige concederlo antes
+          de abrir esa cámara: image_picker lo pide solo la primera vez.
         - La galería usa el selector de fotos del sistema y los PDF el de
           documentos: los dos entregan solo lo elegido, sin permiso de
           almacenamiento.
@@ -45,7 +54,12 @@
         android:name="android.permission.READ_MEDIA_AUDIO"
         tools:node="remove" />
 
+    <!--
+        tools:replace: el SDK de Jitsi trae su propio android:label y chocaría
+        con el de la aplicación al fusionar los manifiestos (lo pide su README).
+    -->
     <application
+        tools:replace="android:label"
         android:label="Cliniq"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
@@ -104,8 +118,9 @@
         </intent>
 
         <!--
-            Para abrir en el navegador los documentos legales, el registro,
-            el panel web y la sala de la videoconsulta
+            El navegador integrado (Custom Tabs): el registro, el panel web,
+            los enlaces externos del menú y, si el SDK de video falla, la
+            sala de la videoconsulta
         -->
         <intent>
             <action android:name="android.intent.action.VIEW" />

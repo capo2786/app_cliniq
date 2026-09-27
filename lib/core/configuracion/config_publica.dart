@@ -305,13 +305,32 @@ class ReglasGenerales extends Equatable {
   /// 10). Apagado, basta con que tenga diez dígitos.
   final bool validarCedula;
 
-  const ReglasGenerales({required this.validarCedula});
+  /// Los días que tiene la clínica para responder una solicitud ARCO (el
+  /// servidor calcula con ellos el `plazoVence` de cada una).
+  final int arcoPlazoDias;
 
-  factory ReglasGenerales._leer(_Lector l) =>
-      ReglasGenerales(validarCedula: l.booleano('validarCedula'));
+  /// Hasta cuántos días después de una cita atendida se puede responder su
+  /// encuesta.
+  final int encuestasDiasVentana;
+
+  const ReglasGenerales({
+    required this.validarCedula,
+    required this.arcoPlazoDias,
+    required this.encuestasDiasVentana,
+  });
+
+  factory ReglasGenerales._leer(_Lector l) => ReglasGenerales(
+    validarCedula: l.booleano('validarCedula'),
+    arcoPlazoDias: l.entero('arcoPlazoDias', minimo: 1),
+    encuestasDiasVentana: l.entero('encuestasDiasVentana', minimo: 1),
+  );
 
   @override
-  List<Object?> get props => [validarCedula];
+  List<Object?> get props => [
+    validarCedula,
+    arcoPlazoDias,
+    encuestasDiasVentana,
+  ];
 }
 
 /// Lee campos obligatorios de una sección y dice cuál falta si falta uno.

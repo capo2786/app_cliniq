@@ -18,6 +18,7 @@ const Map<String, IconData> iconosDelPanel = {
   'ban': Icons.block_rounded,
   'calendario': Icons.event_note_rounded,
   'calendario-mas': Icons.add_circle_outline_rounded,
+  'campana': Icons.notifications_none_rounded,
   'candado': Icons.lock_outline_rounded,
   'cedula': Icons.badge_outlined,
   'check': Icons.check_rounded,

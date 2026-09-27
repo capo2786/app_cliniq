@@ -13,22 +13,21 @@ import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
-import '../../agendar/presentacion/agendar_page.dart';
 import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
-import '../../citas/presentacion/citas_page.dart';
+import '../../avisos/providers/campana_cubit.dart';
 import '../../citas/providers/citas_bloc.dart';
 import '../../citas/providers/citas_event.dart';
-import '../../consultas/presentacion/consultas_page.dart';
 import '../../consultas/providers/consultas_bloc.dart';
 import '../../consultas/providers/consultas_event.dart';
-import '../../dependientes/presentacion/dependientes_page.dart';
 import '../../dependientes/providers/dependientes_bloc.dart';
+import '../../encuestas/providers/encuestas_cubit.dart';
 import '../../navegacion/data/menu_service.dart';
 import '../../navegacion/dominio/destinos.dart';
+import '../../navegacion/presentacion/enrutador.dart';
+import '../../navegacion/presentacion/pantallas_nativas.dart';
 import '../../navegacion/providers/menu_cubit.dart';
-import '../../perfil/presentacion/perfil_page.dart';
 import 'inicio_page.dart';
 
 /// Las pantallas que viven como pestaña (las demás se abren encima).
@@ -46,12 +45,15 @@ const Set<PantallaNativa> pantallasDePestana = {
 /// APP`): los cuatro primeros enlaces, por su orden, más «Perfil», que
 /// siempre está; el resto va a «Accesos rápidos» del inicio. Cada enlace
 /// lleva el nombre, el icono y el color que eligió el administrador. Una
-/// ruta que la aplicación conoce abre su pantalla; una que no conoce se abre
-/// en el navegador, en el panel web.
+/// ruta del sistema abre su pantalla (ver el enrutador en
+/// `navegacion/dominio/destinos.dart`); una que la aplicación no sabe abrir
+/// no se enseña, y un enlace externo se abre en el navegador integrado:
+/// nada saca a la persona de la aplicación.
 ///
 /// Aquí nacen también las cargas de todo lo que comparten las pestañas
-/// —citas, consultas en línea, dependientes y el menú— y los recordatorios,
-/// y se vuelven a pedir al regresar a la aplicación.
+/// —citas, consultas en línea, dependientes, el menú y la campana de
+/// avisos— y los recordatorios, y se vuelven a pedir al regresar a la
+/// aplicación. La campana se enciende si el menú la trae.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -63,12 +65,22 @@ class _DashboardPageState extends State<DashboardPage>
     with WidgetsBindingObserver {
   PantallaNativa _actual = PantallaNativa.inicio;
 
+  /// Las pestañas y la campana del último menú pintado: las usa quien abre
+  /// un destino desde una pantalla que está encima.
+  List<PantallaNativa> _pestanas = const [
+    PantallaNativa.inicio,
+    PantallaNativa.perfil,
+  ];
+  EnlaceMenu? _campana;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _actualizarCampana(context.read<MenuCubit>().state.enlaces);
       _sincronizar();
 
       // El permiso de notificaciones se pide aquí, ya dentro: pedirlo en el
@@ -86,12 +98,28 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      Servicios.red.olvidar();
-      unawaited(Servicios.red.estado());
-      context.read<AuthBloc>().add(const AuthPerfilRefrescado());
-      _sincronizar();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        Servicios.red.olvidar();
+        unawaited(Servicios.red.estado());
+        context.read<AuthBloc>().add(const AuthPerfilRefrescado());
+        _sincronizar();
+      case AppLifecycleState.paused || AppLifecycleState.hidden:
+        // En segundo plano la campana no pregunta.
+        context.read<CampanaCubit>().pausar();
+      case _:
+        break;
     }
+  }
+
+  /// La campana existe si el menú trae `/notificaciones`. Sin menú todavía,
+  /// se decide cuando llegue.
+  void _actualizarCampana(List<EnlaceMenu>? enlaces) {
+    if (enlaces == null) return;
+
+    context.read<CampanaCubit>().activar(
+      NavegacionDeLaApp.desde(enlaces).campana != null,
+    );
   }
 
   void _sincronizar() {
@@ -101,6 +129,8 @@ class _DashboardPageState extends State<DashboardPage>
     if (usuario == null) return;
 
     unawaited(context.read<MenuCubit>().cargar(usuario.uid));
+    context.read<CampanaCubit>().reanudar();
+    unawaited(context.read<EncuestasCubit>().cargar(usuario.uid));
 
     if (usuario.puede(Permisos.misCitas)) {
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));
@@ -119,57 +149,78 @@ class _DashboardPageState extends State<DashboardPage>
 
   /// Las pestañas que hay: el inicio siempre (es la portada, con los accesos
   /// rápidos), las pantallas de la barra en su orden y el perfil al final.
-  List<PantallaNativa> _pestanas(NavegacionDeLaApp navegacion) {
+  List<PantallaNativa> _pestanasDe(NavegacionDeLaApp navegacion) {
     final pestanas = <PantallaNativa>[PantallaNativa.inicio];
 
     for (final enlace in navegacion.barra) {
-      if (destinoDe(enlace) case DestinoNativo(:final pantalla)
-          when pantallasDePestana.contains(pantalla) &&
-              !pestanas.contains(pantalla)) {
-        pestanas.add(pantalla);
+      if (destinoDe(enlace) case final DestinoNativo destino
+          when destino.sinParametros &&
+              pantallasDePestana.contains(destino.pantalla) &&
+              !pestanas.contains(destino.pantalla)) {
+        pestanas.add(destino.pantalla);
       }
     }
 
     return pestanas..add(PantallaNativa.perfil);
   }
 
-  /// Abre una pantalla de la aplicación: su pestaña si la tiene; si no,
-  /// encima (agendar siempre va encima, es un recorrido).
-  void _abrir(PantallaNativa pantalla, List<PantallaNativa> pestanas) {
-    if (pantalla != PantallaNativa.agendar && pestanas.contains(pantalla)) {
+  /// Abre un destino del enrutador: su pestaña si la tiene (cerrando lo que
+  /// hubiera encima); si no, encima (agendar siempre va encima, es un
+  /// recorrido).
+  void _abrir(DestinoNativo destino, {String? titulo}) {
+    if (!mounted) return;
+
+    final navegador = Navigator.of(context);
+    final pantalla = destino.pantalla;
+
+    if (destino.sinParametros &&
+        pantalla != PantallaNativa.agendar &&
+        _pestanas.contains(pantalla)) {
+      navegador.popUntil((ruta) => ruta.isFirst);
       setState(() => _actual = pantalla);
       return;
     }
 
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => _pagina(pantalla, pestanas)),
+    navegador.push(
+      MaterialPageRoute<void>(
+        builder: (_) => _conAlcance(_pagina(destino, titulo: titulo), _campana),
+      ),
     );
   }
 
-  void _abrirEnlace(EnlaceMenu enlace, List<PantallaNativa> pestanas) {
+  void _abrirEnlace(EnlaceMenu enlace) {
     switch (destinoDe(enlace)) {
-      case DestinoNativo(:final pantalla):
-        _abrir(pantalla, pestanas);
+      case final DestinoNativo destino:
+        _abrir(destino, titulo: enlace.label);
       case DestinoWeb(:final url):
         unawaited(abrirEnlace(context, url, queEs: '«${enlace.label}»'));
+      case DestinoContacto(:final direccion):
+        unawaited(abrirContacto(context, direccion));
+      case null:
+        // No se enseña: la aplicación no la sabe abrir.
+        break;
     }
   }
 
-  Widget _pagina(PantallaNativa pantalla, List<PantallaNativa> pestanas) {
-    return switch (pantalla) {
-      PantallaNativa.inicio => const SizedBox.shrink(),
-      PantallaNativa.citas => CitasPage(
-        alAgendar: () => _abrir(PantallaNativa.agendar, pestanas),
-      ),
-      PantallaNativa.agendar => const AgendarPage(),
-      PantallaNativa.dependientes => const DependientesPage(),
-      PantallaNativa.consultas => const ConsultasPage(),
-      PantallaNativa.perfil => const PerfilPage(),
-    };
-  }
+  Widget _pagina(DestinoNativo destino, {String? titulo}) => pantallaNativa(
+    destino,
+    titulo: titulo,
+    alAgendar: () => _abrir(const DestinoNativo(PantallaNativa.agendar)),
+  );
+
+  Widget _conAlcance(Widget child, EnlaceMenu? campana) =>
+      AlcanceDeNavegacion(abrir: _abrir, campana: campana, child: child);
 
   @override
   Widget build(BuildContext context) {
+    return BlocListener<MenuCubit, MenuState>(
+      listenWhen: (antes, ahora) => antes.enlaces != ahora.enlaces,
+      listener: (context, menu) => _actualizarCampana(menu.enlaces),
+      child: _tablero(context),
+    );
+  }
+
+  Widget _tablero(BuildContext context) {
     final menu = context.watch<MenuCubit>().state;
     final enlaces = menu.enlaces;
 
@@ -183,45 +234,49 @@ class _DashboardPageState extends State<DashboardPage>
     }
 
     final navegacion = NavegacionDeLaApp.desde(enlaces);
-    final pestanas = _pestanas(navegacion);
+    final pestanas = _pestanas = _pestanasDe(navegacion);
+    _campana = navegacion.campana;
     final actual = pestanas.contains(_actual) ? _actual : pestanas.first;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: pestanas.indexOf(actual),
-        children: [
-          // Con su clave: si el administrador reordena el menú, cada
-          // pantalla conserva su estado y no el de la que estaba antes ahí.
-          for (final pantalla in pestanas)
-            KeyedSubtree(
-              key: ValueKey(pantalla),
-              child: pantalla == PantallaNativa.inicio
-                  ? InicioPage(
-                      accesos: navegacion.accesos,
-                      alAbrirEnlace: (e) => _abrirEnlace(e, pestanas),
-                      alAbrir: (p) => _abrir(p, pestanas),
-                    )
-                  : _pagina(pantalla, pestanas),
+    return _conAlcance(
+      Scaffold(
+        body: IndexedStack(
+          index: pestanas.indexOf(actual),
+          children: [
+            // Con su clave: si el administrador reordena el menú, cada
+            // pantalla conserva su estado y no el de la que estaba antes ahí.
+            for (final pantalla in pestanas)
+              KeyedSubtree(
+                key: ValueKey(pantalla),
+                child: pantalla == PantallaNativa.inicio
+                    ? InicioPage(
+                        accesos: navegacion.accesos,
+                        alAbrirEnlace: _abrirEnlace,
+                        alAbrir: _abrir,
+                      )
+                    : _pagina(DestinoNativo(pantalla)),
+              ),
+          ],
+        ),
+        bottomNavigationBar: _BarraInferior(
+          pestanas: [
+            for (final enlace in navegacion.barra)
+              _Pestana.deEnlace(
+                enlace,
+                activa: destinoDe(enlace) == DestinoNativo(actual),
+                alTocar: () => _abrirEnlace(enlace),
+              ),
+            _Pestana(
+              clave: const Key('pestana-perfil'),
+              etiqueta: 'Perfil',
+              icono: Icons.person_outline_rounded,
+              activa: actual == PantallaNativa.perfil,
+              alTocar: () => _abrir(const DestinoNativo(PantallaNativa.perfil)),
             ),
-        ],
+          ],
+        ),
       ),
-      bottomNavigationBar: _BarraInferior(
-        pestanas: [
-          for (final enlace in navegacion.barra)
-            _Pestana.deEnlace(
-              enlace,
-              activa: destinoDe(enlace) == DestinoNativo(actual),
-              alTocar: () => _abrirEnlace(enlace, pestanas),
-            ),
-          _Pestana(
-            clave: const Key('pestana-perfil'),
-            etiqueta: 'Perfil',
-            icono: Icons.person_outline_rounded,
-            activa: actual == PantallaNativa.perfil,
-            alTocar: () => _abrir(PantallaNativa.perfil, pestanas),
-          ),
-        ],
-      ),
+      navegacion.campana,
     );
   }
 }

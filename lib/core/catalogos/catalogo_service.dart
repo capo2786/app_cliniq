@@ -27,6 +27,11 @@ class Catalogos {
   static const String estadoCita = 'ESTADO_CITA';
   static const String estadoConsulta = 'ESTADO_CONSULTA';
 
+  /// Los derechos ARCO que se pueden pedir (nombre, descripción, orden y
+  /// cuáles se ofrecen) y cómo se ve cada estado de una solicitud.
+  static const String tipoArco = 'TIPO_ARCO';
+  static const String estadoArco = 'ESTADO_ARCO';
+
   static const List<String> todos = [
     especialidad,
     motivoCancelacionPaciente,
@@ -40,6 +45,8 @@ class Catalogos {
     tipoSangre,
     estadoCita,
     estadoConsulta,
+    tipoArco,
+    estadoArco,
   ];
 }
 

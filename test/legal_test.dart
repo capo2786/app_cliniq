@@ -69,10 +69,6 @@ void main() {
     expect(lista.map((d) => d.clave), ['TERMINOS', 'CONTRATO_MEDICO']);
     expect(lista.first.slug, 'terminos-de-uso');
     expect(lista.first.titulo, 'Términos de uso de la clínica');
-    expect(
-      lista.first.url,
-      'https://cliniq.gcaicedo-proyectos.com/legal/terminos-de-uso',
-    );
     expect(lista.first.aplicaA(tipoDeUsuario: 3), isTrue);
     expect(lista.last.aplicaA(tipoDeUsuario: 3), isFalse);
     // Con nombres de rol en lugar de números, también.
@@ -108,7 +104,7 @@ void main() {
 
     final viejo = datos.aceptaciones.last;
     expect(viejo.titulo, 'VIEJO');
-    expect(viejo.url, isNull);
+    expect(viejo.slug, isNull);
   });
 
   test('el bloc carga la lista y las aceptaciones; sin lista, sigue', () async {

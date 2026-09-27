@@ -242,6 +242,8 @@ void main() {
           ],
         },
       ),
+      'GET /portal/arco': (_) => (estado: 200, cuerpo: []),
+      'GET /portal/encuestas/pendientes': (_) => (estado: 200, cuerpo: []),
       'POST /portal/citas': (o) {
         final datos = o.data as Map;
         return (
@@ -381,6 +383,18 @@ void main() {
     // (`GET /legal/documentos`), con su enlace.
     expect(find.text('Términos y condiciones de uso'), findsNWidgets(2));
     expect(find.byKey(const Key('documento-terminos')), findsOneWidget);
+
+    // Mis derechos sobre mis datos: siempre en el perfil, nativo.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('mis-derechos')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tocar(tester, find.byKey(const Key('mis-derechos')));
+    expect(find.text('Mis derechos sobre mis datos'), findsWidgets);
+    expect(find.text('Aún no has hecho solicitudes'), findsOneWidget);
+    await tocar(tester, find.byTooltip('Atrás'));
+    expect(find.text('Aún no has hecho solicitudes'), findsNothing);
 
     // 7. Agendar, paso a paso hasta los horarios.
     await tocar(tester, find.byKey(const Key('pestana-agendar-cita')));
