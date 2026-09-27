@@ -24,7 +24,7 @@ class ResultadoMiSalud {
   });
 }
 
-/// Una receta o una orden y de dónde salió.
+/// Una receta, una orden o un certificado y de dónde salió.
 class ResultadoDocumento<T extends DocumentoClinico> {
   final T documento;
   final bool desdeCache;
@@ -38,8 +38,9 @@ class ResultadoDocumento<T extends DocumentoClinico> {
 }
 
 /// La historia clínica que ve el paciente: `GET /portal/mi-salud`, y el
-/// detalle de cada receta y orden (`/portal/recetas/:id`,
-/// `/portal/ordenes/:id`).
+/// detalle de cada receta, orden y certificado de reposo
+/// (`/portal/recetas/:id`, `/portal/ordenes/:id`,
+/// `/portal/certificados/:id`).
 ///
 /// El servidor solo deja ver lo propio y lo de los dependientes del
 /// titular (`?pacienteId=`); lo ajeno responde 404. Cada respuesta se
@@ -62,6 +63,7 @@ class MiSaludService {
       'mi-salud:$uid:$paciente';
   String _claveReceta(String uid, String id) => 'receta:$uid:$id';
   String _claveOrden(String uid, String id) => 'orden:$uid:$id';
+  String _claveCertificado(String uid, String id) => 'certificado:$uid:$id';
 
   /// Mi salud del titular o de uno de sus dependientes. Sin conexión, la
   /// última copia guardada; sin copia, el error.
@@ -117,6 +119,16 @@ class MiSaludService {
   /// `GET /portal/ordenes/:id`. Sin conexión, la copia guardada.
   Future<ResultadoDocumento<Orden>> orden(String uid, String id) =>
       _documento('/portal/ordenes/$id', _claveOrden(uid, id), Orden.desdeJson);
+
+  /// `GET /portal/certificados/:id`. Sin conexión, la copia guardada.
+  Future<ResultadoDocumento<CertificadoReposo>> certificado(
+    String uid,
+    String id,
+  ) => _documento(
+    '/portal/certificados/$id',
+    _claveCertificado(uid, id),
+    CertificadoReposo.desdeJson,
+  );
 
   Future<ResultadoDocumento<T>> _documento<T extends DocumentoClinico>(
     String ruta,

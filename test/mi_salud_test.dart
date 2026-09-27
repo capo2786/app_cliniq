@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/dependientes/data/models/dependiente.dart';
 import 'package:app_cliniq/features/mi_salud/data/mi_salud_service.dart';
@@ -19,6 +20,8 @@ import 'dobles/mi_salud.dart';
 /// Mi salud: la lectura de la respuesta, el cálculo del embarazo, la copia
 /// sin red y el cubit que elige de quién se ve.
 void main() {
+  setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
+
   group('La lectura de Mi salud', () {
     test('la ficha, las mediciones y cada atención con sus documentos', () {
       final salud = MiSalud.desdeJson(miSaludJson());
@@ -101,6 +104,233 @@ void main() {
       expect(nombreDelTipoDeOrden(orden.tipo), 'Imagen');
       expect(nombreDelTipoDeOrden(TipoOrden.desdeCodigo('RAYOS')), 'Orden');
     });
+  });
+
+  group('Certificados de reposo y firma electrónica', () {
+    test('Mi salud trae los certificados de cada atención', () {
+      final salud = MiSalud.desdeJson(
+        miSaludJson(
+          atenciones: [
+            atencionJson(
+              certificados: [
+                certificadoJson(),
+                {'dias': 2},
+              ],
+            ),
+          ],
+        ),
+      );
+
+      // El ilegible (sin identificador) se salta.
+      final certificado = salud.atenciones.single.certificados.single;
+      expect(certificado.id, 'c1');
+      expect(certificado.dias, 3);
+      expect(certificado.diasEnLetras, 'tres');
+      expect(certificado.fechaDesde, DateTime(2026, 9, 26));
+      expect(certificado.fechaHasta, DateTime(2026, 9, 28));
+      expect(certificado.tipoReposo, 'ABSOLUTO');
+      expect(certificado.absoluto, isTrue);
+      expect(certificado.contingencia, 'ENFERMEDAD_GENERAL');
+      expect(certificado.modalidad, 'TELEMEDICINA');
+      expect(certificado.destinatario, 'EMPLEADOR');
+      expect(
+        certificado.recomendaciones,
+        'Hidratación abundante y evitar el frío.',
+      );
+      expect(certificado.codigoVerificacion, 'CR7Q2MXK9P');
+    });
+
+    test(
+      'una atención abierta trae solo lo firmado, sin contenido clínico',
+      () {
+        final salud = MiSalud.desdeJson(
+          miSaludJson(
+            atenciones: [
+              atencionEnCursoJson(certificados: [certificadoJson(id: 'c9')]),
+              atencionJson(),
+            ],
+          ),
+        );
+
+        final abierta = salud.atenciones.first;
+        expect(abierta.enCurso, isTrue);
+        expect(abierta.diagnosticos, isEmpty);
+        expect(abierta.plan, isEmpty);
+        expect(abierta.motivoConsulta, isEmpty);
+        expect(abierta.certificados.single.id, 'c9');
+        expect(salud.atenciones.last.enCurso, isFalse);
+      },
+    );
+
+    test('sin fechaHasta se calcula como el servidor: desde + días − 1', () {
+      final certificado = CertificadoReposo.desdeJson(
+        certificadoJson(dias: 3, fechaHasta: null),
+      );
+      expect(certificado.fechaHasta, DateTime(2026, 9, 28));
+
+      final conHora = CertificadoReposo.desdeJson({
+        ...certificadoJson(fechaHasta: null),
+        'fechaDesde': '2026-09-30T00:00:00.000Z',
+        'dias': 2,
+      });
+      // El día escrito, sin moverlo por la zona; cruza de mes.
+      expect(conHora.fechaDesde, DateTime(2026, 9, 30));
+      expect(conHora.fechaHasta, DateTime(2026, 10, 1));
+
+      expect(
+        () => CertificadoReposo.desdeJson({'dias': 3}),
+        throwsFormatException,
+      );
+    });
+
+    test('el diagnóstico solo si el servidor lo manda y no está reservado', () {
+      final reservado = CertificadoReposo.desdeJson(
+        certificadoJson(mostrarDiagnostico: false),
+      );
+      expect(reservado.diagnosticoVisible, isFalse);
+      expect(reservado.diagnosticoReservado, isTrue);
+
+      final autorizado = CertificadoReposo.desdeJson(
+        certificadoJson(mostrarDiagnostico: true),
+      );
+      expect(autorizado.diagnosticoVisible, isTrue);
+      expect(autorizado.diagnosticoReservado, isFalse);
+
+      final sinBandera = CertificadoReposo.desdeJson(
+        certificadoJson(mostrarDiagnostico: null),
+      );
+      expect(sinBandera.diagnosticoVisible, isTrue);
+
+      final noLoMando = CertificadoReposo.desdeJson(
+        certificadoJson(mostrarDiagnostico: true, conDiagnostico: false),
+      );
+      expect(noLoMando.diagnosticoVisible, isFalse);
+    });
+
+    test('la firma, con la forma del documento o la resumida', () {
+      final receta = Receta.desdeJson(
+        recetaJson(firmada: true, pdfDisponible: true),
+      );
+      expect(receta.firmado, isTrue);
+      expect(receta.pdfDisponible, isTrue);
+      expect(receta.puedeVerPdf, isTrue);
+      expect(receta.firma!.firmadoPor, 'LUIS ALBERTO MORA SALAZAR');
+      expect(receta.firma!.emisor, 'Security Data');
+      expect(receta.firma!.firmadoEn, DateTime.utc(2026, 9, 26, 15, 15));
+      expect(receta.firma!.sha256, huellaDePrueba);
+
+      final resumida = FirmaElectronica.desdeJson({
+        'firmadoPor': 'Luis Mora',
+        'emisor': 'BCE',
+        'firmadoEn': '2026-09-26T15:15:00.000Z',
+        'sha256': huellaDePrueba.toUpperCase(),
+      });
+      expect(resumida!.firmadoPor, 'Luis Mora');
+      expect(resumida.emisor, 'BCE');
+      expect(resumida.sha256, huellaDePrueba);
+
+      // Una huella que no es sha256 no se usa.
+      expect(FirmaElectronica.desdeJson({'sha256': 'abc'})!.sha256, isNull);
+    });
+
+    test('sin firmar, en curso o sin PDF no se ofrece «Ver PDF»', () {
+      final sinFirma = Receta.desdeJson(recetaJson());
+      expect(sinFirma.firmado, isFalse);
+      expect(sinFirma.firma, isNull);
+      expect(sinFirma.puedeVerPdf, isFalse);
+
+      final enCurso = Receta.desdeJson({
+        ...recetaJson(),
+        'firma': {'estado': 'EN_CURSO', 'preparacionId': 'p1'},
+      });
+      expect(enCurso.firmado, isFalse);
+      expect(enCurso.firma, isNull);
+
+      // Solo con el estado de la firma, sin el `firmado` del portal.
+      final soloEstado = Receta.desdeJson({
+        ...recetaJson(),
+        'firmado': null,
+        'firma': firmaJson(),
+      });
+      expect(soloEstado.firmado, isTrue);
+
+      final firmadaSinPdf = CertificadoReposo.desdeJson(
+        certificadoJson(pdfDisponible: false),
+      );
+      expect(firmadaSinPdf.firmado, isTrue);
+      expect(firmadaSinPdf.puedeVerPdf, isFalse);
+
+      final anulado = CertificadoReposo.desdeJson(
+        certificadoJson(estado: 'ANULADA', anuladoMotivo: 'Fechas erradas'),
+      );
+      expect(anulado.pdfDisponible, isTrue);
+      expect(anulado.puedeVerPdf, isFalse);
+      expect(anulado.anuladaMotivo, 'Fechas erradas');
+    });
+
+    test('los nombres de los códigos y la firma en palabras', () {
+      final certificado = CertificadoReposo.desdeJson(certificadoJson());
+
+      expect(resumenDelReposo(certificado), 'Reposo absoluto · 3 días');
+      expect(
+        resumenDelReposo(
+          CertificadoReposo.desdeJson(
+            certificadoJson(dias: 1, tipoReposo: 'RELATIVO'),
+          ),
+        ),
+        'Reposo relativo · 1 día',
+      );
+      expect(
+        nombreDeLaContingencia('ACCIDENTE_TRABAJO'),
+        'Accidente de trabajo',
+      );
+      expect(nombreDeLaContingencia('MATERNIDAD'), 'Maternidad');
+      expect(nombreDeLaContingencia('NUEVA'), 'NUEVA');
+      expect(
+        nombreDelDestinatario('INSTITUCION_EDUCATIVA'),
+        'Institución educativa',
+      );
+      expect(nombreDelTipoDeReposo('RELATIVO'), 'Relativo');
+
+      // 15:15 UTC son las 10:15 en Guayaquil.
+      expect(
+        textoDeLaFirma(certificado.firma),
+        'Firmado electrónicamente por LUIS ALBERTO MORA SALAZAR el sábado 26 '
+        'de septiembre de 2026 a las 10:15',
+      );
+      expect(textoDeLaFirma(null), 'Firmado electrónicamente');
+    });
+
+    test(
+      'el servicio pide el certificado por su ruta y guarda la copia',
+      () async {
+        final cache = CacheEnMemoria();
+        var hayRed = true;
+        final api = DioGrabador({
+          'GET /portal/certificados/c1': (_) {
+            if (!hayRed) throw errorDeRed();
+            return certificadoJson();
+          },
+        });
+        final servicio = MiSaludService(api.dio, cache);
+
+        final certificado = await servicio.certificado('u1', 'c1');
+        expect(api.claves, ['GET /portal/certificados/c1']);
+        expect(certificado.documento.dias, 3);
+        expect(certificado.desdeCache, isFalse);
+
+        hayRed = false;
+        final sinRed = await servicio.certificado('u1', 'c1');
+        expect(sinRed.desdeCache, isTrue);
+        expect(sinRed.documento.fechaHasta, DateTime(2026, 9, 28));
+
+        await cache.vaciarDatosPersonales();
+        await expectLater(
+          servicio.certificado('u1', 'c1'),
+          throwsA(isA<DioException>()),
+        );
+      },
+    );
   });
 
   group('Las reglas', () {

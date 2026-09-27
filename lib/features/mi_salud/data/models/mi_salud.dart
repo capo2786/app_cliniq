@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/archivos/archivo_meta.dart';
 import '../../../../core/fechas/fecha_local.dart';
+import '../../../../core/fechas/instante.dart';
 
 /*
  * «Mi salud»: lo que el paciente tiene derecho a ver de su historia clínica,
@@ -13,7 +14,9 @@ import '../../../../core/fechas/fecha_local.dart';
  * Las fechas clínicas —el inicio de una atención, la fecha de una receta,
  * las últimas mediciones— son hora local de la clínica «congelada» como UTC,
  * igual que las citas: se leen con `leerFechaLocal`, que descarta la zona.
- * El próximo control es un día suelto (`AAAA-MM-DD`).
+ * El próximo control es un día suelto (`AAAA-MM-DD`), igual que las fechas
+ * de un certificado de reposo. El momento de una firma electrónica, en
+ * cambio, es un instante de verdad y se lee con `leerInstante`.
  */
 
 String? _texto(Object? valor) {
@@ -26,6 +29,15 @@ num? _numero(Object? valor) {
   if (valor is num) return valor.isFinite ? valor : null;
   if (valor is String) return num.tryParse(valor.trim());
   return null;
+}
+
+/// Un día suelto (`AAAA-MM-DD`). Si llega con hora (`2026-09-28T00:00…`),
+/// cuenta solo el día escrito: no se convierte de zona.
+DateTime? _dia(Object? valor) {
+  final texto = _texto(valor);
+  if (texto == null || texto.length < 10) return null;
+
+  return deFechaIso(texto.substring(0, 10));
 }
 
 List<Map<dynamic, dynamic>> _mapas(Object? valor) => [
@@ -167,8 +179,81 @@ class ItemOrden extends Equatable {
   List<Object?> get props => [nombre, codigo, indicaciones];
 }
 
-/// Lo común a una receta y a una orden: quién la emitió, para quién, cuándo
-/// y con qué código se verifica.
+/// La firma electrónica de una receta o de un certificado: quién la firmó
+/// (el nombre de su certificado), cuándo, qué entidad emitió ese certificado
+/// y la huella (sha256) del PDF firmado.
+///
+/// Se lee de `firma` tal como la manda el portal. Acepta las dos formas del
+/// contrato: la del documento (`certificado.nombre`, `certificado.emisor`,
+/// `sha256Firmado`) y la resumida de la verificación pública (`firmadoPor`,
+/// `emisor`, `sha256`). La clave privada y el `.p12` nunca pasan por aquí.
+class FirmaElectronica extends Equatable {
+  /// El nombre del certificado con que se firmó.
+  final String? firmadoPor;
+
+  /// La entidad certificadora que emitió ese certificado.
+  final String? emisor;
+
+  /// Cuándo se firmó: un instante real, en UTC.
+  final DateTime? firmadoEn;
+
+  /// La huella sha256 del PDF firmado, en hexadecimal y minúsculas, o `null`
+  /// si no llegó o no es una huella.
+  final String? sha256;
+
+  const FirmaElectronica({
+    this.firmadoPor,
+    this.emisor,
+    this.firmadoEn,
+    this.sha256,
+  });
+
+  /// `null` si no es un objeto.
+  static FirmaElectronica? desdeJson(Object? json) {
+    if (json is! Map) return null;
+
+    final certificado = json['certificado'];
+    final delCertificado = certificado is Map ? certificado : const {};
+
+    return FirmaElectronica(
+      firmadoPor:
+          _texto(json['firmadoPor']) ?? _texto(delCertificado['nombre']),
+      emisor: _texto(json['emisor']) ?? _texto(delCertificado['emisor']),
+      firmadoEn: leerInstante(json['firmadoEn']),
+      sha256: huellaSha256(json['sha256Firmado'] ?? json['sha256']),
+    );
+  }
+
+  @override
+  List<Object?> get props => [firmadoPor, emisor, firmadoEn, sha256];
+}
+
+final RegExp _huella = RegExp(r'^[0-9a-f]{64}$');
+
+/// Una huella sha256 en hexadecimal (64 caracteres), en minúsculas, o
+/// `null` si [valor] no lo es.
+String? huellaSha256(Object? valor) {
+  final texto = _texto(valor)?.toLowerCase();
+  return texto != null && _huella.hasMatch(texto) ? texto : null;
+}
+
+/// Los documentos que el médico firma y que el paciente puede bajar en PDF.
+enum TipoDocumentoFirmado {
+  receta('recetas', 'receta'),
+  certificado('certificados', 'certificado');
+
+  /// El segmento de la ruta: `/portal/recetas/:id/pdf`.
+  final String ruta;
+
+  /// El comienzo del nombre del archivo guardado.
+  final String prefijo;
+
+  const TipoDocumentoFirmado(this.ruta, this.prefijo);
+}
+
+/// Lo común a una receta, una orden y un certificado: quién lo emitió, para
+/// quién, cuándo, con qué código se verifica y, si lo firmó el médico, su
+/// firma electrónica.
 abstract class DocumentoClinico extends Equatable {
   final String id;
   final String atencionId;
@@ -193,6 +278,17 @@ abstract class DocumentoClinico extends Equatable {
   final String estado;
   final String? anuladaMotivo;
 
+  /// El médico lo firmó electrónicamente (`firmado` del portal, o
+  /// `firma.estado == 'FIRMADO'`).
+  final bool firmado;
+
+  /// La firma, si el portal la manda.
+  final FirmaElectronica? firma;
+
+  /// El servidor tiene el PDF firmado y deja que el paciente lo descargue
+  /// (`pdfDisponible`: firmado, emitido y entregable según la clínica).
+  final bool pdfDisponible;
+
   const DocumentoClinico({
     required this.id,
     this.atencionId = '',
@@ -208,9 +304,17 @@ abstract class DocumentoClinico extends Equatable {
     this.codigoVerificacion = '',
     this.estado = 'EMITIDA',
     this.anuladaMotivo,
+    this.firmado = false,
+    this.firma,
+    this.pdfDisponible = false,
   });
 
-  bool get anulada => estado.toUpperCase() == 'ANULADA';
+  bool get anulada =>
+      const {'ANULADA', 'ANULADO'}.contains(estado.toUpperCase());
+
+  /// Se ofrece «Ver PDF»: el servidor lo tiene y el documento sigue vigente.
+  /// Uno anulado ya no se entrega, aunque quede una copia vieja.
+  bool get puedeVerPdf => pdfDisponible && !anulada;
 
   @override
   List<Object?> get props => [
@@ -228,7 +332,27 @@ abstract class DocumentoClinico extends Equatable {
     codigoVerificacion,
     estado,
     anuladaMotivo,
+    firmado,
+    firma,
+    pdfDisponible,
   ];
+}
+
+/// Los datos de la firma de un documento del portal: `firmado`,
+/// `pdfDisponible` y `firma`.
+({bool firmado, FirmaElectronica? firma, bool pdfDisponible}) _firmaDe(
+  Map<dynamic, dynamic> json,
+) {
+  final crudo = json['firma'];
+  final estado = crudo is Map ? _texto(crudo['estado'])?.toUpperCase() : null;
+  final firmado = json['firmado'] == true || estado == 'FIRMADO';
+
+  return (
+    firmado: firmado,
+    // Una reserva en curso (`EN_CURSO`) no es una firma: no se enseña.
+    firma: firmado ? FirmaElectronica.desdeJson(crudo) : null,
+    pdfDisponible: json['pdfDisponible'] == true,
+  );
 }
 
 /// Una receta (`GET /portal/recetas/:id` o dentro de Mi salud).
@@ -251,6 +375,9 @@ class Receta extends DocumentoClinico {
     super.codigoVerificacion,
     super.estado,
     super.anuladaMotivo,
+    super.firmado,
+    super.firma,
+    super.pdfDisponible,
     this.items = const [],
     this.indicacionesNoFarmacologicas,
   });
@@ -261,6 +388,7 @@ class Receta extends DocumentoClinico {
     if (id == null) throw const FormatException('Receta sin identificador');
 
     final edad = _numero(json['pacienteEdad']);
+    final firma = _firmaDe(json);
 
     return Receta(
       id: id,
@@ -277,6 +405,9 @@ class Receta extends DocumentoClinico {
       codigoVerificacion: _texto(json['codigoVerificacion']) ?? '',
       estado: _texto(json['estado'])?.toUpperCase() ?? 'EMITIDA',
       anuladaMotivo: _texto(json['anuladaMotivo']),
+      firmado: firma.firmado,
+      firma: firma.firma,
+      pdfDisponible: firma.pdfDisponible,
       items: [
         for (final item in _mapas(json['items'])) ?ItemReceta.desdeJson(item),
       ],
@@ -385,6 +516,146 @@ class Orden extends DocumentoClinico {
     items,
     prioridad,
     observaciones,
+  ];
+}
+
+/// Un certificado médico de reposo (`GET /portal/certificados/:id` o dentro
+/// de Mi salud): cuántos días, desde y hasta cuándo, de qué tipo y por qué
+/// contingencia, con las recomendaciones del médico.
+///
+/// Los códigos (`tipoReposo`, `contingencia`, `destinatario`) son del
+/// sistema, como el tipo de una orden; sus nombres están en
+/// `dominio/reglas_mi_salud.dart`.
+class CertificadoReposo extends DocumentoClinico {
+  /// `ABSOLUTO` o `RELATIVO`.
+  final String tipoReposo;
+
+  /// `ENFERMEDAD_GENERAL`, `ACCIDENTE_TRABAJO`, `ENFERMEDAD_PROFESIONAL`,
+  /// `MATERNIDAD` u `OTRA`.
+  final String contingencia;
+
+  /// La modalidad de la atención: código del catálogo `MODALIDAD_CITA`.
+  final String modalidad;
+
+  final int dias;
+
+  /// Los días en palabras, como los escribe el servidor («tres»).
+  final String? diasEnLetras;
+
+  /// El primer y el último día de reposo (días sueltos, sin hora).
+  final DateTime? fechaDesde;
+  final DateTime? fechaHasta;
+
+  /// Si el diagnóstico va en el certificado. `null` si no llegó: entonces
+  /// se enseña el que mande el servidor, si manda alguno.
+  final bool? mostrarDiagnostico;
+
+  final String? recomendaciones;
+
+  /// `EMPLEADOR`, `INSTITUCION_EDUCATIVA` u `OTRO`, o `null`.
+  final String? destinatario;
+
+  const CertificadoReposo({
+    required super.id,
+    super.atencionId,
+    super.pacienteId,
+    super.pacienteNombre,
+    super.pacienteCedula,
+    super.pacienteEdad,
+    super.medicoNombre,
+    super.medicoEspecialidad,
+    super.medicoRegistro,
+    super.fecha,
+    super.diagnosticos,
+    super.codigoVerificacion,
+    super.estado,
+    super.anuladaMotivo,
+    super.firmado,
+    super.firma,
+    super.pdfDisponible,
+    this.tipoReposo = '',
+    this.contingencia = '',
+    this.modalidad = '',
+    this.dias = 0,
+    this.diasEnLetras,
+    this.fechaDesde,
+    this.fechaHasta,
+    this.mostrarDiagnostico,
+    this.recomendaciones,
+    this.destinatario,
+  });
+
+  bool get absoluto => tipoReposo.toUpperCase() == 'ABSOLUTO';
+
+  /// El diagnóstico se enseña solo si el servidor lo manda y el certificado
+  /// no lo reserva: la pantalla dice lo mismo que el PDF.
+  bool get diagnosticoVisible =>
+      diagnosticos.isNotEmpty && mostrarDiagnostico != false;
+
+  /// El certificado dice «Diagnóstico reservado».
+  bool get diagnosticoReservado => mostrarDiagnostico == false;
+
+  /// Lee un certificado; lanza [FormatException] si no tiene identificador.
+  factory CertificadoReposo.desdeJson(Map<dynamic, dynamic> json) {
+    final id = _texto(json['_id']);
+    if (id == null) {
+      throw const FormatException('Certificado sin identificador');
+    }
+
+    final edad = _numero(json['pacienteEdad']);
+    final dias = _numero(json['dias'])?.toInt() ?? 0;
+    final desde = _dia(json['fechaDesde']);
+    final firma = _firmaDe(json);
+    final mostrar = json['mostrarDiagnostico'];
+
+    return CertificadoReposo(
+      id: id,
+      atencionId: _texto(json['atencionId']) ?? '',
+      pacienteId: _texto(json['pacienteId']) ?? '',
+      pacienteNombre: _texto(json['pacienteNombre']) ?? '',
+      pacienteCedula: _texto(json['pacienteCedula']),
+      pacienteEdad: edad?.toInt(),
+      medicoNombre: _texto(json['medicoNombre']) ?? '',
+      medicoEspecialidad: _texto(json['medicoEspecialidad']),
+      medicoRegistro: _texto(json['medicoRegistro']),
+      fecha: leerFechaLocal(json['fecha']),
+      diagnosticos: _diagnosticos(json['diagnosticos']),
+      codigoVerificacion: _texto(json['codigoVerificacion']) ?? '',
+      estado: _texto(json['estado'])?.toUpperCase() ?? 'EMITIDA',
+      anuladaMotivo:
+          _texto(json['anuladaMotivo']) ?? _texto(json['anuladoMotivo']),
+      firmado: firma.firmado,
+      firma: firma.firma,
+      pdfDisponible: firma.pdfDisponible,
+      tipoReposo: _texto(json['tipoReposo'])?.toUpperCase() ?? '',
+      contingencia: _texto(json['contingencia'])?.toUpperCase() ?? '',
+      modalidad: _texto(json['modalidad'])?.toUpperCase() ?? '',
+      dias: dias,
+      diasEnLetras: _texto(json['diasEnLetras']),
+      fechaDesde: desde,
+      // Si no llega, se calcula como el servidor: hasta = desde + días − 1.
+      fechaHasta:
+          _dia(json['fechaHasta']) ??
+          (desde != null && dias > 0 ? sumarDias(desde, dias - 1) : null),
+      mostrarDiagnostico: mostrar is bool ? mostrar : null,
+      recomendaciones: _texto(json['recomendaciones']),
+      destinatario: _texto(json['destinatario'])?.toUpperCase(),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+    ...super.props,
+    tipoReposo,
+    contingencia,
+    modalidad,
+    dias,
+    diasEnLetras,
+    fechaDesde,
+    fechaHasta,
+    mostrarDiagnostico,
+    recomendaciones,
+    destinatario,
   ];
 }
 
@@ -513,8 +784,16 @@ class FichaClinica extends Equatable {
 }
 
 /// Una atención cerrada, con lo que el paciente puede ver de ella.
+///
+/// También puede ser una atención todavía abierta ([enCurso]) en la que el
+/// médico ya firmó una receta o un certificado: la clínica los entrega al
+/// firmar, así que llegan sus documentos firmados y nada del contenido
+/// clínico de la consulta.
 class AtencionMiSalud extends Equatable {
   final String id;
+
+  /// La consulta sigue abierta: solo trae lo que ya está firmado.
+  final bool enCurso;
 
   /// Hora local de la clínica.
   final DateTime? inicio;
@@ -539,12 +818,14 @@ class AtencionMiSalud extends Equatable {
 
   final List<Receta> recetas;
   final List<Orden> ordenes;
+  final List<CertificadoReposo> certificados;
 
   /// Los adjuntos clínicos (fotos, exámenes).
   final List<ArchivoMeta> adjuntos;
 
   const AtencionMiSalud({
     required this.id,
+    this.enCurso = false,
     this.inicio,
     this.medicoNombre = '',
     this.especialidad = '',
@@ -556,6 +837,7 @@ class AtencionMiSalud extends Equatable {
     this.proximoControl,
     this.recetas = const [],
     this.ordenes = const [],
+    this.certificados = const [],
     this.adjuntos = const [],
   });
 
@@ -565,6 +847,7 @@ class AtencionMiSalud extends Equatable {
 
     return AtencionMiSalud(
       id: id,
+      enCurso: json['enCurso'] == true,
       inicio: leerFechaLocal(json['inicio']),
       medicoNombre: _texto(json['medicoNombre']) ?? '',
       especialidad: _texto(json['especialidad']) ?? '',
@@ -583,6 +866,10 @@ class AtencionMiSalud extends Equatable {
         for (final orden in _mapas(json['ordenes']))
           ?_intentar(() => Orden.desdeJson(orden)),
       ],
+      certificados: [
+        for (final certificado in _mapas(json['certificados']))
+          ?_intentar(() => CertificadoReposo.desdeJson(certificado)),
+      ],
       adjuntos: interpretarArchivos(json['adjuntos']),
     );
   }
@@ -590,6 +877,7 @@ class AtencionMiSalud extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    enCurso,
     inicio,
     medicoNombre,
     especialidad,
@@ -601,6 +889,7 @@ class AtencionMiSalud extends Equatable {
     proximoControl,
     recetas,
     ordenes,
+    certificados,
     adjuntos,
   ];
 }
