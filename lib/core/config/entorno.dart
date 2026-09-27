@@ -19,7 +19,11 @@ class Entorno {
   );
 
   /// Dónde vive el panel web. La aplicación no lo abre: su dirección se
-  /// enseña, para copiarla, al personal que entra por error.
+  /// enseña, para copiarla, al personal que entra por error, y es el dominio
+  /// de los enlaces de los correos que abren la aplicación
+  /// (`/confirmar-correo`, `/restablecer`). Si cambia, cambian también el
+  /// dominio de los App Links (AndroidManifest.xml) y de los Universal Links
+  /// (Runner.entitlements).
   static const String webUrl = String.fromEnvironment(
     'WEB_URL',
     defaultValue: 'https://cliniq.gcaicedo-proyectos.com',

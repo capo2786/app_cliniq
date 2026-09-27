@@ -75,9 +75,49 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
+            <!--
+                Los enlaces que abren la aplicación los recibe app_links y
+                los enruta la aplicación (ReceptorDeEnlaces). Con el enlace
+                profundo propio de Flutter encendido, además, Flutter
+                intentaría abrir «/confirmar-correo?token=…» como una ruta
+                con nombre, que la aplicación no tiene.
+            -->
+            <meta-data
+                android:name="flutter_deeplinking_enabled"
+                android:value="false" />
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!--
+                App Links: los enlaces de los correos de la clínica abren la
+                aplicación en vez del navegador. Son las dos rutas del panel
+                que arma el API (auth-mailer.service.ts):
+                /confirmar-correo?token=… y /restablecer?token=…. El resto
+                del panel sigue abriéndose en el navegador.
+
+                autoVerify: Android comprueba al instalar que el dominio
+                autoriza a esta aplicación, con el archivo
+                https://cliniq.gcaicedo-proyectos.com/.well-known/assetlinks.json
+                que sirve el panel (con la huella SHA-256 del certificado con
+                que se firma la publicación; ver «Enlaces de los correos» en
+                el README). Sin esa verificación, Android pregunta con qué
+                abrirlos o los abre en el navegador, donde el panel hace lo
+                mismo.
+
+                El dominio es el de WEB_URL: si se compila con otro, se
+                cambia aquí también (y en Runner.entitlements de iOS).
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="cliniq.gcaicedo-proyectos.com" />
+                <data android:path="/confirmar-correo" />
+                <data android:path="/restablecer" />
             </intent-filter>
 
         </activity>

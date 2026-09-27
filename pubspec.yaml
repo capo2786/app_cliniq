@@ -29,6 +29,10 @@ dependencies:
   local_auth: ^3.0.1
   package_info_plus: ^10.1.0
   url_launcher: ^6.3.2
+  # Los enlaces de los correos (confirmar el correo, crear la contraseña
+  # nueva) abren la aplicación: App Links y Universal Links (ver «Enlaces de
+  # los correos» en el README).
+  app_links: ^7.2.1
 
   # El logotipo de la clínica llega de la configuración como data URL, y
   # puede ser SVG además de PNG o JPG.

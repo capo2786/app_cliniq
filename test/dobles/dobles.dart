@@ -128,6 +128,28 @@ class AuthServiceFalso implements AuthService {
     if (error != null) throw error;
   }
 
+  /// Lo que contesta confirmar el correo; por defecto, el mensaje del API.
+  Future<String> Function(String token)? alConfirmar;
+
+  @override
+  Future<String> confirmarCorreo(String token) {
+    llamadas.add('confirmar:$token');
+    return alConfirmar?.call(token) ??
+        Future.value('Tu correo fue confirmado. Ya puedes iniciar sesión.');
+  }
+
+  /// Lo que contesta restablecer la contraseña; por defecto, que salió bien.
+  Future<void> Function(String token, String nueva)? alRestablecer;
+
+  @override
+  Future<void> restablecerContrasena({
+    required String token,
+    required String nueva,
+  }) {
+    llamadas.add('restablecer:$token:$nueva');
+    return alRestablecer?.call(token, nueva) ?? Future.value();
+  }
+
   @override
   Future<void> cambiarContrasena({
     required String actual,

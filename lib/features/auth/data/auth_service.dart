@@ -131,6 +131,33 @@ class AuthService {
     );
   }
 
+  /// `POST /auth/registro/confirmar` (pública): el enlace del correo de
+  /// registro. Devuelve el mensaje del servidor. Un enlace vencido o ya
+  /// usado es un 400.
+  Future<String> confirmarCorreo(String token) async {
+    final respuesta = await _dio.post<dynamic>(
+      '/auth/registro/confirmar',
+      data: {'token': token},
+      options: Options(extra: const {rutaPublica: true}),
+    );
+
+    return _mensajeDe(respuesta.data) ?? mensajeCorreoConfirmado;
+  }
+
+  /// `POST /auth/password/restablecer` (pública): la contraseña nueva con el
+  /// enlace que llegó al correo. El API revisa el mínimo de la clínica antes
+  /// de gastar el enlace; uno vencido o ya usado es un 400.
+  Future<void> restablecerContrasena({
+    required String token,
+    required String nueva,
+  }) async {
+    await _dio.post<dynamic>(
+      '/auth/password/restablecer',
+      data: {'token': token, 'newPassword': nueva},
+      options: Options(extra: const {rutaPublica: true}),
+    );
+  }
+
   /// `GET /auth/me`: el perfil vigente, con permisos y legales pendientes.
   Future<Usuario> yo() async {
     final respuesta = await _dio.get<dynamic>('/auth/me');
@@ -185,6 +212,16 @@ class AuthService {
     return yo();
   }
 }
+
+/// El `message` de una respuesta, si trae uno legible.
+String? _mensajeDe(Object? datos) {
+  final mensaje = datos is Map ? datos['message']?.toString().trim() : null;
+  return mensaje == null || mensaje.isEmpty ? null : mensaje;
+}
+
+/// Si el servidor confirma el correo sin decir nada.
+const String mensajeCorreoConfirmado =
+    'Confirmamos tu correo. Ya puedes ingresar con tu correo y tu contraseña.';
 
 /// Lo que se dice tras pedir otro enlace de confirmación, llegue o no.
 const String mensajeReenvioNeutral =

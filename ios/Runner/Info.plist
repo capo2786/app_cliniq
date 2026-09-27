@@ -32,6 +32,8 @@
 		<string>Usamos el micrófono para que el médico te escuche en la videoconsulta.</string>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Usamos tus fotos para que adjuntes a tu consulta en línea las imágenes que elijas, como recetas o exámenes.</string>
+		<key>FlutterDeepLinkingEnabled</key>
+		<false/>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UIApplicationSceneManifest</key>
