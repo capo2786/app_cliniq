@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/archivos/archivo_local.dart';
+import '../../../core/archivos/eleccion.dart';
 import '../../../core/configuracion/config_publica.dart';
 import '../../../core/network/errores.dart';
 import '../data/consultas_service.dart';
@@ -239,21 +239,13 @@ class DetalleConsultaBloc
     DetalleConsultaAdjuntoElegido event,
     Emitter<DetalleConsultaState> emit,
   ) {
-    final seleccion = event.seleccion;
-
-    if (seleccion.archivos.isEmpty) {
-      if (seleccion.problemas.isNotEmpty) {
-        emit(state.copiarCon(aviso: _aviso(seleccion.problemas.join('\n'))));
-      }
-      return;
-    }
-
     // Un mensaje lleva un solo archivo: se toma el primero.
-    final archivo = seleccion.archivos.first;
-    final problema = problemaDelArchivo(archivo, _archivos);
+    final eleccion = unSoloArchivo(event.seleccion, _archivos);
+    final archivo = eleccion.archivo;
 
-    if (problema != null) {
-      emit(state.copiarCon(aviso: _aviso(problema)));
+    if (archivo == null) {
+      final problema = eleccion.problema;
+      if (problema != null) emit(state.copiarCon(aviso: _aviso(problema)));
       return;
     }
 
@@ -264,7 +256,7 @@ class DetalleConsultaBloc
           .copiarCon(
             adjunto: archivo,
             limpiarErrorEnvio: true,
-            aviso: seleccion.archivos.length > 1
+            aviso: eleccion.habiaVarios
                 ? _aviso(
                     'Cada mensaje lleva un solo archivo: adjuntamos el '
                     'primero.',

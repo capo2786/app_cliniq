@@ -1,10 +1,10 @@
 // lib/features/ayuda/data/ayuda_service.dart
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../../core/network/errores.dart';
 import '../../../core/storage/cache_local.dart';
+import '../../../core/storage/copia_guardada.dart';
 import '../dominio/busqueda_ayuda.dart';
 import 'models/articulo_ayuda.dart';
 
@@ -51,7 +51,7 @@ class AyudaService {
       final articulos = interpretarArticulos(respuesta.data);
 
       // Solo la lista completa: una búsqueda pisaría la copia.
-      if (texto.isEmpty) await _guardar(uid, respuesta.data);
+      if (texto.isEmpty) await _cache.guardarCopia(_clave(uid), respuesta.data);
 
       return ResultadoAyuda(articulos: articulos);
     } catch (error) {
@@ -70,29 +70,13 @@ class AyudaService {
 
   /// La última lista completa guardada, si hay.
   Future<ResultadoAyuda?> guardados(String uid) async {
-    try {
-      final copia = await _cache.leer(_clave(uid));
-      if (copia is! Map || copia['datos'] is! List) return null;
+    final copia = await _cache.leerCopia(_clave(uid));
+    if (copia == null || copia.datos is! List) return null;
 
-      return ResultadoAyuda(
-        articulos: interpretarArticulos(copia['datos']),
-        desdeCache: true,
-        guardadaEn: DateTime.tryParse(copia['guardadaEn']?.toString() ?? '')
-            ?.toLocal(),
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _guardar(String uid, Object? datos) async {
-    try {
-      await _cache.guardar(_clave(uid), {
-        'guardadaEn': DateTime.now().toUtc().toIso8601String(),
-        'datos': datos,
-      });
-    } catch (error) {
-      debugPrint('Cliniq · no se pudo guardar la ayuda: $error');
-    }
+    return ResultadoAyuda(
+      articulos: interpretarArticulos(copia.datos),
+      desdeCache: true,
+      guardadaEn: copia.guardadaEn,
+    );
   }
 }

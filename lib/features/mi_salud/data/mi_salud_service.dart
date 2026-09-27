@@ -1,10 +1,10 @@
 // lib/features/mi_salud/data/mi_salud_service.dart
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 
 import '../../../core/network/errores.dart';
 import '../../../core/storage/cache_local.dart';
+import '../../../core/storage/copia_guardada.dart';
 import 'models/mi_salud.dart';
 
 /// Mi salud y de dónde salió.
@@ -75,7 +75,7 @@ class MiSaludService {
       );
       final datos = MiSalud.desdeJson(respuesta.data);
 
-      await _guardar(_claveMiSalud(uid, paciente), respuesta.data);
+      await _cache.guardarCopia(_claveMiSalud(uid, paciente), respuesta.data);
 
       return ResultadoMiSalud(datos: datos);
     } catch (error) {
@@ -90,7 +90,9 @@ class MiSaludService {
 
   /// La última copia de Mi salud de ese paciente, si hay.
   Future<ResultadoMiSalud?> guardada(String uid, {String? pacienteId}) async {
-    final copia = await _leer(_claveMiSalud(uid, _paciente(uid, pacienteId)));
+    final copia = await _cache.leerCopia(
+      _claveMiSalud(uid, _paciente(uid, pacienteId)),
+    );
     if (copia == null) return null;
 
     try {
@@ -127,13 +129,13 @@ class MiSaludService {
       if (datos is! Map) throw const FormatException('Documento ilegible');
 
       final documento = leer(datos);
-      await _guardar(clave, datos);
+      await _cache.guardarCopia(clave, datos);
 
       return ResultadoDocumento(documento: documento);
     } catch (error) {
       if (!esFaltaDeRed(error)) rethrow;
 
-      final copia = await _leer(clave);
+      final copia = await _cache.leerCopia(clave);
       final datos = copia?.datos;
       if (datos is! Map) rethrow;
 
@@ -150,32 +152,6 @@ class MiSaludService {
         desdeCache: true,
         guardadoEn: copia!.guardadaEn,
       );
-    }
-  }
-
-  Future<void> _guardar(String clave, Object? datos) async {
-    try {
-      await _cache.guardar(clave, {
-        'guardadaEn': DateTime.now().toUtc().toIso8601String(),
-        'datos': datos,
-      });
-    } catch (error) {
-      debugPrint('Cliniq · no se pudo guardar $clave: $error');
-    }
-  }
-
-  Future<({Object? datos, DateTime? guardadaEn})?> _leer(String clave) async {
-    try {
-      final copia = await _cache.leer(clave);
-      if (copia is! Map || !copia.containsKey('datos')) return null;
-
-      return (
-        datos: copia['datos'],
-        guardadaEn: DateTime.tryParse(copia['guardadaEn']?.toString() ?? '')
-            ?.toLocal(),
-      );
-    } catch (_) {
-      return null;
     }
   }
 }
