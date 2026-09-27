@@ -55,7 +55,7 @@ class PasoEnviada extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               consulta.codigo,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.acentoSuave,
                 fontSize: 15,
                 fontWeight: FontWeight.w800,

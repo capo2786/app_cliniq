@@ -45,7 +45,7 @@ class _VisorDeImagenState extends State<VisorDeImagen> {
         future: _bytes,
         builder: (context, instantanea) {
           if (instantanea.connectionState != ConnectionState.done) {
-            return const Center(
+            return Center(
               child: CircularProgressIndicator(color: AppColors.acentoClaro),
             );
           }

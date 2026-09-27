@@ -11,7 +11,9 @@ class OpcionSeleccionable extends StatelessWidget {
   final String titulo;
   final String? descripcion;
   final IconData icono;
-  final Color color;
+
+  /// Sin él, el de la marca (primarioClaro).
+  final Color? color;
   final bool elegida;
   final VoidCallback? onTap;
   final Widget? extra;
@@ -23,12 +25,13 @@ class OpcionSeleccionable extends StatelessWidget {
     required this.elegida,
     required this.onTap,
     this.descripcion,
-    this.color = AppColors.primarioClaro,
+    this.color,
     this.extra,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.primarioClaro;
     return Semantics(
       button: true,
       selected: elegida,

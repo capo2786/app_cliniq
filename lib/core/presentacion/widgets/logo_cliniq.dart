@@ -28,16 +28,17 @@ class LogoCliniq extends StatelessWidget {
 /// El dibujo del logotipo, suelto para poder pintarlo también en un lienzo
 /// fuera de la interfaz (el generador de iconos).
 class PintorLogoCliniq extends CustomPainter {
-  final Color colorAnillo;
-  final Color colorCruz;
+  /// Sin ellos, los de la marca en uso (ver `PaletaMarca`).
+  final Color? colorAnillo;
+  final Color? colorCruz;
 
-  const PintorLogoCliniq({
-    this.colorAnillo = AppColors.primario,
-    this.colorCruz = AppColors.acento,
-  });
+  const PintorLogoCliniq({this.colorAnillo, this.colorCruz});
 
   @override
   void paint(Canvas canvas, Size size) {
+    final colorAnillo = this.colorAnillo ?? AppColors.primario;
+    final colorCruz = this.colorCruz ?? AppColors.acento;
+
     final lado = size.shortestSide;
     final centro = size.center(Offset.zero);
 

@@ -401,7 +401,7 @@ class _Seguridad extends StatelessWidget {
             children: [
               ListTile(
                 enabled: hayRed && !state.guardando,
-                leading: const Icon(
+                leading: Icon(
                   Icons.lock_reset_rounded,
                   color: AppColors.primarioClaro,
                 ),
@@ -424,7 +424,7 @@ class _Seguridad extends StatelessWidget {
                 onChanged: hayRed && !state.guardando
                     ? (_) => alCambiar2fa()
                     : null,
-                secondary: const Icon(
+                secondary: Icon(
                   Icons.verified_user_outlined,
                   color: AppColors.primarioClaro,
                 ),
@@ -449,7 +449,7 @@ class _Seguridad extends StatelessWidget {
                   value: state.biometriaActiva,
                   onChanged: (valor) =>
                       context.read<PerfilCubit>().cambiarBiometria(valor),
-                  secondary: const Icon(
+                  secondary: Icon(
                     Icons.fingerprint_rounded,
                     color: AppColors.primarioClaro,
                   ),
@@ -577,7 +577,7 @@ class _DocumentosDeLaClinica extends StatelessWidget {
                     for (final d in documentos)
                       ListTile(
                         key: Key('documento-${d.slug}'),
-                        leading: const Icon(
+                        leading: Icon(
                           Icons.description_outlined,
                           color: AppColors.primarioClaro,
                         ),
@@ -598,7 +598,7 @@ class _DocumentosDeLaClinica extends StatelessWidget {
                                   fontSize: 12,
                                 ),
                               ),
-                        trailing: const Icon(
+                        trailing: Icon(
                           Icons.open_in_new_rounded,
                           size: 18,
                           color: AppColors.acentoSuave,

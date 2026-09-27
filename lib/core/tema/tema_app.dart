@@ -57,7 +57,7 @@ ThemeData temaCliniq() {
             ? AppColors.acento
             : Colors.transparent,
       ),
-      side: const BorderSide(color: AppColors.primarioClaro, width: 1.6),
+      side: BorderSide(color: AppColors.primarioClaro, width: 1.6),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
@@ -71,7 +71,7 @@ ThemeData temaCliniq() {
             : AppColors.tarjeta,
       ),
     ),
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
+    progressIndicatorTheme: ProgressIndicatorThemeData(
       color: AppColors.acentoClaro,
     ),
     textSelectionTheme: TextSelectionThemeData(

@@ -653,7 +653,7 @@ class _Redactor extends StatelessWidget {
                   key: const Key('boton-adjuntar-mensaje'),
                   tooltip: 'Adjuntar un archivo',
                   onPressed: state.enviando ? null : alAdjuntar,
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.attach_file_rounded,
                     color: AppColors.primarioClaro,
                   ),
@@ -697,7 +697,7 @@ class _Redactor extends StatelessWidget {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(
+                        borderSide: BorderSide(
                           color: AppColors.acentoClaro,
                           width: 1.6,
                         ),
@@ -707,7 +707,7 @@ class _Redactor extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 state.enviando
-                    ? const Padding(
+                    ? Padding(
                         padding: EdgeInsets.all(12),
                         child: SizedBox(
                           width: 22,

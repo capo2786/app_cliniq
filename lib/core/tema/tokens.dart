@@ -1,38 +1,42 @@
 import 'package:flutter/material.dart';
 
+import 'paleta_marca.dart';
+
 /// Sistema de diseño de Cliniq: colores, degradados, espaciados y radios.
 ///
 /// Cada valor vive aquí una sola vez, con el nombre de su papel: las
 /// pantallas dicen `AppColors.exito`, no "0xFF4ADE80", y un ajuste de marca se
 /// hace en este archivo y en ningún otro.
 ///
-/// La marca son dos colores: el gris azulado `#5A6E73`, que es la calma de la
-/// clínica, y el terracota `#D16F4B`, que es la acción. Todo lo demás se
-/// deriva de ellos: los fondos son el mismo gris azulado llevado casi a negro,
-/// y los encabezados bajan desde el tono de la marca hacia ese fondo.
+/// La marca son dos colores: el primario, que es la calma de la clínica, y el
+/// acento, que es la acción. Los elige el administrador en la configuración
+/// (`clinica.colorPrimario`, `clinica.colorAcento`); si no los configuró son
+/// los de siempre, el gris azulado `#5A6E73` y el terracota `#D16F4B`. Por
+/// eso los de la marca no son constantes: salen de [PaletaMarca.actual]. Los
+/// fondos, los estados y los textos sí lo son.
 ///
 /// Regla para código nuevo: ningún `Color(0xFF...)` suelto en una pantalla.
 /// Si hace falta un color que no está aquí, se agrega aquí con nombre.
 class AppColors {
   const AppColors._();
 
-  // ── Marca ──────────────────────────────────────────────────────────
-  /// Gris azulado de la marca: el anillo del logotipo.
-  static const Color primario = Color(0xFF5A6E73);
+  // ── Marca (de la configuración de la clínica) ───────────────────────
+  /// El primario de la marca: el anillo del logotipo.
+  static Color get primario => PaletaMarca.actual.primario;
 
-  /// El gris azulado aclarado, para iconos y detalles sobre fondo oscuro:
-  /// el de la marca, tal cual, se pierde sobre el fondo profundo.
-  static const Color primarioClaro = Color(0xFF9DB3B8);
+  /// El primario aclarado, para iconos y detalles sobre fondo oscuro: el de
+  /// la marca, tal cual, se pierde sobre el fondo profundo.
+  static Color get primarioClaro => PaletaMarca.actual.primarioClaro;
 
-  /// Terracota de la marca: la cruz del logotipo y la acción principal.
-  static const Color acento = Color(0xFFD16F4B);
+  /// El acento de la marca: la cruz del logotipo y la acción principal.
+  static Color get acento => PaletaMarca.actual.acento;
 
-  /// Terracota encendido, para el final del degradado del botón y el anillo
+  /// El acento encendido, para el final del degradado del botón y el anillo
   /// de foco de los campos.
-  static const Color acentoClaro = Color(0xFFE8956F);
+  static Color get acentoClaro => PaletaMarca.actual.acentoClaro;
 
-  /// Terracota muy suave, para textos que acompañan a una acción.
-  static const Color acentoSuave = Color(0xFFF3C3AA);
+  /// El acento muy suave, para textos que acompañan a una acción.
+  static Color get acentoSuave => PaletaMarca.actual.acentoSuave;
 
   // ── Fondos ─────────────────────────────────────────────────────────
   /// Fondo general de las pantallas oscuras: el gris azulado casi negro.
@@ -138,15 +142,15 @@ class AppGradientes {
 
   /// Encabezado de sección: la tarjeta que presenta cada pantalla. Baja del
   /// gris azulado de la marca al fondo.
-  static const LinearGradient encabezado = LinearGradient(
-    colors: [Color(0xFF62797F), Color(0xFF465A5F), Color(0xFF2B393C)],
+  static LinearGradient get encabezado => LinearGradient(
+    colors: PaletaMarca.actual.encabezado,
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   /// Tarjeta de identidad del perfil, un punto más oscura que el encabezado.
-  static const LinearGradient identidad = LinearGradient(
-    colors: [Color(0xFF556A70), Color(0xFF3A4B50), Color(0xFF243034)],
+  static LinearGradient get identidad => LinearGradient(
+    colors: PaletaMarca.actual.identidad,
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
@@ -157,20 +161,15 @@ class AppGradientes {
   /// marca a su terracota en vez de bajar al fondo como las demás. Sobre el
   /// extremo claro el texto blanco necesita un velo oscuro por debajo; eso lo
   /// pone la tarjeta, no este degradado.
-  static const LinearGradient bienvenida = LinearGradient(
-    colors: [
-      Color(0xFF465A5F),
-      AppColors.primario,
-      Color(0xFF966E5F),
-      AppColors.acento,
-    ],
-    stops: [0, 0.38, 0.72, 1],
+  static LinearGradient get bienvenida => LinearGradient(
+    colors: PaletaMarca.actual.bienvenida,
+    stops: const [0, 0.38, 0.72, 1],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   /// La acción principal de cada pantalla: el terracota encendiéndose.
-  static const LinearGradient accion = LinearGradient(
+  static LinearGradient get accion => LinearGradient(
     colors: [AppColors.acento, AppColors.acentoClaro],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
@@ -185,12 +184,11 @@ class AppGradientes {
   );
 
   /// El nombre de la marca en el acceso: blanco que se entibia.
-  static const LinearGradient nombreDeMarca = LinearGradient(
-    colors: [Colors.white, AppColors.acentoSuave],
-  );
+  static LinearGradient get nombreDeMarca =>
+      LinearGradient(colors: [Colors.white, AppColors.acentoSuave]);
 
   /// El logotipo pequeño de las barras: la marca de un tono al otro.
-  static const LinearGradient marca = LinearGradient(
+  static LinearGradient get marca => LinearGradient(
     colors: [AppColors.primario, AppColors.acento],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,

@@ -273,7 +273,7 @@ class FilaAdjunto extends StatelessWidget {
                 ),
               ),
               if (quitando)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(12),
                   child: SizedBox(
                     width: 18,
@@ -331,7 +331,7 @@ Future<void> abrirArchivo(BuildContext context, ArchivoMeta archivo) async {
   showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const PopScope(
+    builder: (_) => PopScope(
       canPop: false,
       child: Center(
         child: CircularProgressIndicator(color: AppColors.acentoClaro),

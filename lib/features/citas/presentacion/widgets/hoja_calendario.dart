@@ -9,18 +9,21 @@ import '../../../../core/tema/tokens.dart';
 /// leer una frase.
 class HojaCalendario extends StatelessWidget {
   final DateTime fecha;
-  final Color color;
+
+  /// Sin él, el de la marca (acento).
+  final Color? color;
   final double ancho;
 
   const HojaCalendario({
     super.key,
     required this.fecha,
-    this.color = AppColors.acento,
+    this.color,
     this.ancho = 62,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.acento;
     return Container(
       width: ancho,
       decoration: BoxDecoration(

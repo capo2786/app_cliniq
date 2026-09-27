@@ -61,7 +61,7 @@ class _PasoCodigoState extends State<PasoCodigo> {
                   color: AppColors.acento.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(15),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.mark_email_read_outlined,
                   color: AppColors.acentoClaro,
                 ),

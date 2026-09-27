@@ -169,7 +169,7 @@ class _TarjetaMedico extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.schedule_rounded,
                 size: 15,
                 color: AppColors.primarioClaro,

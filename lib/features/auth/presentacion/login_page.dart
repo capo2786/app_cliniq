@@ -589,7 +589,7 @@ class _Marca extends StatelessWidget {
               color: AppColors.primarioClaro.withValues(alpha: 0.24),
             ),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
@@ -838,7 +838,7 @@ class _SoloPacientes extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(
@@ -965,7 +965,7 @@ class _CorreoSinVerificar extends StatelessWidget {
               key: const Key('boton-reenviar-enlace'),
               onPressed: puede ? alReenviar : null,
               icon: reenviando
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 15,
                       height: 15,
                       child: CircularProgressIndicator(

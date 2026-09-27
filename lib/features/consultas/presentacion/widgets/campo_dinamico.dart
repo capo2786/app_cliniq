@@ -267,7 +267,7 @@ class _CampoDinamicoState extends State<CampoDinamico> {
           ),
           child: Row(
             children: [
-              const Icon(
+              Icon(
                 Icons.event_rounded,
                 color: AppColors.primarioClaro,
                 size: 20,
@@ -346,7 +346,7 @@ class _Ficha extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 if (elegida) ...[
-                  const Icon(
+                  Icon(
                     Icons.check_rounded,
                     color: AppColors.acentoClaro,
                     size: 17,

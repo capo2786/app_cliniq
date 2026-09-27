@@ -121,18 +121,21 @@ class BotonSecundario extends StatelessWidget {
   final String texto;
   final IconData? icono;
   final VoidCallback? onPressed;
-  final Color color;
+
+  /// Sin él, el de la marca (primarioClaro).
+  final Color? color;
 
   const BotonSecundario({
     super.key,
     required this.texto,
     required this.onPressed,
     this.icono,
-    this.color = AppColors.primarioClaro,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.primarioClaro;
     return SizedBox(
       width: double.infinity,
       height: 50,

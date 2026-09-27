@@ -133,16 +133,15 @@ class TarjetaCita extends StatelessWidget {
 /// Los consejos para prepararse, en un recuadro.
 class ConsejosDePreparacion extends StatelessWidget {
   final List<String> consejos;
-  final Color color;
 
-  const ConsejosDePreparacion({
-    super.key,
-    required this.consejos,
-    this.color = AppColors.acentoClaro,
-  });
+  /// Sin él, el de la marca (acentoClaro).
+  final Color? color;
+
+  const ConsejosDePreparacion({super.key, required this.consejos, this.color});
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.acentoClaro;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),

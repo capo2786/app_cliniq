@@ -12,7 +12,9 @@ class EstadoVacio extends StatelessWidget {
   final String descripcion;
   final String? accion;
   final VoidCallback? alPulsar;
-  final Color color;
+
+  /// Sin él, el de la marca (primarioClaro).
+  final Color? color;
 
   const EstadoVacio({
     super.key,
@@ -21,11 +23,12 @@ class EstadoVacio extends StatelessWidget {
     required this.descripcion,
     this.accion,
     this.alPulsar,
-    this.color = AppColors.primarioClaro,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.primarioClaro;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppEspaciado.xxl),
@@ -125,7 +128,7 @@ class CargandoCentro extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 30,
             height: 30,
             child: CircularProgressIndicator(
@@ -153,7 +156,10 @@ class CargandoCentro extends StatelessWidget {
 class RecuadroAviso extends StatelessWidget {
   final String mensaje;
   final IconData icono;
-  final Color color;
+
+  /// `null` en el de información: el tono de la marca en uso, que sale de
+  /// la configuración de la clínica y no es constante.
+  final Color? color;
   final Color colorTexto;
 
   const RecuadroAviso({
@@ -183,11 +189,13 @@ class RecuadroAviso extends StatelessWidget {
     this.mensaje, {
     super.key,
     this.icono = Icons.info_outline_rounded,
-  }) : color = AppColors.primarioClaro,
+  }) : color = null,
        colorTexto = AppColors.textoSuave;
 
   @override
   Widget build(BuildContext context) {
+    final color = this.color ?? AppColors.primarioClaro;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(13),

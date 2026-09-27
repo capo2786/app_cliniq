@@ -116,7 +116,7 @@ class _InicioPageState extends State<InicioPage> {
                       letterSpacing: 0.2,
                     ),
                   ),
-                  const Text(
+                  Text(
                     'Portal del paciente',
                     style: TextStyle(
                       color: AppColors.primarioClaro,

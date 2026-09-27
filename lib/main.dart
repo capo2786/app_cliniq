@@ -13,6 +13,7 @@ import 'core/fechas/zona_clinica.dart';
 import 'core/network/api_client.dart';
 import 'core/presentacion/rutas.dart';
 import 'core/servicios.dart';
+import 'core/tema/paleta_marca.dart';
 import 'core/tema/tema_app.dart';
 import 'features/arranque/presentacion/arranque_page.dart';
 import 'features/arranque/presentacion/espera_datos_clinica.dart';
@@ -51,6 +52,14 @@ void main() {
     // enseñar las citas guardadas desde el primer cuadro.
     await intentar('la caché local', () => Servicios.cache.inicializar());
 
+    // La última configuración de la clínica, si hay: su zona horaria y los
+    // colores de su marca desde el primer cuadro. La del servidor llega
+    // después (ver `ConfigPublicaCubit`).
+    await intentar('la configuración guardada', () async {
+      final guardada = await Servicios.configuracion.guardada();
+      if (guardada != null) aplicarConfiguracion(guardada.config);
+    });
+
     // Los recordatorios se preparan antes de arrancar para que los ya
     // programados sobrevivan a un reinicio del teléfono.
     await intentar(
@@ -66,9 +75,36 @@ void main() {
   }, (error, pila) => registrarFallo('el arranque', error, pila));
 }
 
-/// Lo que se hace con cada configuración que entra en uso.
+/// Lo que se hace con cada configuración que entra en uso: la zona horaria
+/// de la clínica y los colores de su marca. Si los colores cambiaron con la
+/// aplicación ya abierta, se vuelve a pintar entera (conservando dónde está
+/// cada quien).
 void aplicarConfiguracion(ConfigPublica config) {
   ZonaClinica.aplicar(config.clinica.zonaHoraria);
+
+  final cambioLaMarca = PaletaMarca.aplicar(
+    primario: config.clinica.colorPrimario,
+    acento: config.clinica.colorAcento,
+  );
+  if (cambioLaMarca) repintarTodo();
+}
+
+/// Marca para reconstruir cada elemento del árbol. Los colores de la marca
+/// no viven en el tema de Material sino en los tokens (`AppColors`), así que
+/// cambiar el tema no basta: hay que volver a construir lo ya pintado. El
+/// estado de cada pantalla se conserva.
+void repintarTodo() {
+  final binding = WidgetsBinding.instance;
+
+  void marcar(Element elemento) {
+    elemento.markNeedsBuild();
+    elemento.visitChildren(marcar);
+  }
+
+  binding.addPostFrameCallback(
+    (_) => binding.rootElement?.visitChildren(marcar),
+  );
+  binding.scheduleFrame();
 }
 
 /// La aplicación: los blocs compartidos y la puerta de entrada.
@@ -127,23 +163,34 @@ class CliniqApp extends StatelessWidget {
         BlocProvider<MenuCubit>(create: (_) => MenuCubit(Servicios.menu)),
       ],
       child: _DatosDeLaClinicaAlDia(
-        child: BlocSelector<ConfigPublicaCubit, ConfigPublicaState, String>(
-          selector: (state) => state.config?.clinica.nombre ?? '',
-          builder: (context, nombre) => MaterialApp(
-            title: nombre,
-            debugShowCheckedModeBanner: false,
-            theme: temaCliniq(),
-            locale: const Locale('es'),
-            supportedLocales: const [Locale('es'), Locale('es', 'EC')],
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            navigatorObservers: [observadorDeRutas],
-            home: const EsperaDatosDeLaClinica(child: PuertaDeEntrada()),
-          ),
-        ),
+        child:
+            BlocSelector<
+              ConfigPublicaCubit,
+              ConfigPublicaState,
+              (String, String?, String?)
+            >(
+              // El nombre para el sistema y los colores de la marca para el
+              // tema: si cambian, el tema se vuelve a armar.
+              selector: (state) => (
+                state.config?.clinica.nombre ?? '',
+                state.config?.clinica.colorPrimario,
+                state.config?.clinica.colorAcento,
+              ),
+              builder: (context, datos) => MaterialApp(
+                title: datos.$1,
+                debugShowCheckedModeBanner: false,
+                theme: temaCliniq(),
+                locale: const Locale('es'),
+                supportedLocales: const [Locale('es'), Locale('es', 'EC')],
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                navigatorObservers: [observadorDeRutas],
+                home: const EsperaDatosDeLaClinica(child: PuertaDeEntrada()),
+              ),
+            ),
       ),
     );
   }
