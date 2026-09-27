@@ -7,6 +7,7 @@ import 'package:app_cliniq/core/storage/credenciales_service.dart';
 import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/data/auth_service.dart';
 import 'package:app_cliniq/features/auth/data/errores_de_acceso.dart';
+import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_event.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
@@ -405,6 +406,119 @@ void main() {
         expect(await almacen.leer(), isNull);
         expect(limpiezas, 1);
         expect(await credenciales.leer(), isNotNull);
+      },
+    );
+  });
+
+  group('Solo pacientes', () {
+    Usuario delPersonal() => Usuario({
+      'uid': 'm1',
+      'nombre': 'Luis Mora',
+      'email': 'luis@clinica.com',
+      'role': 2,
+      'permisos': ['agenda.atender', 'consultas.atender'],
+      'legalPendientes': <String>[],
+    });
+
+    blocTest<AuthBloc, AuthState>(
+      'una cuenta del personal no entra: ni sesión, ni token, ni '
+      'credenciales guardadas',
+      setUp: () {
+        servicio.alEntrar = (_, _) async =>
+            AccesoConcedido(token: 'jwt-medico', usuario: delPersonal());
+      },
+      build: crear,
+      act: (bloc) => bloc.add(
+        const AuthLoginSolicitado(
+          email: 'luis@clinica.com',
+          password: 'secreta1',
+        ),
+      ),
+      expect: () => [const AuthCargando(), const AuthCuentaDelPersonal()],
+      verify: (_) async {
+        expect(token, isNull);
+        expect(await almacen.leer(), isNull);
+        expect(await credenciales.leer(), isNull);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'el administrador tampoco: su comodín no abre el portal del paciente',
+      setUp: () {
+        servicio.alEntrar = (_, _) async => AccesoConcedido(
+          token: 'jwt-admin',
+          usuario: Usuario({
+            'uid': 'a1',
+            'permisos': ['*'],
+          }),
+        );
+      },
+      build: crear,
+      act: (bloc) => bloc.add(
+        const AuthLoginSolicitado(email: 'admin@clinica.com', password: 'x'),
+      ),
+      expect: () => [const AuthCargando(), const AuthCuentaDelPersonal()],
+      verify: (_) => expect(token, isNull),
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'una sesión guardada del personal se cierra al restaurar',
+      setUp: () async {
+        await almacen.guardar(
+          SesionGuardada(token: 'jwt', usuario: delPersonal()),
+        );
+        servicio.alPedirPerfil = () async => delPersonal();
+      },
+      build: () => crear(restaurar: true),
+      expect: () => [const AuthCuentaDelPersonal()],
+      verify: (_) async {
+        expect(servicio.llamadas, ['me']);
+        expect(await almacen.leer(), isNull);
+        expect(token, isNull);
+        expect(limpiezas, 1);
+      },
+    );
+
+    blocTest<AuthBloc, AuthState>(
+      'sin red, la sesión guardada del personal tampoco abre',
+      setUp: () async {
+        await almacen.guardar(
+          SesionGuardada(token: 'jwt', usuario: delPersonal()),
+        );
+        servicio.alPedirPerfil = () async => throw errorDeRed();
+      },
+      build: () => crear(restaurar: true),
+      expect: () => [const AuthCuentaDelPersonal()],
+      verify: (_) async => expect(await almacen.leer(), isNull),
+    );
+  });
+
+  group('Correo sin confirmar', () {
+    blocTest<AuthBloc, AuthState>(
+      '403 CORREO_NO_VERIFICADO: el error lo dice y guarda el correo para '
+      'reenviar el enlace',
+      setUp: () {
+        servicio.alEntrar = (_, _) async => throw errorHttp(
+          403,
+          'Confirma tu correo para ingresar.',
+          'CORREO_NO_VERIFICADO',
+        );
+      },
+      build: crear,
+      act: (bloc) => bloc.add(
+        const AuthLoginSolicitado(email: ' Ana@Correo.com ', password: 'x'),
+      ),
+      expect: () => [
+        const AuthCargando(),
+        const AuthError(
+          'Confirma tu correo para ingresar.',
+          correoSinVerificar: true,
+          correo: 'ana@correo.com',
+        ),
+      ],
+      verify: (_) async {
+        expect(token, isNull);
+        expect(await credenciales.leer(), isNull);
       },
     );
   });

@@ -95,6 +95,24 @@ class AuthService {
               'restablecer tu contraseña.';
   }
 
+  /// `POST /auth/registro/reenviar`: otro enlace para confirmar el correo de
+  /// una cuenta del autorregistro. Como la recuperación, responde siempre lo
+  /// mismo —exista o no el correo, esté o no confirmado— y el servidor
+  /// ignora en silencio los pedidos de más. Devuelve ese mensaje.
+  Future<String> reenviarConfirmacion(String email) async {
+    final respuesta = await _dio.post<dynamic>(
+      '/auth/registro/reenviar',
+      data: {'email': email.trim().toLowerCase()},
+    );
+
+    final datos = respuesta.data;
+    final mensaje = datos is Map ? datos['message']?.toString() : null;
+
+    return mensaje?.trim().isNotEmpty == true
+        ? mensaje!.trim()
+        : mensajeReenvioNeutral;
+  }
+
   /// `GET /auth/me`: el perfil vigente, con permisos y legales pendientes.
   Future<Usuario> yo() async {
     final respuesta = await _dio.get<dynamic>('/auth/me');
@@ -149,6 +167,11 @@ class AuthService {
     return yo();
   }
 }
+
+/// Lo que se dice tras pedir otro enlace de confirmación, llegue o no.
+const String mensajeReenvioNeutral =
+    'Si el correo tiene una cuenta pendiente de confirmar, te enviamos un '
+    'enlace nuevo. Revisa tu bandeja y el correo no deseado.';
 
 /// Lee la respuesta del acceso. Fuera de la clase para poder probarla.
 ResultadoDeAcceso interpretarAcceso(Object? datos) {

@@ -8,6 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/app/version_instalada.dart';
+import '../../../core/config/entorno.dart';
+import '../../../core/network/errores.dart';
+import '../../../core/presentacion/enlaces.dart';
 import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/campos.dart';
 import '../../../core/presentacion/widgets/entrada_animada.dart';
@@ -24,6 +27,9 @@ import '../providers/auth_event.dart';
 import '../providers/auth_state.dart';
 import 'widgets/paso_codigo.dart';
 import 'widgets/recuperar_contrasena.dart';
+
+/// Segundos entre un pedido de enlace de confirmación y el siguiente.
+const int segundosEntreReenvios = 60;
 
 /// La pantalla de acceso.
 ///
@@ -74,6 +80,17 @@ class _LoginPageState extends State<LoginPage> {
   ModoDeAcceso _modo = ModoDeAcceso.primeraVez;
   CredencialesLocales? _guardadas;
 
+  /*
+   * El reenvío del enlace de confirmación vive aquí y no en el aviso: el
+   * aviso desaparece y vuelve con cada intento de entrar, y la espera de un
+   * minuto entre enlaces tiene que sobrevivir a eso.
+   */
+  bool _reenviando = false;
+  int _esperaReenvio = 0;
+  Timer? _cuentaReenvio;
+  String? _respuestaReenvio;
+  String? _errorReenvio;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +99,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   void dispose() {
+    _cuentaReenvio?.cancel();
     _email.dispose();
     _password.dispose();
     super.dispose();
@@ -162,6 +180,54 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  /// Pide otro enlace para confirmar el correo y apaga el botón un minuto.
+  ///
+  /// La respuesta es siempre la misma, exista o no la cuenta: se enseña tal
+  /// cual. El servidor ignora en silencio los pedidos de más; la espera
+  /// evita que alguien toque diez veces pensando que no funcionó.
+  Future<void> _reenviarEnlace(String correo) async {
+    if (_reenviando || _esperaReenvio > 0) return;
+
+    setState(() {
+      _reenviando = true;
+      _errorReenvio = null;
+    });
+
+    try {
+      final mensaje = await (widget.servicio ?? Servicios.auth)
+          .reenviarConfirmacion(correo);
+      if (!mounted) return;
+
+      setState(() => _respuestaReenvio = mensaje);
+      _esperarParaReenviar();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _errorReenvio = mensajeDeError(
+          error,
+          generico: 'No pudimos pedir el enlace. Intenta de nuevo.',
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _reenviando = false);
+    }
+  }
+
+  void _esperarParaReenviar() {
+    _cuentaReenvio?.cancel();
+    setState(() => _esperaReenvio = segundosEntreReenvios);
+
+    _cuentaReenvio = Timer.periodic(const Duration(seconds: 1), (reloj) {
+      if (!mounted) {
+        reloj.cancel();
+        return;
+      }
+
+      setState(() => _esperaReenvio--);
+      if (_esperaReenvio <= 0) reloj.cancel();
+    });
+  }
+
   Future<void> _recuperar() async {
     await mostrarRecuperarContrasena(
       context,
@@ -236,6 +302,10 @@ class _LoginPageState extends State<LoginPage> {
                       children: [
                         const _Marca(),
                         const SizedBox(height: 24),
+                        if (state is AuthCuentaDelPersonal) ...[
+                          const _SoloPacientes(),
+                          const SizedBox(height: 16),
+                        ],
                         if (state is AuthNoAutenticado &&
                             state.aviso != null) ...[
                           RecuadroAviso.alerta(
@@ -316,10 +386,21 @@ class _LoginPageState extends State<LoginPage> {
                   ? Padding(
                       key: ValueKey(state.mensaje),
                       padding: const EdgeInsets.only(top: 18),
-                      child: _ErrorDeAcceso(
-                        estado: state,
-                        alRecuperar: _recuperar,
-                      ),
+                      child: state.correoSinVerificar
+                          ? _CorreoSinVerificar(
+                              mensaje: state.mensaje,
+                              reenviando: _reenviando,
+                              espera: _esperaReenvio,
+                              respuesta: _respuestaReenvio,
+                              error: _errorReenvio,
+                              alReenviar: () => _reenviarEnlace(
+                                state.correo ?? _email.text.trim(),
+                              ),
+                            )
+                          : _ErrorDeAcceso(
+                              estado: state,
+                              alRecuperar: _recuperar,
+                            ),
                     )
                   : const SizedBox.shrink(key: ValueKey('sin-error')),
             ),
@@ -683,33 +764,213 @@ class _ErrorDeAcceso extends StatelessWidget {
   }
 }
 
-/// No hay registro público: las cuentas las crea la clínica.
+/// Quien no tiene cuenta la crea en el panel web: el autorregistro pide la
+/// cédula, acepta los términos y confirma el correo, y la aplicación no
+/// copia ese formulario.
 class _SinCuenta extends StatelessWidget {
   const _SinCuenta();
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Icon(
-          Icons.info_outline_rounded,
-          color: AppColors.textoSecundario,
-          size: 16,
+        const Text(
+          '¿No tienes cuenta?',
+          style: TextStyle(
+            color: AppColors.textoSecundario,
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        SizedBox(width: 7),
-        Flexible(
-          child: Text(
-            '¿No tienes cuenta? Pide tu registro en la clínica',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textoSecundario,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w600,
-            ),
+        TextButton(
+          key: const Key('boton-crear-cuenta'),
+          onPressed: () =>
+              abrirEnlace(context, Entorno.urlRegistro, queEs: 'el registro'),
+          style: TextButton.styleFrom(
+            foregroundColor: AppColors.acentoSuave,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+            minimumSize: const Size(0, 36),
+          ),
+          child: const Text(
+            'Crea tu cuenta',
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800),
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Entró alguien del personal: esta aplicación no es para su cuenta.
+class _SoloPacientes extends StatelessWidget {
+  const _SoloPacientes();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primarioClaro.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.primarioClaro.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.badge_outlined,
+                color: AppColors.primarioClaro,
+                size: 20,
+              ),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  avisoSoloPacientes,
+                  style: TextStyle(
+                    color: AppColors.textoSuave,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('boton-panel-web'),
+              onPressed: () =>
+                  abrirEnlace(context, Entorno.webUrl, queEs: 'el panel web'),
+              icon: const Icon(Icons.open_in_new_rounded, size: 17),
+              label: const Text('Abrir el panel web'),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.acentoSuave,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// La cuenta existe y la contraseña es buena, pero falta confirmar el correo.
+class _CorreoSinVerificar extends StatelessWidget {
+  final String mensaje;
+  final bool reenviando;
+
+  /// Segundos que faltan para poder pedir otro enlace; 0, ya se puede.
+  final int espera;
+
+  final String? respuesta;
+  final String? error;
+  final VoidCallback alReenviar;
+
+  const _CorreoSinVerificar({
+    required this.mensaje,
+    required this.reenviando,
+    required this.espera,
+    required this.respuesta,
+    required this.error,
+    required this.alReenviar,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final respuesta = this.respuesta;
+    final error = this.error;
+    final puede = !reenviando && espera <= 0;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.alerta.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.alerta.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.mark_email_unread_outlined,
+                color: AppColors.alerta,
+                size: 20,
+              ),
+              SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  'Confirma tu correo para entrar',
+                  style: TextStyle(
+                    color: AppColors.alertaTexto,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            mensaje,
+            style: const TextStyle(
+              color: AppColors.alertaTextoFuerte,
+              fontSize: 12.5,
+              height: 1.4,
+            ),
+          ),
+          if (respuesta != null) ...[
+            const SizedBox(height: 10),
+            RecuadroAviso(
+              mensaje: respuesta,
+              icono: Icons.mark_email_read_outlined,
+              color: AppColors.exito,
+              colorTexto: AppColors.texto,
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            RecuadroAviso.error(error),
+          ],
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('boton-reenviar-enlace'),
+              onPressed: puede ? alReenviar : null,
+              icon: reenviando
+                  ? const SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.acentoSuave,
+                      ),
+                    )
+                  : const Icon(Icons.forward_to_inbox_rounded, size: 17),
+              label: Text(
+                espera > 0
+                    ? 'Reenviar el enlace ($espera s)'
+                    : 'Reenviar el enlace',
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.acentoSuave,
+                disabledForegroundColor: AppColors.textoTenue,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -9,8 +9,24 @@ class ErrorDeAcceso {
   /// La cuenta quedó bloqueada 15 minutos por varios intentos fallidos.
   final bool bloqueada;
 
-  const ErrorDeAcceso(this.mensaje, {this.bloqueada = false});
+  /// La cuenta se creó desde el autorregistro y todavía no confirmó el
+  /// correo: la contraseña era correcta, pero falta abrir el enlace.
+  final bool correoSinVerificar;
+
+  const ErrorDeAcceso(
+    this.mensaje, {
+    this.bloqueada = false,
+    this.correoSinVerificar = false,
+  });
 }
+
+/// El `codigo` con que la API marca un correo sin confirmar (HTTP 403).
+const String codigoCorreoNoVerificado = 'CORREO_NO_VERIFICADO';
+
+const String mensajeCorreoNoVerificado =
+    'Te enviamos un enlace a tu correo cuando creaste la cuenta. Ábrelo para '
+    'activarla; si no lo encuentras, revisa el correo no deseado o pide uno '
+    'nuevo.';
 
 const String mensajeCredencialesIncorrectas =
     'Correo o contraseña incorrectos.';
@@ -32,10 +48,21 @@ const String mensajeCuentaBloqueada =
 /// - **423** es la cuenta bloqueada: cinco intentos fallidos en quince
 ///   minutos la cierran otros quince. El servidor dice cuántos minutos
 ///   faltan y ese texto se respeta; si no llega, se explica igual.
+/// - **403 con `codigo: CORREO_NO_VERIFICADO`** es una cuenta del
+///   autorregistro que todavía no abrió el enlace de su correo.
 ErrorDeAcceso errorDeAcceso(Object error, {bool esCodigo = false}) {
   if (error is DioException && error.response != null) {
     final estado = error.response?.statusCode;
     final delServidor = mensajeDelServidor(error);
+    final datos = error.response?.data;
+    final codigo = datos is Map ? datos['codigo']?.toString() : null;
+
+    if (estado == 403 && codigo == codigoCorreoNoVerificado) {
+      return ErrorDeAcceso(
+        delServidor ?? mensajeCorreoNoVerificado,
+        correoSinVerificar: true,
+      );
+    }
 
     if (estado == 423) {
       return ErrorDeAcceso(

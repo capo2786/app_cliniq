@@ -10,6 +10,7 @@ class Permisos {
   static const String misCitas = 'portal.mis_citas';
   static const String agendar = 'portal.agendar';
   static const String dependientes = 'portal.dependientes';
+  static const String consultas = 'portal.consultas';
 }
 
 /// El contacto de emergencia del paciente.
@@ -128,6 +129,13 @@ class Usuario extends Equatable {
   /// Si tiene un permiso. El comodín de los administradores los abre todos.
   bool puede(String permiso) =>
       permisos.contains(Permisos.comodin) || permisos.contains(permiso);
+
+  /// Si la cuenta es de un paciente: tiene «mis citas» por sí misma.
+  ///
+  /// Se mira el permiso **exacto** y no con [puede]: el comodín de los
+  /// administradores no abre el portal del paciente (`*` excluye `portal.*`
+  /// en la API), y el personal de la clínica trabaja en el panel web.
+  bool get esPaciente => permisos.contains(Permisos.misCitas);
 
   /// El primer nombre, para el saludo: «Hola, Ana» y no el nombre completo.
   String get primerNombre {
