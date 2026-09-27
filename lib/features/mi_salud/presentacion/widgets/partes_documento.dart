@@ -8,6 +8,7 @@ import '../../../../core/presentacion/avisos.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/mi_salud.dart';
+import '../../dominio/reglas_mi_salud.dart';
 
 /// Un bloque de texto con su rótulo pequeño en mayúsculas: «Indicaciones»,
 /// «Recomendaciones».
@@ -128,7 +129,8 @@ class ListaDeDiagnosticos extends StatelessWidget {
   }
 }
 
-/// La cabecera de una receta o una orden: qué es, cuándo y si está anulada.
+/// La cabecera de una receta, una orden o un certificado: qué es, cuándo y
+/// si está anulado.
 class EncabezadoDeDocumento extends StatelessWidget {
   final IconData icono;
   final String titulo;
@@ -137,31 +139,37 @@ class EncabezadoDeDocumento extends StatelessWidget {
   /// Algo más bajo la fecha: «Urgente».
   final List<Widget> pastillas;
 
+  /// «Emitido», «Anulado»: un certificado; la receta y la orden, en
+  /// femenino.
+  final bool masculino;
+
   const EncabezadoDeDocumento({
     super.key,
     required this.icono,
     required this.titulo,
     required this.documento,
     this.pastillas = const [],
+    this.masculino = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final fecha = documento.fecha;
+    final emitido = masculino ? 'Emitido' : 'Emitida';
 
     return TarjetaEncabezado(
       icono: icono,
       titulo: titulo,
       descripcion: fecha == null
-          ? 'Emitida por ${documento.medicoNombre}'
-          : 'Emitida el ${FormatoFecha.diaLargoConAnio(fecha).toLowerCase()}',
+          ? '$emitido por ${documento.medicoNombre}'
+          : '$emitido el ${FormatoFecha.diaLargoConAnio(fecha).toLowerCase()}',
       accesorio: documento.anulada || pastillas.isNotEmpty
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 if (documento.anulada)
-                  const Pastilla(
-                    texto: 'Anulada',
+                  Pastilla(
+                    texto: masculino ? 'Anulado' : 'Anulada',
                     color: AppColors.peligroSuave,
                     icono: Icons.block_rounded,
                   ),
@@ -169,6 +177,63 @@ class EncabezadoDeDocumento extends StatelessWidget {
               ],
             )
           : null,
+    );
+  }
+}
+
+/// «Firmado electrónicamente por … el …»: el sello de un documento que el
+/// médico firmó, con la entidad que emitió su certificado.
+class SelloDeFirma extends StatelessWidget {
+  final FirmaElectronica? firma;
+
+  const SelloDeFirma({super.key, required this.firma});
+
+  @override
+  Widget build(BuildContext context) {
+    final emisor = firma?.emisor;
+
+    return Container(
+      key: const Key('sello-firma'),
+      width: double.infinity,
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppColors.exito.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.exito.withValues(alpha: 0.32)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.verified_rounded, color: AppColors.exito, size: 21),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  textoDeLaFirma(firma),
+                  style: const TextStyle(
+                    color: AppColors.texto,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.4,
+                  ),
+                ),
+                if (emisor != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'Emisor del certificado: $emisor',
+                    style: const TextStyle(
+                      color: AppColors.textoSecundario,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

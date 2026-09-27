@@ -14,6 +14,7 @@ import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
 import 'package:app_cliniq/features/avisos/data/avisos_service.dart';
+import 'package:app_cliniq/features/avisos/dominio/avisos.dart';
 import 'package:app_cliniq/features/avisos/presentacion/avisos_page.dart';
 import 'package:app_cliniq/features/avisos/providers/avisos_cubit.dart';
 import 'package:app_cliniq/features/avisos/providers/campana_cubit.dart';
@@ -379,6 +380,45 @@ void main() {
       expect(abiertos, [const DestinoNativo(PantallaNativa.citas)]);
       expect(api.claves, contains('PATCH /notificaciones/a1/leida'));
       expect(campana.state.noLeidos, 2);
+    });
+
+    testWidgets('«Tu receta está lista» y «Tu certificado de reposo está '
+        'listo» abren Mi salud', (tester) async {
+      avisos = [
+        aviso(
+          'a5',
+          tipo: 'DOCUMENTO_FIRMADO',
+          titulo: 'Tu receta está lista',
+          enlace: '/mi-salud',
+        ),
+        aviso(
+          'a6',
+          tipo: 'DOCUMENTO_FIRMADO',
+          titulo: 'Tu certificado de reposo está listo',
+          enlace: '/mi-salud',
+        ),
+      ];
+      api.rutas['PATCH /notificaciones/a5/leida'] = (_) =>
+          aviso('a5', leida: true);
+      api.rutas['PATCH /notificaciones/a6/leida'] = (_) =>
+          aviso('a6', leida: true);
+      await montar(tester);
+
+      // El tipo que manda agenda-ms al registrar la firma.
+      expect(iconoDeAviso('DOCUMENTO_FIRMADO'), Icons.description_outlined);
+      expect(iconoDeAviso('CERTIFICADO_LISTO'), Icons.description_outlined);
+
+      await tester.tap(find.text('Tu receta está lista'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Tu certificado de reposo está listo'));
+      await tester.pumpAndSettle();
+
+      expect(abiertos, [
+        const DestinoNativo(PantallaNativa.miSalud),
+        const DestinoNativo(PantallaNativa.miSalud),
+      ]);
+      expect(api.claves, contains('PATCH /notificaciones/a5/leida'));
+      expect(api.claves, contains('PATCH /notificaciones/a6/leida'));
     });
 
     testWidgets('si su enlace no es del paciente, se queda en la lista', (

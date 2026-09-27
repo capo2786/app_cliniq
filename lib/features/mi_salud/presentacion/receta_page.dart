@@ -12,13 +12,15 @@ import '../data/mi_salud_service.dart';
 import '../data/models/mi_salud.dart';
 import '../dominio/reglas_mi_salud.dart';
 import '../providers/documento_cubit.dart';
+import 'visor_pdf_page.dart';
 import 'widgets/partes_documento.dart';
 import 'widgets/vista_documento.dart';
 
 /// Una receta entera, dentro de la aplicación: los medicamentos con cómo
 /// tomarlos, las recomendaciones, quién la emitió y el código con que la
 /// farmacia la comprueba. Se guarda en el teléfono para enseñarla sin
-/// cobertura.
+/// cobertura. Si el médico la firmó electrónicamente, lo dice, y con el PDF
+/// disponible ofrece «Ver PDF».
 class RecetaPage extends StatelessWidget {
   final String id;
 
@@ -42,12 +44,18 @@ class RecetaPage extends StatelessWidget {
       child: VistaDeDocumento<Receta>(
         titulo: 'Receta',
         cargando: 'Abriendo la receta…',
+        alVerPdf: (context, receta) =>
+            abrirPdfDelDocumento(context, TipoDocumentoFirmado.receta, receta),
         contenido: (context, receta) => [
           EncabezadoDeDocumento(
             icono: Icons.medication_outlined,
             titulo: 'Receta médica',
             documento: receta,
           ),
+          if (receta.firmado) ...[
+            const SizedBox(height: 12),
+            SelloDeFirma(firma: receta.firma),
+          ],
           if (receta.anulada) ...[
             const SizedBox(height: 12),
             RecuadroAviso.error(

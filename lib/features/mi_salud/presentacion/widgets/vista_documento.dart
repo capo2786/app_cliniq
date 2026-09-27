@@ -6,83 +6,109 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/margenes.dart';
 import '../../../../core/presentacion/widgets/aviso_sin_conexion.dart';
+import '../../../../core/presentacion/widgets/barra_de_accion.dart';
+import '../../../../core/presentacion/widgets/botones.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/mi_salud.dart';
 import '../../providers/documento_cubit.dart';
 
-/// El esqueleto de una receta o una orden abierta: la barra, lo que se
-/// dice mientras carga o si falla, la copia guardada y deslizar para
-/// ponerla al día. El contenido lo pone cada pantalla.
+/// El esqueleto de una receta, una orden o un certificado abierto: la
+/// barra, lo que se dice mientras carga o si falla, la copia guardada y
+/// deslizar para ponerlo al día. El contenido lo pone cada pantalla.
+///
+/// Con [alVerPdf], si el documento tiene su PDF firmado disponible, abajo va
+/// «Ver PDF» (en la `BarraDeAccion`).
 class VistaDeDocumento<T extends DocumentoClinico> extends StatelessWidget {
   final String titulo;
   final String cargando;
   final List<Widget> Function(BuildContext context, T documento) contenido;
+  final void Function(BuildContext context, T documento)? alVerPdf;
 
   const VistaDeDocumento({
     super.key,
     required this.titulo,
     required this.cargando,
     required this.contenido,
+    this.alVerPdf,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.fondo,
-      appBar: AppBar(title: Text(titulo)),
-      body: FondoDegradado(
-        child: BlocBuilder<DocumentoCubit<T>, DocumentoState<T>>(
-          builder: (context, state) {
-            final documento = state.documento;
-            final cubit = context.read<DocumentoCubit<T>>();
+    return BlocBuilder<DocumentoCubit<T>, DocumentoState<T>>(
+      builder: (context, state) {
+        final documento = state.documento;
+        final cubit = context.read<DocumentoCubit<T>>();
 
-            if (documento == null) {
-              return ListView(
-                padding: context.margenDeScroll(),
-                children: [
-                  if (state.carga == CargaDocumento.error)
-                    EstadoError(
-                      mensaje: state.error ?? 'No pudimos abrir el documento.',
-                      alReintentar: cubit.cargar,
-                    )
-                  else
-                    CargandoCentro(mensaje: cargando),
-                ],
-              );
-            }
-
-            return RefreshIndicator(
-              color: AppColors.acentoClaro,
-              backgroundColor: AppColors.superficie,
-              onRefresh: cubit.cargar,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: context.margenDeScroll(inferior: 28),
-                children: [
-                  const AvisoSinConexion(
-                    queSePuedeHacer:
-                        'Mostramos la copia que guardamos en este teléfono.',
-                  ),
-                  if (state.desdeCache && state.guardadoEn != null) ...[
-                    RecuadroAviso.informacion(
-                      'Mostramos la copia guardada el '
-                      '${FormatoFecha.cortaConHora(state.guardadoEn!)}.',
-                      icono: Icons.offline_pin_outlined,
+        return Scaffold(
+          backgroundColor: AppColors.fondo,
+          appBar: AppBar(title: Text(titulo)),
+          // Sin PDF, sin barra: una vacía le quitaría a la lista el margen
+          // de la barra del sistema.
+          bottomNavigationBar: _barra(context, documento),
+          body: FondoDegradado(
+            child: documento == null
+                ? ListView(
+                    padding: context.margenDeScroll(),
+                    children: [
+                      if (state.carga == CargaDocumento.error)
+                        EstadoError(
+                          mensaje:
+                              state.error ?? 'No pudimos abrir el documento.',
+                          alReintentar: cubit.cargar,
+                        )
+                      else
+                        CargandoCentro(mensaje: cargando),
+                    ],
+                  )
+                : RefreshIndicator(
+                    color: AppColors.acentoClaro,
+                    backgroundColor: AppColors.superficie,
+                    onRefresh: cubit.cargar,
+                    child: ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: context.margenDeScroll(inferior: 28),
+                      children: [
+                        const AvisoSinConexion(
+                          queSePuedeHacer:
+                              'Mostramos la copia que guardamos en este '
+                              'teléfono.',
+                        ),
+                        if (state.desdeCache && state.guardadoEn != null) ...[
+                          RecuadroAviso.informacion(
+                            'Mostramos la copia guardada el '
+                            '${FormatoFecha.cortaConHora(state.guardadoEn!)}.',
+                            icono: Icons.offline_pin_outlined,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (state.error != null) ...[
+                          RecuadroAviso.alerta(state.error!),
+                          const SizedBox(height: 12),
+                        ],
+                        ...contenido(context, documento),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                  ],
-                  if (state.error != null) ...[
-                    RecuadroAviso.alerta(state.error!),
-                    const SizedBox(height: 12),
-                  ],
-                  ...contenido(context, documento),
-                ],
-              ),
-            );
-          },
-        ),
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget? _barra(BuildContext context, T? documento) {
+    final abrir = alVerPdf;
+    if (abrir == null || documento == null || !documento.puedeVerPdf) {
+      return null;
+    }
+
+    return BarraDeAccion(
+      child: BotonPrincipal(
+        key: const Key('boton-ver-pdf'),
+        texto: 'Ver PDF',
+        icono: Icons.picture_as_pdf_outlined,
+        onPressed: () => abrir(context, documento),
       ),
     );
   }

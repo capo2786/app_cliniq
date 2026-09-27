@@ -24,15 +24,18 @@ import '../data/mi_salud_service.dart';
 import '../data/models/mi_salud.dart';
 import '../dominio/reglas_mi_salud.dart';
 import '../providers/mi_salud_cubit.dart';
+import 'certificado_page.dart';
 import 'orden_page.dart';
 import 'receta_page.dart';
+import 'visor_pdf_page.dart';
 import 'widgets/partes_documento.dart';
 
 /// «Mi salud»: lo que el paciente tiene derecho a ver de su historia
 /// clínica, como en el panel. Su ficha y sus alergias, las últimas
 /// mediciones y, por consulta, los diagnósticos, las indicaciones, las
-/// recetas, las órdenes y los adjuntos clínicos. También los de sus
-/// dependientes, si la cuenta los gestiona.
+/// recetas, las órdenes, los certificados de reposo y los adjuntos clínicos.
+/// También los de sus dependientes, si la cuenta los gestiona. Una receta o
+/// un certificado firmado lo dice, y con su PDF disponible ofrece «Ver PDF».
 ///
 /// Sin conexión enseña la última copia guardada; sin copia, lo dice con
 /// «Reintentar».
@@ -124,8 +127,8 @@ class _VistaMiSaludState extends State<_VistaMiSalud> {
                     icono: Icons.favorite_border_rounded,
                     titulo: 'Mi salud',
                     descripcion:
-                        'Tus diagnósticos, indicaciones, recetas y órdenes '
-                        'de cada consulta en $nombreClinica.',
+                        'Tus diagnósticos, indicaciones, recetas, órdenes y '
+                        'certificados de cada consulta en $nombreClinica.',
                   ),
                   if (state.dependientes.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -190,7 +193,8 @@ class _VistaMiSaludState extends State<_VistaMiSalud> {
                         titulo: 'Aún no hay consultas registradas',
                         descripcion:
                             'Después de cada consulta verás aquí tus '
-                            'diagnósticos, indicaciones, recetas y órdenes.',
+                            'diagnósticos, indicaciones, recetas, órdenes y '
+                            'certificados.',
                       )
                     else
                       for (final atencion in atenciones) ...[
@@ -474,12 +478,25 @@ class _TarjetaAtencion extends StatelessWidget {
                             fontSize: 12.5,
                           ),
                         ),
-                        if (modalidad != null) ...[
+                        if (modalidad != null || atencion.enCurso) ...[
                           const SizedBox(height: 8),
-                          Pastilla(
-                            texto: modalidad.nombre,
-                            color: modalidad.color,
-                            icono: modalidad.icono,
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              if (modalidad != null)
+                                Pastilla(
+                                  texto: modalidad.nombre,
+                                  color: modalidad.color,
+                                  icono: modalidad.icono,
+                                ),
+                              if (atencion.enCurso)
+                                const Pastilla(
+                                  texto: 'En curso',
+                                  color: AppColors.alerta,
+                                  icono: Icons.pending_outlined,
+                                ),
+                            ],
                           ),
                         ],
                       ],
@@ -540,6 +557,23 @@ class _DetalleAtencion extends StatelessWidget {
     );
   }
 
+  Future<void> _abrirCertificado(
+    BuildContext context,
+    CertificadoReposo certificado,
+  ) {
+    final servicio = context.read<MiSaludCubit>().servicio;
+
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CertificadoPage(
+          id: certificado.id,
+          inicial: certificado,
+          servicio: servicio,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final control = atencion.proximoControl;
@@ -549,6 +583,14 @@ class _DetalleAtencion extends StatelessWidget {
       children: [
         const Divider(color: AppColors.bordeCampo, height: 1),
         const SizedBox(height: 14),
+        if (atencion.enCurso) ...[
+          const RecuadroAviso.informacion(
+            'La consulta sigue abierta: por ahora ves lo que el médico ya '
+            'firmó. El resto aparecerá cuando la cierre.',
+            icono: Icons.pending_outlined,
+          ),
+          const SizedBox(height: 12),
+        ],
         if (atencion.motivoConsulta.isNotEmpty)
           BloqueDeTexto(rotulo: 'Motivo', texto: atencion.motivoConsulta),
         if (atencion.diagnosticos.isNotEmpty) ...[
@@ -584,7 +626,42 @@ class _DetalleAtencion extends StatelessWidget {
                     '${item.medicamento}: ${item.posologia}',
               ].join('\n'),
               anulado: receta.anulada,
+              firmado: receta.firmado,
               alTocar: () => _abrirReceta(context, receta),
+              claveDelPdf: Key('pdf-receta-${receta.id}'),
+              alVerPdf: receta.puedeVerPdf
+                  ? () => abrirPdfDelDocumento(
+                      context,
+                      TipoDocumentoFirmado.receta,
+                      receta,
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 8),
+          ],
+          const SizedBox(height: 4),
+        ],
+        if (atencion.certificados.isNotEmpty) ...[
+          const RotuloPequeno('Certificados de reposo'),
+          const SizedBox(height: 6),
+          for (final certificado in atencion.certificados) ...[
+            _FilaDocumento(
+              key: Key('certificado-${certificado.id}'),
+              icono: Icons.hotel_outlined,
+              titulo: resumenDelReposo(certificado),
+              detalle: _periodo(certificado),
+              anulado: certificado.anulada,
+              masculino: true,
+              firmado: certificado.firmado,
+              alTocar: () => _abrirCertificado(context, certificado),
+              claveDelPdf: Key('pdf-certificado-${certificado.id}'),
+              alVerPdf: certificado.puedeVerPdf
+                  ? () => abrirPdfDelDocumento(
+                      context,
+                      TipoDocumentoFirmado.certificado,
+                      certificado,
+                    )
+                  : null,
             ),
             const SizedBox(height: 8),
           ],
@@ -629,14 +706,36 @@ class _DetalleAtencion extends StatelessWidget {
   }
 }
 
-/// Una receta o una orden dentro de una consulta: se toca para verla entera.
+/// «Del lunes 28 de septiembre al miércoles 30 de septiembre de 2026».
+String _periodo(CertificadoReposo certificado) {
+  final desde = certificado.fechaDesde;
+  final hasta = certificado.fechaHasta;
+  if (desde == null) return '';
+  if (hasta == null || hasta == desde) {
+    return 'El ${FormatoFecha.diaLargoConAnio(desde).toLowerCase()}';
+  }
+
+  return 'Del ${FormatoFecha.diaLargo(desde).toLowerCase()} al '
+      '${FormatoFecha.diaLargoConAnio(hasta).toLowerCase()}';
+}
+
+/// Una receta, una orden o un certificado dentro de una consulta: se toca
+/// para verlo entero. Si tiene su PDF firmado, «Ver PDF» lo abre directo.
 class _FilaDocumento extends StatelessWidget {
   final IconData icono;
   final String titulo;
   final String detalle;
   final bool anulado;
   final bool urgente;
+  final bool firmado;
+
+  /// «Anulado», «Firmado»: un certificado; la receta y la orden, en
+  /// femenino.
+  final bool masculino;
+
   final VoidCallback alTocar;
+  final VoidCallback? alVerPdf;
+  final Key? claveDelPdf;
 
   const _FilaDocumento({
     super.key,
@@ -646,6 +745,10 @@ class _FilaDocumento extends StatelessWidget {
     required this.alTocar,
     this.anulado = false,
     this.urgente = false,
+    this.firmado = false,
+    this.masculino = false,
+    this.alVerPdf,
+    this.claveDelPdf,
   });
 
   @override
@@ -691,14 +794,15 @@ class _FilaDocumento extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (anulado || urgente) ...[
+                      if (anulado || urgente || firmado) ...[
                         const SizedBox(height: 6),
                         Wrap(
                           spacing: 6,
+                          runSpacing: 6,
                           children: [
                             if (anulado)
-                              const Pastilla(
-                                texto: 'Anulada',
+                              Pastilla(
+                                texto: masculino ? 'Anulado' : 'Anulada',
                                 color: AppColors.peligroSuave,
                                 icono: Icons.block_rounded,
                               ),
@@ -708,7 +812,35 @@ class _FilaDocumento extends StatelessWidget {
                                 color: AppColors.alerta,
                                 icono: Icons.priority_high_rounded,
                               ),
+                            if (firmado)
+                              Pastilla(
+                                texto: masculino
+                                    ? 'Firmado electrónicamente'
+                                    : 'Firmada electrónicamente',
+                                color: AppColors.exito,
+                                icono: Icons.verified_rounded,
+                              ),
                           ],
+                        ),
+                      ],
+                      if (alVerPdf != null) ...[
+                        const SizedBox(height: 4),
+                        TextButton.icon(
+                          key: claveDelPdf,
+                          onPressed: alVerPdf,
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.acentoClaro,
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          icon: const Icon(
+                            Icons.picture_as_pdf_outlined,
+                            size: 18,
+                          ),
+                          label: const Text(
+                            'Ver PDF',
+                            style: TextStyle(fontWeight: FontWeight.w800),
+                          ),
                         ),
                       ],
                     ],
