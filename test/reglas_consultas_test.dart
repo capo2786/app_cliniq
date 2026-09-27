@@ -100,6 +100,65 @@ void main() {
     });
   });
 
+  group('Novedades para el sondeo', () {
+    final respondida = resumen(
+      consultaJson(estado: 'RESPONDIDA', mensajes: [mensajeJson('m1')]),
+    );
+
+    test('igual estado, mensajes y último mensaje: nada nuevo', () {
+      expect(hayNovedades(respondida, respondida), isFalse);
+      expect(
+        hayNovedades(
+          respondida,
+          // El mismo instante, escrito de otra forma.
+          resumen({
+            ...respondida.aJson(),
+            'ultimoMensajeEn': '2026-09-28T11:00:00.000-05:00',
+            'horasRestantes': 3,
+            'medicoNombre': 'Otro nombre',
+          }),
+        ),
+        isFalse,
+        reason: 'solo cuentan el estado, los mensajes y el último mensaje',
+      );
+    });
+
+    test('otro estado, otra cantidad de mensajes u otro último mensaje', () {
+      expect(
+        hayNovedades(respondida, resumen(consultaJson(estado: 'CERRADA'))),
+        isTrue,
+      );
+      expect(
+        hayNovedades(
+          respondida,
+          resumen({...respondida.aJson(), 'totalMensajes': 2}),
+        ),
+        isTrue,
+      );
+      expect(
+        hayNovedades(
+          respondida,
+          resumen({
+            ...respondida.aJson(),
+            'ultimoMensajeEn': '2026-09-28T18:00:00.000Z',
+          }),
+        ),
+        isTrue,
+      );
+      expect(
+        hayNovedades(
+          resumen(consultaJson()),
+          resumen({
+            ...consultaJson(),
+            'ultimoMensajeEn': '2026-09-28T18:00:00.000Z',
+          }),
+        ),
+        isTrue,
+        reason: 'antes no había último mensaje',
+      );
+    });
+  });
+
   group('La lista', () {
     final consultas = [
       resumen(consultaJson(id: 'b', estado: 'BORRADOR')),

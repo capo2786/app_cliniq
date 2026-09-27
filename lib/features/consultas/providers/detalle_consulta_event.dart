@@ -14,8 +14,10 @@ class DetalleConsultaSolicitado extends DetalleConsultaEvent {
   const DetalleConsultaSolicitado();
 }
 
-/// Preguntar por novedades. [silencioso] es el sondeo periódico: si falla,
-/// no se dice nada; al deslizar para refrescar, sí.
+/// Preguntar por novedades. [silencioso] es el sondeo periódico (y el
+/// regreso a la pantalla): pregunta por la lista de resúmenes, solo trae el
+/// detalle si esta consulta cambió y, si falla, no dice nada. Al deslizar
+/// para refrescar se vuelve a pedir el detalle y un fallo sí se avisa.
 class DetalleConsultaRefrescado extends DetalleConsultaEvent {
   final bool silencioso;
 

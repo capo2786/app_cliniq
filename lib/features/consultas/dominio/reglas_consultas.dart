@@ -91,6 +91,26 @@ List<ConsultaResumen> consultasTerminadas(List<ConsultaResumen> consultas) =>
 int respuestasPorLeer(List<ConsultaResumen> consultas) =>
     consultas.where((c) => c.respuestaPorLeer).length;
 
+/// Si el resumen que acaba de llegar de una consulta dice que cambió algo
+/// que no está en [vista]: otro estado, otra cantidad de mensajes u otro
+/// último mensaje.
+///
+/// Decide si hace falta volver a pedir el detalle, que el servidor anota en
+/// la bitácora de la historia clínica cada vez que se lee; la lista de
+/// resúmenes no se anota.
+bool hayNovedades(ConsultaResumen vista, ConsultaResumen nueva) {
+  final antes = vista.ultimoMensajeEn;
+  final ahora = nueva.ultimoMensajeEn;
+
+  final mismoUltimo = antes == null || ahora == null
+      ? antes == ahora
+      : antes.isAtSameMomentAs(ahora);
+
+  return nueva.estado != vista.estado ||
+      nueva.totalMensajes != vista.totalMensajes ||
+      !mismoUltimo;
+}
+
 // ── Formulario ───────────────────────────────────────────────────────
 
 bool valorVacio(Object? valor) =>

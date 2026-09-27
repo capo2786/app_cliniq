@@ -188,7 +188,16 @@ class ConsultasFalso implements ConsultasService {
     opcionesJson(),
   );
 
+  /// Lo que contesta `GET /portal/consultas`.
   List<ConsultaResumen> lista = const [];
+
+  /// La lista contesta como la copia guardada: sin red, el servicio de
+  /// verdad devuelve la última lista guardada.
+  bool listaDesdeCache = false;
+
+  /// Si está puesto, el próximo `listar` no contesta hasta que se complete.
+  Completer<void>? retenerLista;
+
   ResultadoConsultas? guardadas;
 
   /// El detalle que devuelve cada `GET /portal/consultas/:id`, en orden; el
@@ -237,8 +246,15 @@ class ConsultasFalso implements ConsultasService {
   @override
   Future<ResultadoConsultas> listar(String uid, {String? estado}) async {
     llamadas.add('listar:$uid');
+
+    final retener = retenerLista;
+    if (retener != null) {
+      retenerLista = null;
+      await retener.future;
+    }
+
     _quizaFalla('listar');
-    return ResultadoConsultas(consultas: lista);
+    return ResultadoConsultas(consultas: lista, desdeCache: listaDesdeCache);
   }
 
   @override

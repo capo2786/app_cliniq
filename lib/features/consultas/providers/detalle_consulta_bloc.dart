@@ -10,7 +10,7 @@ import 'consultas_state.dart';
 import 'detalle_consulta_event.dart';
 import 'detalle_consulta_state.dart';
 
-/// Cada cuánto se pregunta por mensajes nuevos mientras el detalle se ve.
+/// Cada cuánto se pregunta por novedades mientras el detalle se ve.
 const Duration intervaloDeSondeo = Duration(seconds: 30);
 
 Stream<void> _latidosCada30Segundos() =>
@@ -20,8 +20,13 @@ Stream<void> _latidosCada30Segundos() =>
 /// cancelar.
 ///
 /// Mientras la pantalla se ve, pregunta cada 30 segundos si hay novedades:
-/// la respuesta del médico aparece sola, sin tener que deslizar. Los latidos
-/// se inyectan para que las pruebas los den a mano, sin esperar relojes.
+/// la respuesta del médico aparece sola, sin tener que deslizar. Pregunta
+/// por la lista de resúmenes y solo vuelve a pedir el detalle —cuya lectura
+/// el servidor anota en la bitácora de la historia clínica— cuando esta
+/// consulta cambió. Al escribir o cancelar se usa la consulta que devuelve
+/// el servidor, sin volver a pedirla; deslizar para refrescar sí la pide.
+/// Los latidos se inyectan para que las pruebas los den a mano, sin esperar
+/// relojes.
 class DetalleConsultaBloc
     extends Bloc<DetalleConsultaEvent, DetalleConsultaState> {
   final ConsultasService _servicio;
@@ -123,6 +128,15 @@ class DetalleConsultaBloc
       // lo que la persona está haciendo.
       if (actual == null || actual.estado.terminada) return;
       if (state.refrescando || state.enviando || state.cancelando) return;
+
+      final antes = _generacion;
+      emit(state.copiarCon(refrescando: true));
+
+      final traer = await _hayQueTraerElDetalle();
+      if (!traer || antes != _generacion) {
+        emit(state.copiarCon(refrescando: false));
+        return;
+      }
     } else if (actual == null) {
       add(const DetalleConsultaSolicitado());
       return;
@@ -164,6 +178,36 @@ class DetalleConsultaBloc
         ),
       );
     }
+  }
+
+  /// Si el latido tiene que volver a pedir el detalle.
+  ///
+  /// Cada lectura del detalle queda anotada en la bitácora de la historia
+  /// clínica del paciente; la lista de resúmenes (`GET /portal/consultas`),
+  /// no. Por eso el latido pregunta por la lista y solo trae el detalle si
+  /// esta consulta cambió de estado, de cantidad de mensajes o de último
+  /// mensaje, o si lo que se ve es la copia guardada. Si la lista falla o
+  /// llega la guardada (sin red), no se hace nada, sin decir nada.
+  Future<bool> _hayQueTraerElDetalle() async {
+    final ResultadoConsultas resultado;
+
+    try {
+      resultado = await _servicio.listar(_uid);
+    } catch (_) {
+      return false;
+    }
+
+    if (resultado.desdeCache) return false;
+    if (state.desdeCache) return true;
+
+    final vista = state.detalle;
+    final resumen = resultado.consultas.where((c) => c.id == _id).firstOrNull;
+
+    // Si no viene en la lista (el servidor la corta en las más recientes),
+    // no se sabe si cambió: queda para cuando se deslice para refrescar.
+    if (vista == null || resumen == null) return false;
+
+    return hayNovedades(vista, resumen);
   }
 
   // ── Sondeo ─────────────────────────────────────────────────────────

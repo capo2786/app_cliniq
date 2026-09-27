@@ -136,25 +136,101 @@ void main() {
   });
 
   group('Sondeo cada 30 segundos', () {
+    /// Da un latido y espera a que termine de preguntar.
+    Future<void> latir(DetalleConsultaBloc bloc) async {
+      latidos.add(null);
+      await esperar(bloc, (s) => s.refrescando);
+      await esperar(bloc, (s) => !s.refrescando);
+    }
+
+    Future<void> abrirYSondear(DetalleConsultaBloc bloc) async {
+      await abrir(bloc);
+      bloc.add(const DetalleConsultaSondeoCambiado(true));
+      await escuchando.future;
+    }
+
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(
-      'cada latido pregunta y trae la respuesta del médico sola',
-      setUp: () => servicio.detalles = [enviada, respondida],
+      'cada latido pregunta por la lista y, si la consulta cambió, trae el '
+      'detalle con la respuesta del médico',
+      setUp: () {
+        servicio
+          ..detalles = [enviada, respondida]
+          ..lista = [respondida.resumen];
+      },
       build: crear,
       act: (bloc) async {
-        await abrir(bloc);
-        bloc.add(const DetalleConsultaSondeoCambiado(true));
-        await escuchando.future;
+        await abrirYSondear(bloc);
 
         latidos.add(null);
         await esperar(bloc, (s) => s.detalle == respondida && !s.refrescando);
         expect(bloc.sondeando, isTrue);
       },
       verify: (bloc) {
-        expect(servicio.llamadas, ['detalle:c1', 'detalle:c1']);
+        expect(servicio.llamadas, ['detalle:c1', 'listar:u1', 'detalle:c1']);
         expect(bloc.state.aviso, isNull, reason: 'el sondeo no avisa nada');
         expect(bloc.sondeando, isFalse, reason: 'al cerrar se apaga');
         expect(latidos.hasListener, isFalse);
       },
+    );
+
+    blocTest<DetalleConsultaBloc, DetalleConsultaState>(
+      'si esta consulta no cambió, el latido no vuelve a pedir el detalle '
+      '(cada lectura del detalle queda en la bitácora clínica)',
+      setUp: () {
+        servicio
+          ..detalles = [enviada]
+          ..lista = [
+            // Otra consulta que sí cambió no cuenta.
+            ConsultaResumen.desdeJson(
+              consultaJson(id: 'c9', estado: 'RESPONDIDA'),
+            ),
+            enviada.resumen,
+          ];
+      },
+      build: crear,
+      act: (bloc) async {
+        await abrirYSondear(bloc);
+        await latir(bloc);
+        await latir(bloc);
+      },
+      verify: (bloc) {
+        expect(servicio.llamadas, ['detalle:c1', 'listar:u1', 'listar:u1']);
+        expect(bloc.state.detalle, enviada);
+      },
+    );
+
+    blocTest<DetalleConsultaBloc, DetalleConsultaState>(
+      'un mensaje nuevo sin cambio de estado también trae el detalle',
+      setUp: () {
+        final conDos = detalle(
+          consultaJson(
+            estado: 'RESPONDIDA',
+            puedeEscribir: true,
+            mensajes: [
+              mensajeJson('m1'),
+              mensajeJson(
+                'm2',
+                texto: 'Aplica la crema dos veces al día.',
+                fecha: '2026-09-28T18:00:00.000Z',
+              ),
+            ],
+          ),
+        );
+        servicio
+          ..detalles = [respondida, conDos]
+          ..lista = [conDos.resumen];
+      },
+      build: crear,
+      act: (bloc) async {
+        await abrirYSondear(bloc);
+        latidos.add(null);
+        await esperar(
+          bloc,
+          (s) => (s.detalle?.mensajes.length ?? 0) == 2 && !s.refrescando,
+        );
+      },
+      verify: (_) =>
+          expect(servicio.llamadas, ['detalle:c1', 'listar:u1', 'detalle:c1']),
     );
 
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(
@@ -183,23 +259,64 @@ void main() {
     );
 
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(
-      'si un latido falla, no se dice nada y se sigue con lo que había',
-      setUp: () => servicio.detalles = [enviada],
+      'si la lista falla o llega la guardada (sin red), no se dice nada y '
+      'se sigue con lo que había',
+      setUp: () {
+        servicio
+          ..detalles = [enviada]
+          // Aunque la copia de la lista diga otra cosa: es vieja.
+          ..lista = [respondida.resumen]
+          ..listaDesdeCache = true;
+      },
       build: crear,
       act: (bloc) async {
-        await abrir(bloc);
-        servicio.errores['detalle'] = [errorDeRed()];
-        bloc.add(const DetalleConsultaSondeoCambiado(true));
-        await escuchando.future;
+        await abrirYSondear(bloc);
+        await latir(bloc);
 
-        latidos.add(null);
-        await esperar(bloc, (s) => s.refrescando);
-        await esperar(bloc, (s) => !s.refrescando);
+        servicio
+          ..listaDesdeCache = false
+          ..errores['listar'] = [errorHttp(500)];
+        await latir(bloc);
       },
       verify: (bloc) {
+        expect(servicio.llamadas, ['detalle:c1', 'listar:u1', 'listar:u1']);
         expect(bloc.state.detalle, enviada);
         expect(bloc.state.aviso, isNull);
         expect(bloc.state.error, isNull);
+      },
+    );
+
+    blocTest<DetalleConsultaBloc, DetalleConsultaState>(
+      'si se ve la copia guardada, el primer latido con red trae el detalle '
+      'aunque no haya cambiado',
+      setUp: () {
+        servicio
+          ..detalleEnCache = ResultadoDetalle(
+            detalle: enviada,
+            desdeCache: true,
+            guardadaEn: DateTime(2026, 9, 28, 10),
+          )
+          ..errores['detalle'] = [errorDeRed()]
+          ..detalles = [enviada]
+          ..lista = [enviada.resumen];
+      },
+      build: crear,
+      act: (bloc) async {
+        await abrirYSondear(bloc);
+        expect(bloc.state.desdeCache, isTrue);
+
+        latidos.add(null);
+        await esperar(bloc, (s) => !s.desdeCache && !s.refrescando);
+        await latir(bloc);
+      },
+      verify: (bloc) {
+        expect(servicio.llamadas, [
+          'detalle:c1',
+          'listar:u1',
+          'detalle:c1',
+          'listar:u1',
+        ]);
+        expect(bloc.state.detalle, enviada);
       },
     );
 
@@ -220,6 +337,18 @@ void main() {
         ['detalle:c1', 'detalle:c1'],
         reason: 'el latido silencioso no preguntó; la carga a mano sí',
       ),
+    );
+
+    blocTest<DetalleConsultaBloc, DetalleConsultaState>(
+      'deslizar para refrescar vuelve a pedir el detalle, sin mirar la lista',
+      setUp: () => servicio.detalles = [enviada, respondida],
+      build: crear,
+      act: (bloc) async {
+        await abrir(bloc);
+        bloc.add(const DetalleConsultaRefrescado());
+        await esperar(bloc, (s) => s.detalle == respondida && !s.refrescando);
+      },
+      verify: (_) => expect(servicio.llamadas, ['detalle:c1', 'detalle:c1']),
     );
 
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(
@@ -392,15 +521,20 @@ void main() {
 
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(
       'una respuesta vieja del sondeo no pisa el mensaje recién enviado',
-      setUp: () => servicio.detalles = [respondida],
+      setUp: () {
+        servicio
+          ..detalles = [respondida]
+          // La lista que salió antes del envío: un solo mensaje.
+          ..lista = [respondida.resumen];
+      },
       build: crear,
       act: (bloc) async {
         await abrir(bloc);
 
-        // El latido pregunta antes del envío y su respuesta (la vieja, con
-        // un solo mensaje) llega después: se descarta.
+        // El latido pregunta antes del envío y su respuesta llega después:
+        // se descarta, sin volver a pedir el detalle.
         final tarde = Completer<void>();
-        servicio.retenerDetalle = tarde;
+        servicio.retenerLista = tarde;
         bloc.add(const DetalleConsultaRefrescado(silencioso: true));
         await esperar(bloc, (s) => s.refrescando);
 
@@ -412,7 +546,31 @@ void main() {
         await esperar(bloc, (s) => !s.refrescando);
       },
       verify: (bloc) {
-        expect(servicio.llamadas, ['detalle:c1', 'detalle:c1', 'escribir:c1']);
+        expect(servicio.llamadas, ['detalle:c1', 'listar:u1', 'escribir:c1']);
+        expect(bloc.state.detalle?.mensajes, hasLength(2));
+      },
+    );
+
+    blocTest<DetalleConsultaBloc, DetalleConsultaState>(
+      'después de escribir se usa la consulta que devolvió el servidor: el '
+      'latido siguiente no vuelve a pedir el detalle',
+      setUp: () => servicio.detalles = [respondida],
+      build: crear,
+      act: (bloc) async {
+        await abrir(bloc);
+        bloc.add(const DetalleConsultaMensajeEnviado('Gracias'));
+        await esperar(bloc, (s) => s.enviados == 1);
+
+        servicio.lista = [bloc.state.detalle!.resumen];
+        bloc.add(const DetalleConsultaSondeoCambiado(true));
+        await escuchando.future;
+
+        latidos.add(null);
+        await esperar(bloc, (s) => s.refrescando);
+        await esperar(bloc, (s) => !s.refrescando);
+      },
+      verify: (bloc) {
+        expect(servicio.llamadas, ['detalle:c1', 'escribir:c1', 'listar:u1']);
         expect(bloc.state.detalle?.mensajes, hasLength(2));
       },
     );
@@ -430,7 +588,10 @@ void main() {
         await esperar(bloc, (s) => s.aviso != null && !s.cancelando);
       },
       verify: (bloc) {
-        expect(servicio.llamadas.last, 'cancelar:c1:Ya me siento mejor');
+        expect(servicio.llamadas, [
+          'detalle:c1',
+          'cancelar:c1:Ya me siento mejor',
+        ], reason: 'se usa la consulta que devolvió el servidor');
         expect(bloc.state.detalle?.estado, EstadoConsulta.cancelada);
         expect(bloc.state.puedeCancelar, isFalse);
         expect(bloc.state.aviso?.exito, isTrue);

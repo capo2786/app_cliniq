@@ -443,10 +443,17 @@ las rutas del paciente de `/portal/consultas`
   zoom, bajadas con la sesión y sin copiarlas al teléfono; los PDF con el
   visor del sistema—, la conversación en burbujas y, cuando `puedeEscribir`,
   el redactor con un archivo opcional. Mientras está ENVIADA se puede
-  cancelar con un motivo. Se desliza para refrescar y, **solo mientras la
-  pantalla se ve**, pregunta por novedades cada 30 segundos: se apaga con
-  otra pantalla encima (`observadorDeRutas`) o con la aplicación en segundo
-  plano, y al volver pregunta enseguida.
+  cancelar con un motivo. Se desliza para refrescar (vuelve a pedir el
+  detalle) y, **solo mientras la pantalla se ve**, pregunta por novedades
+  cada 30 segundos: se apaga con otra pantalla encima (`observadorDeRutas`),
+  con la aplicación en segundo plano o con la consulta CERRADA o CANCELADA,
+  y al volver pregunta enseguida. El sondeo pide la lista de resúmenes
+  (`GET /portal/consultas`) y solo vuelve a pedir el detalle si esta
+  consulta cambió de `estado`, `totalMensajes` o `ultimoMensajeEn` (o si se
+  estaba viendo la copia guardada): cada lectura de `GET
+  /portal/consultas/:id` queda en la bitácora de la historia clínica, y
+  pedirlo cada 30 segundos la llenaba. Al escribir o cancelar se usa la
+  consulta que devuelve el servidor, sin volver a pedirla.
 
 ## Videoconsulta
 
@@ -545,10 +552,10 @@ fvm flutter test
 | `instante_test.dart` | Los instantes reales y la hora de la clínica |
 | `archivos_test.dart` | La validación de adjuntos, los nombres y la descarga para abrir un PDF |
 | `consultas_servicio_test.dart` | Cada ruta de `/portal/consultas`: método, ruta, cuerpo, el multipart `archivo` y la copia sin red |
-| `reglas_consultas_test.dart` | El plazo del médico, el formulario dinámico y cómo se leen las respuestas |
+| `reglas_consultas_test.dart` | El plazo del médico, qué novedades despiertan al sondeo, el formulario dinámico y cómo se leen las respuestas |
 | `consultas_bloc_test.dart` | La lista, los borradores y lo que cambia en otras pantallas |
 | `nueva_consulta_bloc_test.dart` | Los pasos y su validación, enviar (borrador → archivos → enviar), reintentar y retomar un borrador |
-| `detalle_consulta_bloc_test.dart` | Cargar, el sondeo con latidos inyectados, escribir con archivo y cancelar |
+| `detalle_consulta_bloc_test.dart` | Cargar, el sondeo con latidos inyectados (la lista primero, el detalle solo si cambió), escribir con archivo y cancelar |
 | `campo_dinamico_test.dart` | Cada tipo de pregunta y el visor de imágenes |
 | `videoconsulta_test.dart` | La ventana de la sala, pedirla, abrirla fuera y los 409/503 |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |
