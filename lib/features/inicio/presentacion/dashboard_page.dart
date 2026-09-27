@@ -15,6 +15,9 @@ import '../../auth/providers/auth_event.dart';
 import '../../citas/presentacion/citas_page.dart';
 import '../../citas/providers/citas_bloc.dart';
 import '../../citas/providers/citas_event.dart';
+import '../../consultas/presentacion/consultas_page.dart';
+import '../../consultas/providers/consultas_bloc.dart';
+import '../../consultas/providers/consultas_event.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
 import '../../dependientes/providers/dependientes_bloc.dart';
 import '../../perfil/presentacion/perfil_page.dart';
@@ -49,9 +52,9 @@ class _Pestana {
 /// La estructura de la aplicación con sesión: las pestañas de abajo.
 ///
 /// Aquí nacen las cargas de todo lo que comparten las pestañas —citas,
-/// dependientes y catálogos— y los recordatorios, y se vuelven a pedir al
-/// regresar a la aplicación: quien la abre por la mañana tiene que ver las
-/// citas de hoy, no las de anoche.
+/// consultas en línea, dependientes y catálogos— y los recordatorios, y se
+/// vuelven a pedir al regresar a la aplicación: quien la abre por la mañana
+/// tiene que ver las citas de hoy, no las de anoche.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -109,6 +112,10 @@ class _DashboardPageState extends State<DashboardPage>
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));
     }
 
+    if (usuario.puede(Permisos.consultas)) {
+      context.read<ConsultasBloc>().add(ConsultasSolicitadas(usuario.uid));
+    }
+
     if (usuario.puede(Permisos.dependientes)) {
       context.read<DependientesBloc>().add(
         DependientesSolicitados(usuario.uid),
@@ -124,10 +131,18 @@ class _DashboardPageState extends State<DashboardPage>
     ).push(MaterialPageRoute<void>(builder: (_) => const AgendarPage()));
   }
 
+  void _abrirConsultas() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const ConsultasPage()));
+  }
+
   void _irA(DestinoRapido destino) {
     switch (destino) {
       case DestinoRapido.agendar:
         _abrirAgendar();
+      case DestinoRapido.consultas:
+        _abrirConsultas();
       case DestinoRapido.citas:
         setState(() => _pagina = _paginaCitas);
       case DestinoRapido.dependientes:

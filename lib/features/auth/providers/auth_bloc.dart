@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/config/entorno.dart';
 import '../../../core/network/errores.dart';
 import '../../../core/storage/credenciales_service.dart';
 import '../data/almacen_de_sesion.dart';
@@ -14,6 +15,11 @@ import 'auth_state.dart';
 
 const String avisoSesionVencida =
     'Tu sesión venció. Vuelve a iniciar sesión para continuar.';
+
+/// Lo que se dice cuando entra alguien del personal de la clínica.
+const String avisoSoloPacientes =
+    'Esta aplicación es para pacientes. El personal de la clínica usa el '
+    'panel web: ${Entorno.webUrl}';
 
 /// La sesión: entrar, el segundo factor, restaurar, vencer y salir.
 ///
@@ -110,12 +116,25 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
      */
     try {
       final usuario = await _servicio.yo().timeout(const Duration(seconds: 6));
+
+      if (!usuario.esPaciente) {
+        await _olvidarSesion();
+        emit(const AuthCuentaDelPersonal());
+        return;
+      }
+
       await _almacen.actualizarUsuario(usuario);
       emit(AuthAutenticado(usuario, restaurada: true));
     } catch (error) {
       if (estadoDe(error) == 401) {
         await _olvidarSesion();
         emit(const AuthNoAutenticado(aviso: avisoSesionVencida));
+        return;
+      }
+
+      if (!sesion.usuario.esPaciente) {
+        await _olvidarSesion();
+        emit(const AuthCuentaDelPersonal());
         return;
       }
 
@@ -155,7 +174,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       }
     } catch (error) {
       final traducido = errorDeAcceso(error);
-      emit(AuthError(traducido.mensaje, bloqueada: traducido.bloqueada));
+      emit(
+        AuthError(
+          traducido.mensaje,
+          bloqueada: traducido.bloqueada,
+          correoSinVerificar: traducido.correoSinVerificar,
+          correo: traducido.correoSinVerificar ? email : null,
+        ),
+      );
     }
   }
 
@@ -214,6 +240,18 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     Emitter<AuthState> emit,
   ) async {
     _pendiente = null;
+
+    /*
+     * Solo entran pacientes. Los permisos llegan con el acceso —el mismo
+     * perfil de sesión que devuelve `GET /auth/me`— y sin «mis citas» la
+     * aplicación no tiene nada que enseñar: se descarta el token sin
+     * guardar la sesión ni las credenciales, y se explica a dónde ir.
+     */
+    if (!acceso.usuario.esPaciente) {
+      _fijarToken(null);
+      emit(const AuthCuentaDelPersonal());
+      return;
+    }
 
     final segundos = acceso.expiraEnSegundos;
     final venceEn = segundos == null || segundos <= 0

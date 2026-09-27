@@ -85,8 +85,26 @@ class AuthError extends AuthState {
   /// La cuenta quedó bloqueada 15 minutos (HTTP 423).
   final bool bloqueada;
 
-  const AuthError(this.mensaje, {this.bloqueada = false});
+  /// Falta confirmar el correo (HTTP 403, `CORREO_NO_VERIFICADO`).
+  final bool correoSinVerificar;
+
+  /// El correo con que se intentó entrar, para pedir otro enlace de
+  /// confirmación sin volver a escribirlo. Solo con [correoSinVerificar].
+  final String? correo;
+
+  const AuthError(
+    this.mensaje, {
+    this.bloqueada = false,
+    this.correoSinVerificar = false,
+    this.correo,
+  });
 
   @override
-  List<Object?> get props => [mensaje, bloqueada];
+  List<Object?> get props => [mensaje, bloqueada, correoSinVerificar, correo];
+}
+
+/// Las credenciales eran buenas, pero la cuenta no es de un paciente: es del
+/// personal de la clínica, que trabaja en el panel web. No se abre la sesión.
+class AuthCuentaDelPersonal extends AuthState {
+  const AuthCuentaDelPersonal();
 }

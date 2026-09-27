@@ -18,8 +18,9 @@ import 'package:app_cliniq/features/dependientes/data/dependientes_service.dart'
 import 'package:app_cliniq/features/dependientes/data/models/dependiente.dart';
 import 'package:dio/dio.dart';
 
-/// Un error HTTP con la forma de la API: `{status, message}`.
-DioException errorHttp(int estado, [Object? mensaje]) {
+/// Un error HTTP con la forma de la API: `{status, message}` y, si se pasa,
+/// el `codigo` con que algunas respuestas se distinguen.
+DioException errorHttp(int estado, [Object? mensaje, String? codigo]) {
   final opciones = RequestOptions(path: '/prueba');
 
   return DioException(
@@ -28,7 +29,7 @@ DioException errorHttp(int estado, [Object? mensaje]) {
     response: Response<dynamic>(
       requestOptions: opciones,
       statusCode: estado,
-      data: {'status': estado, 'message': ?mensaje},
+      data: {'status': estado, 'message': ?mensaje, 'codigo': ?codigo},
     ),
   );
 }
@@ -91,6 +92,19 @@ class AuthServiceFalso implements AuthService {
   @override
   Future<String> pedirRecuperacion(String email) async =>
       'Si el correo está registrado, te enviamos un enlace.';
+
+  /// Si está puesto, reenviar la confirmación falla con este error.
+  Object? errorAlReenviar;
+
+  @override
+  Future<String> reenviarConfirmacion(String email) async {
+    llamadas.add('reenviar:$email');
+
+    final error = errorAlReenviar;
+    if (error != null) throw error;
+
+    return 'Si el correo tiene una cuenta pendiente, te enviamos un enlace.';
+  }
 
   @override
   Future<void> cambiarContrasena({

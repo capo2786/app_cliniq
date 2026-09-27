@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
+import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/cita.dart';
+import '../../dominio/videoconsulta.dart';
 import '../estilos_cita.dart';
 import 'hoja_calendario.dart';
 
@@ -12,7 +14,11 @@ class TarjetaCita extends StatelessWidget {
   final Cita cita;
   final VoidCallback? onTap;
 
-  const TarjetaCita({super.key, required this.cita, this.onTap});
+  /// La hora de la clínica, para saber si la sala de video está abierta.
+  /// Sin ella se usa la de ahora.
+  final DateTime? ahora;
+
+  const TarjetaCita({super.key, required this.cita, this.onTap, this.ahora});
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +92,13 @@ class TarjetaCita extends StatelessWidget {
                             'Para ${cita.pacienteNombre ?? 'un dependiente'}',
                         color: AppColors.acentoClaro,
                         icono: Icons.family_restroom_rounded,
+                      ),
+                    if (estadoDeSala(cita, ahora ?? Servicios.reloj.ahora()) ==
+                        EstadoSala.abierta)
+                      const Pastilla(
+                        texto: 'Sala abierta',
+                        color: AppColors.exito,
+                        icono: Icons.videocam_rounded,
                       ),
                   ],
                 ),

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/fechas/fecha_local.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../citas/data/models/cita.dart';
 import '../../../citas/dominio/reglas_citas.dart';
+import '../../../citas/dominio/videoconsulta.dart';
 import '../../../citas/presentacion/estilos_cita.dart';
 import '../../../citas/presentacion/widgets/detalle_cita.dart';
 import '../../../citas/presentacion/widgets/hoja_calendario.dart';
 import '../../../citas/presentacion/widgets/tarjeta_cita.dart';
+import '../../../citas/presentacion/widgets/videoconsulta.dart';
 
 /// «Tu próxima cita»: cuándo, con quién, cuánto falta y cómo prepararse.
 ///
@@ -23,6 +26,12 @@ class TarjetaProximaCita extends StatelessWidget {
     required this.cita,
     required this.ahora,
   });
+
+  bool get _salaALaVista => switch (estadoDeSala(cita, ahora)) {
+    EstadoSala.abierta => true,
+    EstadoSala.porAbrir => mismoDia(cita.inicio, ahora),
+    _ => false,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -111,6 +120,12 @@ class TarjetaProximaCita extends StatelessWidget {
             consejos: consejosPara(cita.tipo),
             color: cita.tipo.color,
           ),
+          // El botón de la sala va aquí mismo el día de la cita: es lo que
+          // se busca al abrir la aplicación diez minutos antes.
+          if (_salaALaVista) ...[
+            const SizedBox(height: 14),
+            BotonVideoconsulta(cita: cita, compacto: true),
+          ],
         ],
       ),
     );

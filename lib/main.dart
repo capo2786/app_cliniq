@@ -8,6 +8,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'core/arranque/arranque_seguro.dart';
 import 'core/catalogos/catalogos_cubit.dart';
 import 'core/network/api_client.dart';
+import 'core/presentacion/rutas.dart';
 import 'core/servicios.dart';
 import 'core/tema/tema_app.dart';
 import 'features/arranque/presentacion/arranque_page.dart';
@@ -16,6 +17,8 @@ import 'features/auth/providers/auth_bloc.dart';
 import 'features/auth/providers/auth_state.dart';
 import 'features/citas/providers/citas_bloc.dart';
 import 'features/citas/providers/citas_event.dart';
+import 'features/consultas/providers/consultas_bloc.dart';
+import 'features/consultas/providers/consultas_event.dart';
 import 'features/dependientes/providers/dependientes_bloc.dart';
 import 'features/inicio/presentacion/dashboard_page.dart';
 import 'features/legal/presentacion/aceptacion_legal_page.dart';
@@ -60,10 +63,10 @@ void main() {
 
 /// La aplicación: los blocs compartidos y la puerta de entrada.
 ///
-/// Los blocs que usan varias pestañas —la sesión, las citas, los
-/// dependientes y los catálogos— nacen aquí. Una pantalla que se abre por
-/// navegación (agendar) crea el suyo para cargar datos frescos en cada
-/// visita.
+/// Los blocs que usan varias pantallas —la sesión, las citas, las consultas
+/// en línea, los dependientes y los catálogos— nacen aquí. Una pantalla que
+/// se abre por navegación (agendar, una consulta nueva) crea el suyo para
+/// cargar datos frescos en cada visita.
 class CliniqApp extends StatelessWidget {
   const CliniqApp({super.key});
 
@@ -89,6 +92,9 @@ class CliniqApp extends StatelessWidget {
             reloj: Servicios.reloj,
           ),
         ),
+        BlocProvider<ConsultasBloc>(
+          create: (_) => ConsultasBloc(Servicios.consultas),
+        ),
         BlocProvider<DependientesBloc>(
           create: (_) => DependientesBloc(Servicios.dependientes),
         ),
@@ -107,6 +113,7 @@ class CliniqApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        navigatorObservers: [observadorDeRutas],
         home: const PuertaDeEntrada(),
       ),
     );
@@ -141,6 +148,7 @@ class PuertaDeEntrada extends StatelessWidget {
         // quedaran abiertas encima y se olvida lo de la persona anterior.
         Navigator.of(context).popUntil((ruta) => ruta.isFirst);
         context.read<CitasBloc>().add(const CitasVaciadas());
+        context.read<ConsultasBloc>().add(const ConsultasVaciadas());
         context.read<DependientesBloc>().add(const DependientesVaciados());
       },
       buildWhen: (antes, ahora) => _destino(antes) != _destino(ahora),

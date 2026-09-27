@@ -22,10 +22,12 @@ import '../../citas/dominio/reglas_citas.dart';
 import '../../citas/providers/citas_bloc.dart';
 import '../../citas/providers/citas_event.dart';
 import '../../citas/providers/citas_state.dart';
+import '../../consultas/dominio/reglas_consultas.dart';
+import '../../consultas/providers/consultas_bloc.dart';
 import 'widgets/proxima_cita.dart';
 
 /// Las pestañas a las que se puede saltar desde los accesos rápidos.
-enum DestinoRapido { agendar, citas, dependientes, perfil }
+enum DestinoRapido { agendar, consultas, citas, dependientes, perfil }
 
 /// La portada: quién eres, cuál es tu próxima cita y los accesos rápidos.
 class InicioPage extends StatefulWidget {
@@ -169,6 +171,12 @@ class _InicioPageState extends State<InicioPage> {
                           ),
                         const SizedBox(height: 26),
                         const EtiquetaSeccion('Accesos rápidos'),
+                        if (usuario?.puede(Permisos.consultas) ?? false) ...[
+                          _AccesoConsultas(
+                            alAbrir: () => widget.alIr(DestinoRapido.consultas),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         _AccesosRapidos(alIr: widget.alIr),
                         const SizedBox(height: 30),
                         const Center(
@@ -434,6 +442,104 @@ class _Dato extends StatelessWidget {
                 fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Consultas en línea, a lo ancho y antes que los demás accesos: es la forma
+/// de hablar con un médico sin cita, y avisa cuando hay respuestas por leer.
+class _AccesoConsultas extends StatelessWidget {
+  final VoidCallback alAbrir;
+
+  const _AccesoConsultas({required this.alAbrir});
+
+  @override
+  Widget build(BuildContext context) {
+    final porLeer = context.select<ConsultasBloc, int>(
+      (bloc) => respuestasPorLeer(bloc.state.consultas),
+    );
+    final enCurso = context.select<ConsultasBloc, int>(
+      (bloc) => consultasEnCurso(bloc.state.consultas).length,
+    );
+
+    final descripcion = porLeer > 0
+        ? (porLeer == 1
+              ? 'Tienes 1 respuesta del médico'
+              : 'Tienes $porLeer respuestas del médico')
+        : enCurso > 0
+        ? (enCurso == 1 ? '1 consulta en curso' : '$enCurso consultas en curso')
+        : 'Escríbele a un médico sin ir a la clínica';
+
+    return TarjetaTranslucida(
+      key: const Key('acceso-consultas'),
+      tinte: AppColors.ambar,
+      onTap: alAbrir,
+      padding: const EdgeInsets.all(15),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.ambar.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.forum_outlined,
+              color: AppColors.ambar,
+              size: 23,
+            ),
+          ),
+          const SizedBox(width: 13),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Consultas en línea',
+                  style: TextStyle(
+                    color: AppColors.texto,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  descripcion,
+                  style: TextStyle(
+                    color: porLeer > 0
+                        ? AppColors.exito
+                        : AppColors.textoSecundario,
+                    fontSize: 11.5,
+                    height: 1.3,
+                    fontWeight: porLeer > 0 ? FontWeight.w700 : FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (porLeer > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: AppColors.exito,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$porLeer',
+                style: const TextStyle(
+                  color: AppColors.fondoProfundo,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: AppColors.textoSecundario,
           ),
         ],
       ),
