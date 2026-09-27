@@ -146,8 +146,8 @@ void main() {
         bloc.add(const CitasSolicitadas('u1'));
         await bloc.stream.firstWhere((s) => s.carga == CargaCitas.lista);
         bloc.add(const CitasVaciadas());
+        await bloc.stream.firstWhere((s) => s == const CitasState());
       },
-      wait: const Duration(milliseconds: 10),
       verify: (bloc) => expect(bloc.state, const CitasState()),
     );
   });

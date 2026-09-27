@@ -105,8 +105,10 @@ void main() {
     'al abrir carga médicos, especialidades y dependientes, y empieza por '
     '«para quién»',
     build: crear,
-    act: (bloc) => bloc.add(const AgendarIniciado()),
-    wait: const Duration(milliseconds: 20),
+    act: (bloc) async {
+      bloc.add(const AgendarIniciado());
+      await hasta(bloc, (s) => !s.cargando);
+    },
     verify: (bloc) {
       final s = bloc.state;
       expect(s.cargando, isFalse);
@@ -126,8 +128,12 @@ void main() {
       bloc.add(const AgendarIniciado());
       await hasta(bloc, (s) => !s.cargando);
       bloc.add(const AgendarMedicoElegido('ped'));
+      await hasta(
+        bloc,
+        (s) =>
+            s.medicoId == 'ped' && !s.cargandoOcupados && s.ocupados.isNotEmpty,
+      );
     },
-    wait: const Duration(milliseconds: 20),
     verify: (bloc) {
       final s = bloc.state;
       expect(s.paso, PasoAgendar.modalidad);
