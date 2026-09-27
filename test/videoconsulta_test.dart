@@ -3,6 +3,17 @@
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/integraciones/costuras.dart';
 import 'package:app_cliniq/core/tema/tema_app.dart';
+import 'package:app_cliniq/core/storage/almacen_claves.dart';
+import 'package:app_cliniq/core/storage/cache_local.dart';
+import 'package:app_cliniq/core/storage/credenciales_service.dart';
+import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
+import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
+import 'package:app_cliniq/features/auth/providers/auth_state.dart';
+import 'package:app_cliniq/features/citas/data/citas_service.dart';
+import 'package:app_cliniq/features/citas/presentacion/videoconsulta_page.dart';
+import 'package:app_cliniq/features/citas/providers/citas_bloc.dart';
+import 'package:app_cliniq/features/citas/providers/citas_state.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
 import 'package:app_cliniq/features/citas/data/videollamada_service.dart';
 import 'package:app_cliniq/features/citas/dominio/videoconsulta.dart';
@@ -214,36 +225,119 @@ void main() {
       expect(sala.abreEn, DateTime.utc(2026, 9, 28, 14, 45));
     });
 
-    test('la abre en el navegador, fuera de la aplicación', () async {
+    test('entra con el SDK, dentro de la aplicación: servidor, sala, '
+        'token, nombre y asunto', () async {
       final api = DioGrabador({
         'GET /portal/citas/c1/videollamada': (_) => salaJson(),
       });
-      final abiertas = <Uri>[];
+      final sala = _SalaFalsa();
+      final navegador = _NavegadorFalso();
 
-      await VideollamadaEnNavegador(
-        VideollamadaService(api.dio),
-        abrir: (direccion) async {
-          abiertas.add(direccion);
-          return true;
-        },
-      ).unirse('c1');
+      final donde =
+          await VideollamadaEnLaApp(
+            VideollamadaService(api.dio),
+            sala: sala,
+            abrirEnNavegador: navegador.abrir,
+          ).unirse(
+            'c1',
+            nombreVisible: 'Ana María Pérez',
+            asunto: 'Videoconsulta · Clínica Andina',
+          );
 
-      expect(abiertas, [Uri.parse('https://meet.x.com/cliniq-abc?jwt=t')]);
+      expect(donde, SalaAbierta.enLaAplicacion);
+      expect(sala.entradas, [
+        const DatosDeSala(
+          servidor: 'https://meet.x.com',
+          sala: 'cliniq-abc',
+          token: 't',
+          nombreVisible: 'Ana María Pérez',
+          asunto: 'Videoconsulta · Clínica Andina',
+        ),
+      ]);
+      expect(navegador.abiertas, isEmpty);
     });
 
-    test('409: el mensaje del servidor, tal cual', () async {
+    test(
+      'sin dominio, el de la dirección de la sala; el dominio se limpia',
+      () {
+        final sala = Videollamada.desdeJson({
+          ...salaJson(url: 'https://video.andina.ec/cliniq-abc?jwt=t'),
+          'dominio': '',
+        });
+        expect(DatosDeSala.de(sala)?.servidor, 'https://video.andina.ec');
+
+        expect(dominioLimpio(' https://meet.andina.ec/ '), 'meet.andina.ec');
+        expect(
+          DatosDeSala.de(Videollamada.desdeJson({...salaJson(), 'jwt': ''})),
+          isNull,
+          reason: 'sin token no se entra con el SDK',
+        );
+      },
+    );
+
+    test('el asunto lleva el nombre de la clínica', () {
+      expect(
+        asuntoDeLaSala('Clínica Andina'),
+        'Videoconsulta · Clínica Andina',
+      );
+      expect(asuntoDeLaSala('  '), 'Videoconsulta');
+    });
+
+    test('sin SDK (la web), el navegador integrado, con aviso', () async {
+      final api = DioGrabador({
+        'GET /portal/citas/c1/videollamada': (_) => salaJson(),
+      });
+      final sala = _SalaFalsa(disponible: false);
+      final navegador = _NavegadorFalso();
+
+      final donde = await VideollamadaEnLaApp(
+        VideollamadaService(api.dio),
+        sala: sala,
+        abrirEnNavegador: navegador.abrir,
+      ).unirse('c1');
+
+      expect(donde, SalaAbierta.enElNavegador);
+      expect(sala.entradas, isEmpty);
+      expect(navegador.abiertas, [
+        Uri.parse('https://meet.x.com/cliniq-abc?jwt=t'),
+      ]);
+    });
+
+    test('si el SDK falla, recién ahí el navegador integrado', () async {
+      final api = DioGrabador({
+        'GET /portal/citas/c1/videollamada': (_) => salaJson(),
+      });
+
+      for (final sala in [
+        _SalaFalsa(abre: false),
+        _SalaFalsa(error: StateError('sin plataforma')),
+      ]) {
+        final navegador = _NavegadorFalso();
+
+        final donde = await VideollamadaEnLaApp(
+          VideollamadaService(api.dio),
+          sala: sala,
+          abrirEnNavegador: navegador.abrir,
+        ).unirse('c1');
+
+        expect(sala.entradas, hasLength(1));
+        expect(donde, SalaAbierta.enElNavegador);
+        expect(navegador.abiertas, hasLength(1));
+      }
+    });
+
+    test('409: el mensaje del servidor, tal cual, sin abrir nada', () async {
       final api = DioGrabador({
         'GET /portal/citas/c1/videollamada': (_) =>
             throw errorHttp(409, 'La sala se abre 15 minutos antes de la cita'),
       });
-      final abiertas = <Uri>[];
+      final sala = _SalaFalsa();
+      final navegador = _NavegadorFalso();
 
-      final video = VideollamadaEnNavegador(
+      final video = VideollamadaEnLaApp(
         VideollamadaService(api.dio),
-        abrir: (d) async {
-          abiertas.add(d);
-          return true;
-        },
+        sala: sala,
+        abrirEnNavegador: navegador.abrir,
       );
 
       await expectLater(
@@ -256,7 +350,8 @@ void main() {
           ),
         ),
       );
-      expect(abiertas, isEmpty);
+      expect(sala.entradas, isEmpty);
+      expect(navegador.abiertas, isEmpty);
     });
 
     test('503 sin mensaje: se explica que no está disponible', () async {
@@ -265,9 +360,10 @@ void main() {
       });
 
       await expectLater(
-        VideollamadaEnNavegador(
+        VideollamadaEnLaApp(
           VideollamadaService(api.dio),
-          abrir: (_) async => true,
+          sala: _SalaFalsa(),
+          abrirEnNavegador: _NavegadorFalso().abrir,
         ).unirse('c1'),
         throwsA(
           isA<ErrorDeVideollamada>().having(
@@ -295,36 +391,40 @@ void main() {
       expect(mensajeDeVideollamada(errorDeRed()), contains('Sin conexión'));
     });
 
-    test('una dirección que no es https no se abre', () async {
+    test('en el respaldo, una dirección que no es https no se abre', () async {
       final api = DioGrabador({
         'GET /portal/citas/c1/videollamada': (_) =>
             salaJson(url: 'http://meet.x.com/sala'),
       });
+      final navegador = _NavegadorFalso();
 
       await expectLater(
-        VideollamadaEnNavegador(
+        VideollamadaEnLaApp(
           VideollamadaService(api.dio),
-          abrir: (_) async => true,
+          sala: _SalaFalsa(disponible: false),
+          abrirEnNavegador: navegador.abrir,
         ).unirse('c1'),
         throwsA(isA<ErrorDeVideollamada>()),
       );
+      expect(navegador.abiertas, isEmpty);
     });
 
-    test('sin navegador que la abra, se dice', () async {
+    test('si tampoco abre el navegador integrado, se dice', () async {
       final api = DioGrabador({
         'GET /portal/citas/c1/videollamada': (_) => salaJson(),
       });
 
       await expectLater(
-        VideollamadaEnNavegador(
+        VideollamadaEnLaApp(
           VideollamadaService(api.dio),
-          abrir: (_) async => false,
+          sala: _SalaFalsa(disponible: false),
+          abrirEnNavegador: _NavegadorFalso(abre: false).abrir,
         ).unirse('c1'),
         throwsA(
           isA<ErrorDeVideollamada>().having(
             (e) => e.mensaje,
             'mensaje',
-            contains('navegador'),
+            contains('No pudimos abrir la videoconsulta'),
           ),
         ),
       );
@@ -438,21 +538,179 @@ void main() {
       expect(find.text('Entrar a la videoconsulta'), findsNothing);
     });
   });
+
+  group('Entrar a la sala', () {
+    setUp(sondeoConRed);
+
+    Future<void> montar(WidgetTester tester, Widget hijo) async {
+      final llavero = AlmacenClavesEnMemoria();
+      final auth = AuthBloc(
+        servicio: AuthServiceFalso(),
+        almacen: AlmacenDeSesion(llavero),
+        credenciales: CredencialesService(llavero),
+        fijarToken: (_) {},
+        restaurarAlCrear: false,
+      )..emit(AuthAutenticado(usuarioDePrueba()));
+      addTearDown(auth.close);
+
+      await tester.pumpWidget(
+        conDatosDeLaClinica(
+          BlocProvider.value(
+            value: auth,
+            child: MaterialApp(
+              theme: temaCliniq(),
+              home: Scaffold(body: SingleChildScrollView(child: hijo)),
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('entra con el nombre de la sesión y el asunto de la clínica', (
+      tester,
+    ) async {
+      final servicio = _VideoFalso();
+      await montar(tester, EntrarASala(citaId: 'c1', servicio: servicio));
+
+      await tester.tap(find.byKey(const Key('boton-videoconsulta')));
+      await tester.pump();
+
+      expect(servicio.nombresYAsuntos, [
+        ('Ana María Pérez', 'Videoconsulta · Clínica Andina'),
+      ]);
+      expect(find.text(avisoVideoEnElNavegador), findsNothing);
+    });
+
+    testWidgets('si se abrió en el navegador integrado, lo avisa', (
+      tester,
+    ) async {
+      await montar(
+        tester,
+        EntrarASala(
+          citaId: 'c1',
+          servicio: _VideoFalso(donde: SalaAbierta.enElNavegador),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('boton-videoconsulta')));
+      await tester.pump();
+
+      expect(find.text(avisoVideoEnElNavegador), findsOneWidget);
+    });
+  });
+
+  group('La pantalla de la videoconsulta', () {
+    setUp(sondeoConRed);
+
+    Future<void> montar(
+      WidgetTester tester, {
+      required List<Cita> citas,
+      required ServicioVideollamada servicio,
+    }) async {
+      final bloc = CitasBloc(
+        citas: CitasService(DioGrabador().dio, CacheEnMemoria()),
+        portal: PortalFalso(),
+        recordatorios: ProgramadorFalso(),
+        config: configDePrueba,
+        catalogos: catalogosDePrueba,
+      )..emit(CitasState(citas: citas, carga: CargaCitas.lista));
+      addTearDown(bloc.close);
+
+      await tester.pumpWidget(
+        conDatosDeLaClinica(
+          BlocProvider.value(
+            value: bloc,
+            child: MaterialApp(
+              theme: temaCliniq(),
+              home: VideoconsultaPage(citaId: 'c1', servicio: servicio),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('con la cita, su tarjeta y el botón con su ventana', (
+      tester,
+    ) async {
+      await montar(tester, citas: [cita()], servicio: _VideoFalso());
+
+      expect(find.byType(TarjetaCita), findsOneWidget);
+      expect(find.byType(BotonVideoconsulta), findsOneWidget);
+    });
+
+    testWidgets('sin la cita, se entra igual y el servidor decide', (
+      tester,
+    ) async {
+      final servicio = _VideoFalso(
+        error: const ErrorDeVideollamada('No se encontró la cita.'),
+      );
+      await montar(tester, citas: const [], servicio: servicio);
+
+      expect(find.byType(TarjetaCita), findsNothing);
+      await tester.tap(find.byKey(const Key('boton-videoconsulta')));
+      await tester.pump();
+
+      expect(servicio.unidas, ['c1']);
+      expect(find.text('No se encontró la cita.'), findsOneWidget);
+    });
+  });
 }
 
 class _VideoFalso implements ServicioVideollamada {
   final ErrorDeVideollamada? error;
+  final SalaAbierta donde;
   final List<String> unidas = [];
+  final List<(String, String)> nombresYAsuntos = [];
 
-  _VideoFalso({this.error});
+  _VideoFalso({this.error, this.donde = SalaAbierta.enLaAplicacion});
 
   @override
   bool get disponible => true;
 
   @override
-  Future<void> unirse(String citaId) async {
+  Future<SalaAbierta> unirse(
+    String citaId, {
+    String nombreVisible = '',
+    String asunto = '',
+  }) async {
     unidas.add(citaId);
+    nombresYAsuntos.add((nombreVisible, asunto));
     final e = error;
     if (e != null) throw e;
+    return donde;
+  }
+}
+
+/// El SDK de video, sin plataforma: anota a qué salas se entró.
+class _SalaFalsa implements SalaDeVideo {
+  @override
+  final bool disponible;
+
+  final bool abre;
+  final Object? error;
+  final List<DatosDeSala> entradas = [];
+
+  _SalaFalsa({this.disponible = true, this.abre = true, this.error});
+
+  @override
+  Future<bool> entrar(DatosDeSala datos) async {
+    entradas.add(datos);
+    final e = error;
+    if (e != null) throw e;
+    return abre;
+  }
+}
+
+/// El navegador integrado: anota lo que se abrió.
+class _NavegadorFalso {
+  final bool abre;
+  final List<Uri> abiertas = [];
+
+  _NavegadorFalso({this.abre = true});
+
+  Future<bool> abrir(Uri direccion) async {
+    abiertas.add(direccion);
+    return abre;
   }
 }

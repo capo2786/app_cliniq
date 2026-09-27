@@ -18,27 +18,14 @@ class Entorno {
     defaultValue: 'https://api-cliniq.gcaicedo-proyectos.com/api',
   );
 
-  /// Dónde vive el panel web, que publica el texto de los documentos legales.
-  ///
-  /// La aplicación no copia esos textos: los abre en el navegador, así que
-  /// una versión nueva de un documento no obliga a publicar la aplicación.
+  /// Dónde vive el panel web. La aplicación solo lo abre (en el navegador
+  /// integrado) para el autorregistro y para el personal que entra por error.
   static const String webUrl = String.fromEnvironment(
     'WEB_URL',
     defaultValue: 'https://cliniq.gcaicedo-proyectos.com',
   );
 
-  /// Dirección pública de un documento legal por su nombre corto.
-  static String urlLegal(String slug) => '$webUrl/legal/$slug';
-
   /// El autorregistro de pacientes, en el panel web: la aplicación no copia
   /// ese formulario (cédula, términos, confirmación por correo), lo abre.
   static String get urlRegistro => '$webUrl/registro';
-
-  /// Una ruta del panel web, para lo que la aplicación no tiene pantalla
-  /// propia (un enlace del menú que no conoce): `/mi-salud` →
-  /// `https://<web>/mi-salud`.
-  static String urlWeb(String ruta) {
-    final limpia = ruta.trim();
-    return '$webUrl${limpia.startsWith('/') ? '' : '/'}$limpia';
-  }
 }

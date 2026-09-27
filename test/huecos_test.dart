@@ -1,6 +1,7 @@
 // test/huecos_test.dart
 
 import 'package:app_cliniq/features/agendar/data/models/medico_portal.dart';
+import 'package:app_cliniq/features/agendar/data/models/turnos.dart';
 import 'package:app_cliniq/features/agendar/dominio/horarios.dart';
 import 'package:app_cliniq/features/agendar/dominio/huecos.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
@@ -8,15 +9,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/clinica.dart';
 
-/// El puerto del cálculo de horarios del panel web.
+/// La presentación de los turnos que calcula la API, y la jornada del
+/// médico.
 ///
-/// Estas pruebas fijan las mismas reglas que `agenda.utils.ts` y
-/// `horarios.model.ts`: turnos, bloqueos, duración por modalidad, margen a
-/// ambos lados de cada cita, límite diario, el primer día con atención y los
-/// grupos de mañana, tarde y noche. El paso, la anticipación, el horizonte,
-/// los cortes y las duraciones por defecto son los de la configuración de la
-/// clínica (`r`: 15 min, 15 min, 60 días, 12:00/19:00, 30/20/15); las
-/// pruebas del final cambian esos valores y miran que el cálculo los siga.
+/// Los huecos ya no se calculan en la aplicación: la API los manda
+/// (`/portal/turnos/:doctorId`). Aquí se prueba lo que queda: agrupar por
+/// día y por mañana, tarde y noche con los cortes de la clínica, no seguir
+/// ofreciendo lo que dejó de cumplir la anticipación ni lo que el servidor
+/// rechazó, y decir cuándo es un turno con palabras naturales. La
+/// configuración de prueba (`r`) tiene la tarde desde las 12:00, la noche
+/// desde las 19:00 y 15 minutos de anticipación.
 void main() {
   final r = reglasDePrueba();
 
@@ -48,8 +50,16 @@ void main() {
     );
   }
 
-  // Lunes 28 de septiembre de 2026.
-  final lunes = DateTime(2026, 9, 28);
+  Turno turno(int mes, int dia, int hora, int minuto, [int duracion = 30]) {
+    final inicio = DateTime(2026, mes, dia, hora, minuto);
+    return Turno(
+      inicio: inicio,
+      fin: inicio.add(Duration(minutes: duracion)),
+    );
+  }
+
+  // Lunes 28 de septiembre de 2026, a las 10:00.
+  final ahora = DateTime(2026, 9, 28, 10);
 
   group('Horarios del médico', () {
     test('normalizar completa los siete días y apaga los que no tienen '
@@ -67,28 +77,6 @@ void main() {
       expect(normalizados[0].activo, isTrue);
       expect(normalizados[1].activo, isFalse, reason: 'activo pero sin turnos');
       expect(normalizados[6].activo, isFalse);
-    });
-
-    test('rangosDelDia: solo los válidos del día de la semana, en orden', () {
-      final m = medico(
-        horarios: const [
-          HorarioDia(
-            dia: 'Lunes',
-            activo: true,
-            rangos: [
-              HorarioRango(inicio: '14:00', fin: '16:00'),
-              HorarioRango(inicio: '10:00', fin: '09:00'),
-              HorarioRango(inicio: '08:00', fin: '09:00'),
-            ],
-          ),
-        ],
-      );
-
-      expect(rangosDelDia(m.horariosAtencion, lunes), const [
-        HorarioRango(inicio: '08:00', fin: '09:00'),
-        HorarioRango(inicio: '14:00', fin: '16:00'),
-      ]);
-      expect(rangosDelDia(m.horariosAtencion, DateTime(2026, 9, 29)), isEmpty);
     });
 
     test('bloqueoEn cubre los extremos, inclusive', () {
@@ -139,437 +127,166 @@ void main() {
     });
   });
 
-  group('calcularHuecos', () {
-    final antes = DateTime(2026, 9, 27, 20);
+  group('Fichas de los turnos de la API', () {
+    final turnos = [
+      turno(9, 29, 8, 0),
+      turno(9, 28, 11, 45),
+      turno(9, 28, 12, 0),
+      turno(9, 28, 19, 0, 20),
+      turno(9, 30, 18, 59),
+    ];
 
-    test('paso de 15 minutos y solo si la cita cabe entera en el turno', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '08:00', fin: '09:00')],
-        duracion: 30,
-        citas: const [],
-        ahora: antes,
-        reglas: r,
-      );
+    test('una ficha por turno, con su hora, su fin y su periodo', () {
+      final h = Hueco.deTurno(turno(9, 28, 9, 30, 45), r);
 
-      expect(huecos.map((h) => h.hora), ['08:00', '08:15', '08:30']);
-      expect(huecos.last.fin, DateTime(2026, 9, 28, 9));
-    });
-
-    test('lo que ya pasó no se ofrece', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '08:00', fin: '10:00')],
-        duracion: 30,
-        citas: const [],
-        ahora: DateTime(2026, 9, 28, 8, 40),
-        reglas: r,
-      );
-
-      expect(huecos.first.hora, '08:45');
-    });
-
-    test('el margen se suma a ambos lados de cada cita', () {
-      final cita = IntervaloOcupado(
-        id: 'c1',
-        inicio: DateTime(2026, 9, 28, 9),
-        fin: DateTime(2026, 9, 28, 9, 30),
-      );
-
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '08:00', fin: '11:00')],
-        duracion: 30,
-        margen: 10,
-        citas: [cita],
-        ahora: antes,
-        reglas: r,
-      );
-
-      Hueco a(String hora) => huecos.firstWhere((h) => h.hora == hora);
-
-      // 08:15–08:45 termina antes de 08:50: libre.
-      expect(a('08:15').ocupado, isFalse);
-      // 08:30–09:00 pisa el margen previo (08:50).
-      expect(a('08:30').ocupado, isTrue);
-      expect(a('09:00').ocupado, isTrue);
-      // 09:30 empieza antes de 09:40 (fin + margen).
-      expect(a('09:30').ocupado, isTrue);
-      // 09:45 ya está fuera del margen.
-      expect(a('09:45').ocupado, isFalse);
-    });
-
-    test('sin margen, una cita que termina justo cuando empieza otra no '
-        'choca', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '09:00', fin: '10:00')],
-        duracion: 30,
-        citas: [
-          IntervaloOcupado(
-            id: 'c1',
-            inicio: DateTime(2026, 9, 28, 9),
-            fin: DateTime(2026, 9, 28, 9, 30),
-          ),
-        ],
-        ahora: antes,
-        reglas: r,
-      );
-
-      expect(huecos.firstWhere((h) => h.hora == '09:30').ocupado, isFalse);
-    });
-
-    test('la cita que se reprograma no ocupa su propio horario', () {
-      final original = IntervaloOcupado(
-        id: 'mia',
-        inicio: DateTime(2026, 9, 28, 9),
-        fin: DateTime(2026, 9, 28, 9, 30),
-      );
-
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '09:00', fin: '10:00')],
-        duracion: 30,
-        citas: [original],
-        excluirId: 'mia',
-        ahora: antes,
-        reglas: r,
-      );
-
-      expect(huecos.every((h) => !h.ocupado), isTrue);
-    });
-
-    test('las citas que ya no ocupan (canceladas) y las de otro día no '
-        'cuentan', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '09:00', fin: '10:00')],
-        duracion: 30,
-        citas: [
-          IntervaloOcupado(
-            id: 'c1',
-            inicio: DateTime(2026, 9, 28, 9),
-            fin: DateTime(2026, 9, 28, 9, 30),
-            ocupaHorario: false,
-          ),
-          IntervaloOcupado(
-            id: 'c2',
-            inicio: DateTime(2026, 9, 29, 9),
-            fin: DateTime(2026, 9, 29, 9, 30),
-          ),
-        ],
-        ahora: antes,
-        reglas: r,
-      );
-
-      expect(huecos.every((h) => !h.ocupado), isTrue);
-    });
-
-    test('mañana hasta las 12:00, tarde hasta las 19:00, noche después', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [
-          HorarioRango(inicio: '11:30', fin: '12:15'),
-          HorarioRango(inicio: '18:45', fin: '19:30'),
-        ],
-        duracion: 15,
-        citas: const [],
-        ahora: antes,
-        reglas: r,
-      );
-
-      Periodo p(String hora) =>
-          huecos.firstWhere((h) => h.hora == hora).periodo;
-
-      expect(p('11:45'), Periodo.manana);
-      expect(p('12:00'), Periodo.tarde);
-      expect(p('18:45'), Periodo.tarde);
-      expect(p('19:00'), Periodo.noche);
-
-      final grupos = agruparPorPeriodo(huecos);
-      expect(grupos.keys, Periodo.values);
-      expect(grupos[Periodo.noche]!.map((h) => h.hora), ['19:00', '19:15']);
-    });
-
-    test('turnos que se pisan no repiten horarios y salen en orden', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [
-          HorarioRango(inicio: '09:00', fin: '10:00'),
-          HorarioRango(inicio: '09:30', fin: '10:30'),
-        ],
-        duracion: 30,
-        citas: const [],
-        ahora: antes,
-        reglas: r,
-      );
-
-      final horas = huecos.map((h) => h.hora).toList();
-      expect(horas, ['09:00', '09:15', '09:30', '09:45', '10:00']);
-    });
-  });
-
-  group('Límite diario y siguiente día con atención', () {
-    IntervaloOcupado cita(DateTime dia, int hora) => IntervaloOcupado(
-      id: 'c$hora-${dia.day}',
-      inicio: DateTime(dia.year, dia.month, dia.day, hora),
-      fin: DateTime(dia.year, dia.month, dia.day, hora, 30),
-    );
-
-    test('el límite cuenta solo las citas activas de ese día', () {
-      final m = medico(config: const ConfigAgenda(limiteDiario: 2));
-
-      expect(limiteAlcanzado(m, [cita(lunes, 8)], lunes), isFalse);
+      expect(h.hora, '09:30');
+      expect(h.inicio, DateTime(2026, 9, 28, 9, 30));
+      expect(h.fin, DateTime(2026, 9, 28, 10, 15));
+      expect(h.periodo, Periodo.manana);
+      expect(h.mismoHorario(Hueco.deTurno(turno(9, 28, 9, 30, 45), r)), isTrue);
       expect(
-        limiteAlcanzado(m, [cita(lunes, 8), cita(lunes, 9)], lunes),
-        isTrue,
-      );
-      expect(
-        limiteAlcanzado(
-          m,
-          [cita(lunes, 8), cita(lunes, 9)],
-          lunes,
-          excluirId: 'c9-28',
-        ),
+        h.mismoHorario(Hueco.deTurno(turno(9, 29, 9, 30, 45), r)),
         isFalse,
       );
-      expect(
-        limiteAlcanzado(medico(), [cita(lunes, 8)], lunes),
-        isFalse,
-        reason: 'sin límite configurado',
-      );
     });
 
-    test('salta fines de semana y días bloqueados', () {
-      final m = medico(
-        bloqueos: const [
-          BloqueoAgenda(desde: '2026-10-05', hasta: '2026-10-05'),
-        ],
-      );
-
-      // Desde el viernes 2 de octubre: sábado y domingo no atiende, el
-      // lunes 5 está bloqueado → martes 6.
-      expect(
-        siguienteDiaConAtencion(m, DateTime(2026, 10, 2, 15), reglas: r),
-        DateTime(2026, 10, 6),
-      );
-    });
-
-    test('salta los días que ya llegaron al límite si se pasan las citas', () {
-      final m = medico(config: const ConfigAgenda(limiteDiario: 1));
-      final martes = DateTime(2026, 9, 29);
-
-      expect(
-        siguienteDiaConAtencion(m, lunes, reglas: r, citas: [cita(martes, 8)]),
-        DateTime(2026, 9, 30),
-      );
-    });
-
-    test('sin días de atención en 60 días devuelve null', () {
-      expect(
-        siguienteDiaConAtencion(medico(horarios: const []), lunes, reglas: r),
-        isNull,
-      );
-    });
-  });
-
-  group('Primer día con atención (agendar.ts)', () {
-    test('hoy, si todavía cabe una cita con la anticipación', () {
-      final m = medico();
-
-      expect(
-        primerDiaConAtencion(m, 30, DateTime(2026, 9, 28, 17, 0), r),
-        lunes,
-      );
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17, 0), r), isTrue);
-    });
-
-    test('mañana, si hoy ya no cabe ninguna', () {
-      final m = medico();
-
-      // 17:20 + 15 de anticipación = 17:35; la última cita de 30 min
-      // empieza a las 17:30: ya no cabe.
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17, 20), r), isFalse);
-      expect(
-        primerDiaConAtencion(m, 30, DateTime(2026, 9, 28, 17, 20), r),
+    test('los días que tienen turnos, en orden y sin repetir', () {
+      expect(diasConTurnos(turnos), [
+        DateTime(2026, 9, 28),
         DateTime(2026, 9, 29),
-      );
-    });
-
-    test('un día bloqueado no cuenta como hoy', () {
-      final m = medico(
-        bloqueos: const [
-          BloqueoAgenda(desde: '2026-09-28', hasta: '2026-09-28'),
-        ],
-      );
-
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 8), r), isFalse);
-    });
-
-    test('la etiqueta de la tarjeta del médico', () {
-      final m = medico();
-
-      expect(proximaFecha(m, 30, DateTime(2026, 9, 28, 9), r), 'Hoy');
-      expect(proximaFecha(m, 30, DateTime(2026, 9, 26, 9), r), 'Lun 28 sep');
-      expect(
-        proximaFecha(medico(horarios: const []), 30, lunes, r),
-        'Sin fechas próximas',
-      );
-    });
-
-    test('la tira de días solo trae días con atención', () {
-      final dias = diasConAtencion(
-        medico(),
-        DateTime(2026, 10, 2),
-        reglas: r,
-        cantidad: 3,
-      );
-
-      expect(dias, [
-        DateTime(2026, 10, 2),
-        DateTime(2026, 10, 5),
-        DateTime(2026, 10, 6),
+        DateTime(2026, 9, 30),
       ]);
-    });
-  });
-
-  group('La rejilla sigue la configuración de la clínica', () {
-    final antes = DateTime(2026, 9, 27, 20);
-
-    test('pasoMinutos: con 30, un horario cada media hora', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '08:00', fin: '10:00')],
-        duracion: 30,
-        citas: const [],
-        ahora: antes,
-        reglas: reglasDePrueba(agenda: {'pasoMinutos': 30}),
-      );
-
-      expect(huecos.map((h) => h.hora), ['08:00', '08:30', '09:00', '09:30']);
+      expect(diasConTurnos(const []), isEmpty);
     });
 
-    test('minutosAnticipacionReserva: con 60, hoy no se ofrece lo de la '
-        'próxima hora', () {
-      final reglas = reglasDePrueba(agenda: {'minutosAnticipacionReserva': 60});
-      final ahora = DateTime(2026, 9, 28, 8, 40);
+    test('las fichas de un día, en orden, agrupadas en mañana, tarde y '
+        'noche con los cortes de la clínica', () {
+      final lunes = huecosDelDia(turnos, DateTime(2026, 9, 28), r);
+      expect(lunes.map((h) => h.hora), ['11:45', '12:00', '19:00']);
 
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '08:00', fin: '11:00')],
-        duracion: 30,
-        citas: const [],
-        ahora: ahoraConAnticipacion(ahora, reglas),
-        reglas: reglas,
-      );
+      final grupos = agruparPorPeriodo(lunes);
+      expect(grupos.keys, Periodo.values, reason: 'siempre los tres, en orden');
+      expect(grupos[Periodo.manana]!.map((h) => h.hora), ['11:45']);
+      expect(grupos[Periodo.tarde]!.map((h) => h.hora), ['12:00']);
+      expect(grupos[Periodo.noche]!.map((h) => h.hora), ['19:00']);
 
-      expect(huecos.first.hora, '09:45');
-      // Con 15 minutos (la de prueba) el primero era 09:00.
       expect(
-        calcularHuecos(
-          fecha: lunes,
-          rangos: const [HorarioRango(inicio: '08:00', fin: '11:00')],
-          duracion: 30,
-          citas: const [],
-          ahora: ahoraConAnticipacion(ahora, r),
-          reglas: r,
-        ).first.hora,
-        '09:00',
+        huecosDelDia(turnos, DateTime(2026, 9, 30), r).single.periodo,
+        Periodo.tarde,
+        reason: '18:59 todavía es de la tarde',
       );
-    });
-
-    test('la anticipación también decide si hoy todavía cabe una cita', () {
-      final m = medico();
-      final reglas = reglasDePrueba(agenda: {'minutosAnticipacionReserva': 60});
-
-      // 17:00 + 60 = 18:00: ya no empieza ninguna de 30 min antes de las 18.
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17), r), isTrue);
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17), reglas), isFalse);
-    });
-
-    test('diasHorizonteReserva: no se busca ni se ofrece más allá', () {
-      final soloLunes = medico(
-        horarios: const [
-          HorarioDia(
-            dia: 'Lunes',
-            activo: true,
-            rangos: [HorarioRango(inicio: '08:00', fin: '12:00')],
-          ),
-        ],
-      );
-      final cincoDias = reglasDePrueba(agenda: {'diasHorizonteReserva': 5});
-
-      // Desde el martes, el próximo lunes está a 6 días: fuera de 5.
-      expect(
-        siguienteDiaConAtencion(
-          soloLunes,
-          DateTime(2026, 9, 29),
-          reglas: cincoDias,
-        ),
-        isNull,
-      );
-      expect(
-        siguienteDiaConAtencion(soloLunes, DateTime(2026, 9, 29), reglas: r),
-        DateTime(2026, 10, 5),
-      );
-
-      // La tira no pasa del horizonte aunque haya días después.
-      final dias = diasConAtencion(
-        medico(),
-        lunes,
-        reglas: r,
-        hasta: DateTime(2026, 10, 1),
-      );
-      expect(dias.last, DateTime(2026, 10, 1));
+      expect(huecosDelDia(turnos, DateTime(2026, 10, 1), r), isEmpty);
     });
 
     test('horaInicioTarde y horaInicioNoche mueven los cortes', () {
-      final huecos = calcularHuecos(
-        fecha: lunes,
-        rangos: const [HorarioRango(inicio: '12:00', fin: '21:00')],
-        duracion: 60,
-        citas: const [],
-        ahora: antes,
-        reglas: reglasDePrueba(
-          agenda: {
-            'pasoMinutos': 60,
-            'horaInicioTarde': '13:00',
-            'horaInicioNoche': '18:00',
-          },
-        ),
-      );
-
-      Periodo p(String hora) =>
-          huecos.firstWhere((h) => h.hora == hora).periodo;
-
-      expect(p('12:00'), Periodo.manana);
-      expect(p('13:00'), Periodo.tarde);
-      expect(p('17:00'), Periodo.tarde);
-      expect(p('18:00'), Periodo.noche);
-    });
-
-    test('las duraciones por defecto son las de la configuración', () {
       final reglas = reglasDePrueba(
-        agenda: {
-          'duracionPresencial': 40,
-          'duracionTelemedicina': 25,
-          'duracionAsincrona': 10,
-        },
+        agenda: {'horaInicioTarde': '13:00', 'horaInicioNoche': '18:00'},
       );
 
-      expect(duracionDe(null, TipoCita.presencial, reglas), 40);
-      expect(duracionDe(null, TipoCita.telemedicina, reglas), 25);
-      expect(duracionDe(null, TipoCita.asincrona, reglas), 10);
-      // La del médico sigue mandando si la configuró.
+      expect(periodoDe(12 * 60 + 59, reglas), Periodo.manana);
+      expect(periodoDe(13 * 60, reglas), Periodo.tarde);
+      expect(periodoDe(17 * 60 + 59, reglas), Periodo.tarde);
+      expect(periodoDe(18 * 60, reglas), Periodo.noche);
+      expect(periodoDe(12 * 60, r), Periodo.tarde);
+    });
+  });
+
+  group('Turnos que todavía se pueden ofrecer', () {
+    final turnos = [
+      turno(9, 28, 10, 10),
+      turno(9, 28, 10, 15),
+      turno(9, 28, 10, 30),
+      turno(9, 29, 8, 0),
+    ];
+
+    test('no los que ya no cumplen la anticipación de la clínica', () {
+      final limite = ahoraConAnticipacion(ahora, r);
+      expect(limite, DateTime(2026, 9, 28, 10, 15));
+
       expect(
-        duracionDe(
-          medico(config: const ConfigAgenda(duraciones: {'PRESENCIAL': 45})),
-          TipoCita.presencial,
-          reglas,
-        ),
-        45,
+        turnosVigentes(turnos, limite: limite).map((t) => t.inicio.minute),
+        [30, 0],
+        reason: 'el de las 10:15 empieza justo en el límite: ya no vale',
+      );
+
+      final conUnaHora = reglasDePrueba(
+        agenda: {'minutosAnticipacionReserva': 60},
+      );
+      expect(
+        turnosVigentes(turnos, limite: ahoraConAnticipacion(ahora, conUnaHora)),
+        [turno(9, 29, 8, 0)],
       );
     });
+
+    test('no los que el servidor rechazó por estar tomados', () {
+      expect(
+        turnosVigentes(
+          turnos,
+          limite: ahora,
+          descartados: {DateTime(2026, 9, 28, 10, 30)},
+        ),
+        [turno(9, 28, 10, 10), turno(9, 28, 10, 15), turno(9, 29, 8, 0)],
+      );
+    });
+  });
+
+  group('Palabras naturales', () {
+    test('hoy, mañana, el día de esta semana y, más allá, con el mes', () {
+      expect(diaNatural(DateTime(2026, 9, 28, 18), ahora), 'hoy');
+      expect(diaNatural(DateTime(2026, 9, 29, 8), ahora), 'mañana');
+      expect(diaNatural(DateTime(2026, 9, 30), ahora), 'mié 30');
+      expect(diaNatural(DateTime(2026, 10, 4), ahora), 'dom 4');
+      expect(diaNatural(DateTime(2026, 10, 5), ahora), 'lun 5 oct');
+      expect(diaNatural(DateTime(2026, 11, 12), ahora), 'jue 12 nov');
+    });
+
+    test('el turno con su hora', () {
+      expect(
+        turnoNatural(DateTime(2026, 9, 28, 15, 30), ahora),
+        'hoy a las 15:30',
+      );
+      expect(
+        turnoNatural(DateTime(2026, 9, 29, 9), ahora),
+        'mañana a las 09:00',
+      );
+      expect(
+        turnoNatural(DateTime(2026, 10, 2, 8, 5), ahora),
+        'vie 2 a las 08:05',
+      );
+    });
+
+    test('cuántos médicos, y cuándo es el próximo turno', () {
+      expect(cantidadDeMedicos(1), '1 médico');
+      expect(cantidadDeMedicos(3), '3 médicos');
+      expect(
+        resumenDisponibilidad(3, DateTime(2026, 9, 28, 15, 30), ahora),
+        '3 médicos · próximo turno hoy a las 15:30',
+      );
+      expect(resumenDisponibilidad(1, null, ahora), '1 médico');
+    });
+  });
+
+  test('las duraciones por defecto son las de la configuración', () {
+    final reglas = reglasDePrueba(
+      agenda: {
+        'duracionPresencial': 40,
+        'duracionTelemedicina': 25,
+        'duracionAsincrona': 10,
+      },
+    );
+
+    expect(duracionDe(null, TipoCita.presencial, reglas), 40);
+    expect(duracionDe(null, TipoCita.telemedicina, reglas), 25);
+    expect(duracionDe(null, TipoCita.asincrona, reglas), 10);
+    // La del médico sigue mandando si la configuró.
+    expect(
+      duracionDe(
+        medico(config: const ConfigAgenda(duraciones: {'PRESENCIAL': 45})),
+        TipoCita.presencial,
+        reglas,
+      ),
+      45,
+    );
   });
 }
 

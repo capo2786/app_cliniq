@@ -1,36 +1,24 @@
 // test/menu_test.dart
 
-import 'package:app_cliniq/core/catalogos/catalogos_cubit.dart';
-import 'package:app_cliniq/core/storage/almacen_claves.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
-import 'package:app_cliniq/core/storage/credenciales_service.dart';
-import 'package:app_cliniq/core/tema/tema_app.dart';
-import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
-import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
-import 'package:app_cliniq/features/auth/providers/auth_state.dart';
-import 'package:app_cliniq/features/citas/data/citas_service.dart';
-import 'package:app_cliniq/features/citas/providers/citas_bloc.dart';
 import 'package:app_cliniq/features/consultas/presentacion/consultas_page.dart';
-import 'package:app_cliniq/features/consultas/providers/consultas_bloc.dart';
 import 'package:app_cliniq/features/dependientes/presentacion/dependientes_page.dart';
-import 'package:app_cliniq/features/dependientes/providers/dependientes_bloc.dart';
-import 'package:app_cliniq/features/inicio/presentacion/dashboard_page.dart';
 import 'package:app_cliniq/features/navegacion/data/menu_service.dart';
 import 'package:app_cliniq/features/navegacion/dominio/destinos.dart';
+import 'package:app_cliniq/features/mi_salud/presentacion/mi_salud_page.dart';
 import 'package:app_cliniq/features/navegacion/providers/menu_cubit.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/clinica.dart';
-import 'dobles/consultas.dart';
 import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/navegador_falso.dart';
+import 'dobles/tablero.dart';
 
 /// La navegación sale del menú del servidor: la barra, los accesos rápidos,
-/// y qué abre cada enlace.
+/// qué abre cada enlace y el enrutador de las rutas del sistema.
 void main() {
   late CacheLocal cache;
   late bool hayRed;
@@ -146,18 +134,40 @@ void main() {
       );
     });
 
-    test('una desconocida se abre en el panel web, en el navegador', () {
+    test('Mi salud, Centro de ayuda y Soporte ya son pantallas de la '
+        'aplicación (mientras llegan, «Muy pronto»)', () {
       expect(
         destinoDe(enlace('/mi-salud')),
-        const DestinoWeb('https://cliniq.gcaicedo-proyectos.com/mi-salud'),
+        const DestinoNativo(PantallaNativa.miSalud),
+      );
+      expect(
+        destinoDe(enlace('/ayuda')),
+        const DestinoNativo(PantallaNativa.ayuda),
+      );
+      expect(
+        destinoDe(enlace('/soporte')),
+        const DestinoNativo(PantallaNativa.soporte),
       );
     });
 
-    test('un enlace externo se abre tal cual', () {
+    test('una ruta que la aplicación no sabe abrir no tiene destino: ni '
+        'pantalla ni navegador', () {
+      expect(destinoDe(enlace('/admin/usuarios')), isNull);
+      expect(destinoDe(enlace('/agenda')), isNull);
+      expect(destinoDe(enlace('/')), isNull);
+    });
+
+    test('un enlace externo va al navegador integrado, tal cual', () {
       expect(
         destinoDe(enlace('https://blog.andina.ec', tipo: 'EXTERNO')),
         const DestinoWeb('https://blog.andina.ec'),
       );
+      expect(
+        destinoDe(enlace('tel:022550000', tipo: 'EXTERNO')),
+        DestinoContacto(Uri.parse('tel:022550000')),
+      );
+      // Un externo que no es una dirección no se abre.
+      expect(destinoDe(enlace('blog', tipo: 'EXTERNO')), isNull);
     });
 
     test('la barra: los 4 primeros; los demás, accesos rápidos; el perfil '
@@ -177,6 +187,86 @@ void main() {
         '/portal/consultas',
         '/ayuda',
       ]);
+      expect(navegacion.campana, isNull);
+    });
+
+    test('lo que no se sabe abrir no se reparte, y /notificaciones es la '
+        'campana: ni pestaña ni acceso', () {
+      final navegacion = NavegacionDeLaApp.desde([
+        enlace('/inicio'),
+        const EnlaceMenu(
+          key: 'notificaciones',
+          label: 'Avisos',
+          route: '/notificaciones',
+        ),
+        enlace('/admin/menu'),
+        enlace('/mis-citas'),
+      ]);
+
+      expect(navegacion.barra.map((e) => e.route), ['/inicio', '/mis-citas']);
+      expect(navegacion.accesos, isEmpty);
+      expect(navegacion.campana?.label, 'Avisos');
+    });
+  });
+
+  group('El enrutador', () {
+    test('entiende rutas con parámetros', () {
+      expect(
+        destinoDeRuta('/portal/consultas/c1'),
+        const DestinoNativo(PantallaNativa.consulta, {'id': 'c1'}),
+      );
+      expect(
+        destinoDeRuta('/portal/videoconsulta/cita9'),
+        const DestinoNativo(PantallaNativa.videoconsulta, {'citaId': 'cita9'}),
+      );
+      expect(
+        destinoDeRuta('/portal/encuesta/cita9'),
+        const DestinoNativo(PantallaNativa.encuesta, {'citaId': 'cita9'}),
+      );
+      expect(
+        destinoDeRuta('/legal/terminos'),
+        const DestinoNativo(PantallaNativa.legal, {'slug': 'terminos'}),
+      );
+      expect(
+        destinoDeRuta('/soporte/tickets/t1'),
+        const DestinoNativo(PantallaNativa.ticket, {'id': 't1'}),
+      );
+    });
+
+    test('las dos rutas de los derechos ARCO y la de los avisos', () {
+      const privacidad = DestinoNativo(PantallaNativa.privacidad);
+      expect(destinoDeRuta('/portal/arco'), privacidad);
+      expect(destinoDeRuta('/privacidad/solicitudes'), privacidad);
+      expect(
+        destinoDeRuta('/notificaciones'),
+        const DestinoNativo(PantallaNativa.avisos),
+      );
+    });
+
+    test('ignora la consulta, el fragmento y la barra final, y decodifica '
+        'los parámetros', () {
+      expect(
+        destinoDeRuta('/portal/consultas/c1/?desde=aviso#mensajes'),
+        const DestinoNativo(PantallaNativa.consulta, {'id': 'c1'}),
+      );
+      expect(
+        destinoDeRuta('/soporte/tickets/t%201'),
+        const DestinoNativo(PantallaNativa.ticket, {'id': 't 1'}),
+      );
+      expect(
+        destinoDeRuta('/portal/consultas?x=1'),
+        const DestinoNativo(PantallaNativa.consultas),
+      );
+    });
+
+    test('lo que no es una ruta del paciente no se abre', () {
+      expect(destinoDeRuta('/admin/tickets/t1'), isNull);
+      expect(destinoDeRuta('/consultas/c1'), isNull);
+      expect(destinoDeRuta('/portal/consultas/c1/extra'), isNull);
+      expect(destinoDeRuta('https://cliniq.ec/mis-citas'), isNull);
+      expect(destinoDeRuta('//otro.ec/mis-citas'), isNull);
+      expect(destinoDeRuta('/soporte/tickets/%E0%A4%A'), isNull);
+      expect(destinoDeRuta(''), isNull);
     });
   });
 
@@ -220,60 +310,8 @@ void main() {
   });
 
   group('El tablero', () {
-    late MenuCubit menuCubit;
-
-    Future<void> montar(WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 2.75;
-      addTearDown(tester.view.reset);
-
-      final llavero = AlmacenClavesEnMemoria();
-      // La sesión ya abierta, como la deja el acceso.
-      final auth = AuthBloc(
-        servicio: AuthServiceFalso(),
-        almacen: AlmacenDeSesion(llavero),
-        credenciales: CredencialesService(llavero),
-        fijarToken: (_) {},
-        restaurarAlCrear: false,
-      )..emit(AuthAutenticado(_usuario()));
-      addTearDown(auth.close);
-
-      menuCubit = MenuCubit(servicio());
-      addTearDown(menuCubit.close);
-
-      final dioVacio = DioGrabador({
-        'GET /agenda/paciente/mis-citas': (_) => <Object?>[],
-        'GET /portal/dependientes': (_) => <Object?>[],
-      }).dio;
-
-      await tester.pumpWidget(
-        conDatosDeLaClinica(
-          MultiBlocProvider(
-            providers: [
-              BlocProvider.value(value: auth),
-              BlocProvider.value(value: menuCubit),
-              BlocProvider(
-                create: (context) => CitasBloc(
-                  citas: CitasService(dioVacio, CacheEnMemoria()),
-                  portal: PortalFalso(),
-                  recordatorios: ProgramadorFalso(),
-                  config: configDePrueba,
-                  catalogos: () => context.read<CatalogosCubit>().state,
-                ),
-              ),
-              BlocProvider(create: (_) => ConsultasBloc(ConsultasFalso())),
-              BlocProvider(
-                create: (_) => DependientesBloc(DependientesFalso()),
-              ),
-            ],
-            child: MaterialApp(
-              theme: temaCliniq(),
-              home: const DashboardPage(),
-            ),
-          ),
-        ),
-      );
-    }
+    Future<void> montar(WidgetTester tester) =>
+        montarTablero(tester, dio: api.dio, cache: cache, usuario: _usuario());
 
     setUp(sondeoConRed);
 
@@ -305,8 +343,8 @@ void main() {
       expect(find.byType(DependientesPage), findsOneWidget);
     });
 
-    testWidgets('una ruta que la aplicación no tiene se abre en el '
-        'navegador', (tester) async {
+    testWidgets('Mi salud, desde los accesos, abre su pantalla sin salir de '
+        'la aplicación', (tester) async {
       final navegador = NavegadorFalso()..instalar();
       await montar(tester);
       await tester.pumpAndSettle();
@@ -315,10 +353,50 @@ void main() {
       await tester.tap(find.byKey(const Key('acceso-mi-salud')));
       await tester.pumpAndSettle();
 
-      expect(navegador.abiertas, [
-        'https://cliniq.gcaicedo-proyectos.com/mi-salud',
-      ]);
-      expect(navegador.ultimaFuera, isTrue);
+      expect(find.byType(MiSaludPage), findsOneWidget);
+      expect(navegador.abiertas, isEmpty);
+    });
+
+    testWidgets('un enlace externo se abre en el navegador integrado; una '
+        'ruta que no se sabe abrir no se enseña', (tester) async {
+      menu = [
+        ...menuJson(),
+        {
+          'key': 'extras',
+          'label': 'Extras',
+          'tipo': 'GRUPO',
+          'orden': 3,
+          'children': [
+            {
+              'key': 'blog',
+              'label': 'Blog de salud',
+              'route': 'https://blog.andina.ec',
+              'tipo': 'EXTERNO',
+              'orden': 0,
+            },
+            {
+              'key': 'bitacora',
+              'label': 'Bitácora',
+              'route': '/admin/bitacora',
+              'tipo': 'LINK',
+              'orden': 1,
+            },
+          ],
+        },
+      ];
+      final navegador = NavegadorFalso()..instalar();
+      await montar(tester);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('acceso-bitacora')), findsNothing);
+      expect(find.text('Bitácora'), findsNothing);
+
+      await tester.ensureVisible(find.byKey(const Key('acceso-blog')));
+      await tester.tap(find.byKey(const Key('acceso-blog')));
+      await tester.pumpAndSettle();
+
+      expect(navegador.abiertas, ['https://blog.andina.ec']);
+      expect(navegador.ultimaFuera, isFalse);
     });
 
     testWidgets('un acceso conocido que no está en la barra se abre encima', (

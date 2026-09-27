@@ -23,6 +23,7 @@ import 'formulario_dependiente_page.dart';
 import '../../../core/catalogos/catalogo_service.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/presentacion/widgets/contacto_clinica.dart';
+import '../../avisos/presentacion/widgets/boton_campana.dart';
 
 /// Quienes están a cargo del titular: hijos, padres, personas que dependen
 /// de él. Se les agenda citas como a uno mismo.
@@ -76,7 +77,11 @@ class DependientesPage extends StatelessWidget {
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         title: const Text('Dependientes'),
-        actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+        actions: const [
+          BotonCampana(),
+          BotonCerrarSesion(),
+          SizedBox(width: 6),
+        ],
       ),
       body: FondoDegradado(
         child: !puede

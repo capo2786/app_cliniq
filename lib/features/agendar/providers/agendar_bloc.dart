@@ -5,8 +5,8 @@ import '../../../core/network/errores.dart';
 import '../../citas/data/models/cita.dart';
 import '../../dependientes/data/dependientes_service.dart';
 import '../../dependientes/data/models/dependiente.dart';
+import '../data/models/medico_portal.dart';
 import '../data/portal_service.dart';
-import '../dominio/horarios.dart';
 import '../dominio/huecos.dart';
 import 'agendar_event.dart';
 import 'agendar_state.dart';
@@ -14,28 +14,29 @@ import 'agendar_state.dart';
 const String avisoHorarioTomado =
     'Ese horario acaba de ocuparse. Elige otro de la lista actualizada.';
 
-/// El agendamiento paso a paso: para quién, qué médico, qué modalidad, qué
-/// día y hora, el motivo, y confirmar.
+/// El agendamiento paso a paso: para quién, qué especialidad, qué médico,
+/// qué modalidad, qué día y hora, el motivo, y confirmar.
 ///
 /// La pantalla lo crea en cada visita —como las salas en UCEBell— para que
-/// los médicos y lo ocupado lleguen frescos cada vez. Las reglas de qué
-/// horarios se ofrecen viven en `dominio/huecos.dart`; aquí solo se decide
-/// cuándo se piden los datos y a qué paso se va.
+/// los turnos lleguen frescos cada vez. Qué turnos se pueden tomar lo decide
+/// la API (`/portal/proximos-turnos` y `/portal/turnos/:doctorId`); aquí solo
+/// se decide cuándo se piden los datos y a qué paso se va. Sin red no se
+/// inventa nada: se dice que no se pudo y se ofrece reintentar.
 class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
   final PortalService _portal;
   final DependientesService _dependientes;
   final RelojClinica _reloj;
   final String _uid;
 
-  /// [reglas] son las de la configuración de la clínica; [especialidades] y
-  /// [ciudades], los catálogos que ordenan los filtros.
+  /// [reglas] son las de la configuración de la clínica; [ciudades], el
+  /// catálogo que ordena el filtro de ciudad. Las especialidades ya llegan
+  /// ordenadas de la API.
   AgendarBloc({
     required this._portal,
     required this._dependientes,
     required this._uid,
     required String nombreTitular,
     required ReglasAgendamiento reglas,
-    List<String> especialidades = const [],
     List<String> ciudades = const [],
     bool puedeDependientes = true,
     RelojClinica? reloj,
@@ -44,7 +45,6 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
          AgendarState(
            ahora: (reloj ?? RelojClinica()).ahora(),
            reglas: reglas,
-           especialidades: especialidades,
            catalogoCiudades: ciudades,
            nombreTitular: nombreTitular,
            puedeDependientes: puedeDependientes,
@@ -53,7 +53,10 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     on<AgendarIniciado>(_alIniciar);
     on<AgendarParaElegido>(_alElegirPara);
     on<AgendarFiltrosCambiados>(_alFiltrar);
+    on<AgendarEspecialidadElegida>(_alElegirEspecialidad);
+    on<AgendarBusquedaCambiada>(_alBuscar);
     on<AgendarMedicoElegido>(_alElegirMedico);
+    on<AgendarPrimerTurnoElegido>(_alElegirPrimerTurno);
     on<AgendarModalidadElegida>(_alElegirModalidad);
     on<AgendarFechaElegida>(_alElegirFecha);
     on<AgendarHuecoElegido>(_alElegirHueco);
@@ -62,7 +65,8 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     on<AgendarContinuado>(_alContinuar);
     on<AgendarRetrocedido>(_alRetroceder);
     on<AgendarConfirmado>(_alConfirmar);
-    on<AgendarOcupadosReintentados>((event, emit) => _cargarOcupados(emit));
+    on<AgendarTurnosReintentados>((event, emit) => _cargarTurnos(emit));
+    on<AgendarProximosReintentados>((event, emit) => _cargarProximos(emit));
     on<AgendarDependientesRecargados>(_alRecargarDependientes);
     on<AgendarOtraCita>(_alEmpezarOtra);
   }
@@ -77,58 +81,99 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
   ) async {
     emit(state.copiarCon(cargando: true, limpiarError: true, ahora: _ahora));
 
-    try {
-      final medicos = await _portal.medicos();
+    final original = event.reprogramar;
+    if (original != null) return _iniciarReprogramacion(original, emit);
 
-      final dependientes = state.puedeDependientes
-          ? await _listarDependientes()
-          : state.dependientes;
+    // Primero para quién: los próximos turnos se piden sin las citas que
+    // ya tiene el dependiente preelegido.
+    final dependientes = state.puedeDependientes
+        ? await _listarDependientes()
+        : state.dependientes;
+    final para = event.para;
 
-      var siguiente = state.copiarCon(
-        cargando: false,
-        medicos: medicos,
+    emit(
+      state.copiarCon(
         dependientes: dependientes,
+        para: para != null && dependientes.any((d) => d.uid == para)
+            ? para
+            : null,
+      ),
+    );
+
+    try {
+      final proximos = await _portal.proximosTurnos(
+        ciudad: state.filtroCiudad,
+        modalidad: state.filtroModalidad,
+        pacienteId: state.pacienteIdTurnos,
+      );
+
+      final siguiente = state.copiarCon(
+        cargando: false,
+        medicos: proximos.medicos,
+        especialidades: proximos.especialidades,
+        ciudades: AgendarState.ordenarCiudades(
+          state.catalogoCiudades,
+          proximos.medicos,
+        ),
+        limpiarErrorProximos: true,
         ahora: _ahora,
       );
 
-      final para = event.para;
-      if (para != null && dependientes.any((d) => d.uid == para)) {
-        siguiente = siguiente.copiarCon(para: para);
-      }
-
-      final original = event.reprogramar;
-      if (original != null) {
-        if (!medicos.any((m) => m.uid == original.doctorId)) {
-          emit(
-            siguiente.copiarCon(
-              original: original,
-              error:
-                  'El médico de esta cita ya no aparece en el portal. '
-                  'Puedes cancelarla y agendar con otro médico.',
-            ),
-          );
-          return;
-        }
-
-        siguiente = siguiente.copiarCon(
-          original: original,
-          medicoId: original.doctorId,
-          tipo: original.tipo,
-          fecha: inicioDelDia(original.inicio),
-        );
-      }
-
       emit(siguiente.copiarCon(paso: siguiente.primerPaso));
-
-      if (original != null) await _cargarOcupados(emit);
     } catch (error) {
       emit(
         state.copiarCon(
           cargando: false,
           error: mensajeDeError(
             error,
-            generico: 'No pudimos cargar los médicos. Intenta de nuevo.',
+            generico:
+                'No pudimos cargar los médicos disponibles. Intenta de '
+                'nuevo.',
           ),
+        ),
+      );
+    }
+  }
+
+  /// Reprogramar: el mismo médico y la misma modalidad, directo a la hora.
+  ///
+  /// El médico sale de la propia cita; sus turnos, de la API. Si la API dice
+  /// que el médico ya no atiende por el portal o no ofrece la modalidad
+  /// (404/409, con el mismo mensaje que daría la reserva), no hay a dónde
+  /// moverla: se enseña ese mensaje, solo, en lugar de la rejilla.
+  Future<void> _iniciarReprogramacion(
+    Cita original,
+    Emitter<AgendarState> emit,
+  ) async {
+    final medico = MedicoPortal(
+      uid: original.doctorId,
+      nombre: original.medicoVisible ?? '',
+      especialidad: original.especialidad,
+      modalidades: [original.tipo],
+    );
+
+    emit(
+      state.copiarCon(
+        cargando: false,
+        original: original,
+        medico: medico,
+        tipo: original.tipo,
+        fecha: inicioDelDia(original.inicio),
+        paso: PasoAgendar.horario,
+        ahora: _ahora,
+      ),
+    );
+
+    final error = await _cargarTurnos(emit);
+    final estado = error == null ? null : estadoDe(error);
+
+    if (estado == 404 || estado == 409) {
+      emit(
+        state.copiarCon(
+          error:
+              mensajeDelServidor(error!) ??
+              'El médico de esta cita ya no aparece en el portal. Puedes '
+                  'cancelarla y agendar con otro médico.',
         ),
       );
     }
@@ -146,20 +191,67 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
 
   // ── Elecciones ─────────────────────────────────────────────────────
 
-  void _alElegirPara(AgendarParaElegido event, Emitter<AgendarState> emit) {
-    emit(state.copiarCon(para: event.para, ahora: _ahora));
+  Future<void> _alElegirPara(
+    AgendarParaElegido event,
+    Emitter<AgendarState> emit,
+  ) => _cambiarPara(event.para, emit);
+
+  /// Cambia para quién es la cita. Con otro paciente cambian los turnos que
+  /// se le pueden dar (la API quita los que chocan con sus citas): se
+  /// vuelven a pedir los próximos turnos y, si ya hay médico, su rejilla.
+  Future<void> _cambiarPara(String para, Emitter<AgendarState> emit) async {
+    if (state.reprogramando) return;
+
+    final antes = state.pacienteIdTurnos;
+    emit(state.copiarCon(para: para, ahora: _ahora));
+    if (state.pacienteIdTurnos == antes) return;
+
+    await Future.wait([
+      _cargarProximos(emit),
+      if (state.medico != null) _cargarTurnos(emit),
+    ]);
   }
 
-  void _alFiltrar(AgendarFiltrosCambiados event, Emitter<AgendarState> emit) {
+  Future<void> _alFiltrar(
+    AgendarFiltrosCambiados event,
+    Emitter<AgendarState> emit,
+  ) async {
+    final antes = state;
+
     emit(
       state.copiarCon(
-        filtroEspecialidad: event.especialidad,
         filtroCiudad: event.ciudad,
         filtroModalidad: event.modalidad,
         limpiarFiltroModalidad: event.quitarModalidad,
         ahora: _ahora,
       ),
     );
+
+    if (state.filtroCiudad != antes.filtroCiudad ||
+        state.filtroModalidad != antes.filtroModalidad) {
+      await _cargarProximos(emit);
+    }
+  }
+
+  void _alElegirEspecialidad(
+    AgendarEspecialidadElegida event,
+    Emitter<AgendarState> emit,
+  ) {
+    if (state.reprogramando) return;
+
+    emit(
+      state.copiarCon(
+        filtroEspecialidad: event.especialidad.trim(),
+        busqueda: '',
+        paso: PasoAgendar.medico,
+        limpiarAviso: true,
+        ahora: _ahora,
+      ),
+    );
+  }
+
+  void _alBuscar(AgendarBusquedaCambiada event, Emitter<AgendarState> emit) {
+    emit(state.copiarCon(busqueda: event.texto));
   }
 
   Future<void> _alElegirMedico(
@@ -171,40 +263,80 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     final medico = state.medicos.where((m) => m.uid == event.uid).firstOrNull;
     if (medico == null) return;
 
-    final ahora = _ahora;
     final modalidades = medico.modalidadesOfrecidas;
 
-    // La modalidad del filtro, si el médico la ofrece; si no, la actual si
-    // la ofrece; si no, la primera que tenga.
-    final preferida = state.filtroModalidad ?? state.tipo;
+    // La modalidad del filtro, si el médico la ofrece; si no, la de su
+    // próximo turno; si no, la actual si la ofrece; si no, la primera.
+    final preferida =
+        state.filtroModalidad ?? medico.proximo?.modalidad ?? state.tipo;
     final tipo = modalidades.contains(preferida)
         ? preferida
         : modalidades.first;
 
-    // Arranca en el primer día con atención: hoy solo si aún cabe una cita.
-    final fecha = primerDiaConAtencion(
-      medico,
-      duracionDe(medico, tipo, state.reglas),
-      ahora,
-      state.reglas,
-    );
-
     emit(
       state.copiarCon(
-        medicoId: medico.uid,
+        medico: medico,
         tipo: tipo,
-        fecha: fecha,
-        limpiarFecha: fecha == null,
+        limpiarFecha: true,
         limpiarHueco: true,
-        ocupados: const [],
-        limpiarErrorOcupados: true,
+        limpiarTurnos: true,
+        limpiarErrorTurnos: true,
         limpiarAviso: true,
         paso: PasoAgendar.modalidad,
-        ahora: ahora,
+        ahora: _ahora,
       ),
     );
 
-    await _cargarOcupados(emit);
+    await _cargarTurnos(emit);
+  }
+
+  /// «El primer turno disponible»: se eligen el médico, la modalidad y el
+  /// turno de una vez, y se confirma contra los turnos de la API antes de
+  /// seguir. Si entretanto el turno se ocupó, se va a la rejilla con la
+  /// lista actualizada.
+  Future<void> _alElegirPrimerTurno(
+    AgendarPrimerTurnoElegido event,
+    Emitter<AgendarState> emit,
+  ) async {
+    if (state.reprogramando) return;
+
+    final turno = event.turno;
+    final medico = state.medicos
+        .where((m) => m.uid == turno.doctorId)
+        .firstOrNull;
+    if (medico == null) return;
+    if (!medico.modalidadesOfrecidas.contains(turno.modalidad)) return;
+
+    emit(
+      state.copiarCon(
+        medico: medico,
+        tipo: turno.modalidad,
+        fecha: inicioDelDia(turno.inicio),
+        hueco: Hueco.deTurno(turno.turno, state.reglas),
+        limpiarTurnos: true,
+        limpiarErrorTurnos: true,
+        limpiarAviso: true,
+        ahora: _ahora,
+      ),
+    );
+
+    await _cargarTurnos(emit);
+
+    // Mientras tanto se eligió otra cosa: esa elección manda.
+    if (state.medicoId != medico.uid || state.tipo != turno.modalidad) return;
+
+    if (state.huecoValido != null) {
+      emit(state.copiarCon(paso: PasoAgendar.motivo));
+      return;
+    }
+
+    emit(
+      state.copiarCon(
+        paso: PasoAgendar.horario,
+        limpiarHueco: true,
+        aviso: state.errorTurnos == null ? avisoHorarioTomado : null,
+      ),
+    );
   }
 
   Future<void> _alElegirModalidad(
@@ -215,41 +347,25 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     if (state.reprogramando || medico == null) return;
     if (!medico.modalidadesOfrecidas.contains(event.tipo)) return;
 
-    final ahora = _ahora;
-    final primero = primerDiaConAtencion(
-      medico,
-      duracionDe(medico, event.tipo, state.reglas),
-      ahora,
-      state.reglas,
-    );
-
-    // Con otra duración, hoy puede dejar de caber: se corre al primer día.
-    final actual = state.fecha;
-    final fecha = actual == null || primero == null || actual.isBefore(primero)
-        ? primero
-        : actual;
-
-    final cambioDeDia = fecha != actual;
+    final otra = event.tipo != state.tipo;
 
     emit(
       state.copiarCon(
         tipo: event.tipo,
-        fecha: fecha,
-        limpiarFecha: fecha == null,
         limpiarHueco: true,
         limpiarAviso: true,
         paso: PasoAgendar.horario,
-        ahora: ahora,
+        ahora: _ahora,
       ),
     );
 
-    if (cambioDeDia || state.ocupados.isEmpty) await _cargarOcupados(emit);
+    // Con otra modalidad cambian la duración y los turnos: se piden de nuevo.
+    if (otra || (state.turnosActuales == null && !state.cargandoTurnos)) {
+      await _cargarTurnos(emit);
+    }
   }
 
-  Future<void> _alElegirFecha(
-    AgendarFechaElegida event,
-    Emitter<AgendarState> emit,
-  ) async {
+  void _alElegirFecha(AgendarFechaElegida event, Emitter<AgendarState> emit) {
     final fecha = inicioDelDia(event.fecha);
     final ahora = _ahora;
 
@@ -264,19 +380,18 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
         ahora: ahora,
       ),
     );
-
-    await _cargarOcupados(emit);
   }
 
   void _alElegirHueco(AgendarHuecoElegido event, Emitter<AgendarState> emit) {
-    if (event.hueco.ocupado) return;
+    // Solo los que se están ofreciendo.
+    final actual = state.copiarCon(ahora: _ahora);
+    if (!actual.huecos.any(event.hueco.mismoHorario)) return;
 
     emit(
-      state.copiarCon(
+      actual.copiarCon(
         hueco: event.hueco,
         limpiarAviso: true,
         limpiarErrorGuardar: true,
-        ahora: _ahora,
       ),
     );
   }
@@ -340,10 +455,11 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
   }
 
   void _alContinuar(AgendarContinuado event, Emitter<AgendarState> emit) {
-    final siguiente = pasoSiguiente(state);
-    if (siguiente == null || !pasoCompleto(state)) return;
+    final actual = state.copiarCon(ahora: _ahora);
+    final siguiente = pasoSiguiente(actual);
+    if (siguiente == null || !pasoCompleto(actual)) return;
 
-    emit(state.copiarCon(paso: siguiente, limpiarAviso: true, ahora: _ahora));
+    emit(actual.copiarCon(paso: siguiente, limpiarAviso: true));
   }
 
   void _alRetroceder(AgendarRetrocedido event, Emitter<AgendarState> emit) {
@@ -369,50 +485,136 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     emit(state.copiarCon(paso: event.paso, limpiarAviso: true, ahora: _ahora));
   }
 
-  // ── Lo ocupado ─────────────────────────────────────────────────────
+  // ── Lo que se pide a la API ────────────────────────────────────────
 
-  Future<void> _cargarOcupados(Emitter<AgendarState> emit) async {
-    final medico = state.medico;
-    final fecha = state.fecha;
+  /// `GET /portal/proximos-turnos` con los filtros de ciudad y modalidad,
+  /// para el paciente elegido.
+  ///
+  /// Sin red, la lista queda vacía con el error y la opción de reintentar:
+  /// una lista vieja con otros filtros diría médicos y horas que no son.
+  /// Devuelve el error, si lo hubo.
+  Future<Object?> _cargarProximos(Emitter<AgendarState> emit) async {
+    final ciudad = state.filtroCiudad;
+    final modalidad = state.filtroModalidad;
+    final paciente = state.pacienteIdTurnos;
 
-    if (medico == null || fecha == null) {
-      emit(state.copiarCon(ocupados: const [], cargandoOcupados: false));
-      return;
-    }
+    // Mientras llegaba se cambió un filtro o el paciente: esa respuesta ya
+    // no sirve (la nueva consulta está en camino).
+    bool vieja() =>
+        state.filtroCiudad != ciudad ||
+        state.filtroModalidad != modalidad ||
+        state.pacienteIdTurnos != paciente;
 
-    emit(
-      state.copiarCon(
-        ocupados: const [],
-        cargandoOcupados: true,
-        limpiarErrorOcupados: true,
-      ),
-    );
+    emit(state.copiarCon(cargandoProximos: true, limpiarErrorProximos: true));
 
     try {
-      final ocupados = await _portal.ocupados(medico.uid, fecha, fecha);
-
-      // Descarta respuestas viejas si ya se cambió de día o de médico.
-      if (state.medicoId != medico.uid || state.fecha != fecha) return;
+      final proximos = await _portal.proximosTurnos(
+        ciudad: ciudad,
+        modalidad: modalidad,
+        pacienteId: paciente,
+      );
+      if (vieja()) return null;
 
       emit(
         state.copiarCon(
-          ocupados: ocupados,
-          cargandoOcupados: false,
+          cargandoProximos: false,
+          medicos: proximos.medicos,
+          especialidades: proximos.especialidades,
+          // Con una ciudad elegida la lista solo trae esa: se conservan las
+          // opciones que había para poder cambiarla.
+          ciudades: ciudad.isEmpty
+              ? AgendarState.ordenarCiudades(
+                  state.catalogoCiudades,
+                  proximos.medicos,
+                )
+              : null,
           ahora: _ahora,
         ),
       );
+      return null;
     } catch (error) {
-      if (state.medicoId != medico.uid || state.fecha != fecha) return;
+      if (vieja()) return null;
 
       emit(
         state.copiarCon(
-          cargandoOcupados: false,
-          errorOcupados: mensajeDeError(
+          cargandoProximos: false,
+          medicos: const [],
+          especialidades: const [],
+          errorProximos: mensajeDeError(
             error,
-            generico: 'No pudimos ver los horarios ocupados de ese día.',
+            generico: 'No pudimos ver los turnos disponibles.',
           ),
         ),
       );
+      return error;
+    }
+  }
+
+  /// `GET /portal/turnos/:doctorId` del médico y la modalidad elegidos, de
+  /// hoy al horizonte de la clínica, para el paciente elegido. Al
+  /// reprogramar se excluye la cita que se mueve, para que su horario y los
+  /// de al lado se ofrezcan.
+  ///
+  /// Si el día elegido se quedó sin turnos, se pasa al primero que tenga.
+  /// Devuelve el error, si lo hubo.
+  Future<Object?> _cargarTurnos(Emitter<AgendarState> emit) async {
+    final medico = state.medico;
+    final tipo = state.tipo;
+
+    if (medico == null) {
+      emit(state.copiarCon(limpiarTurnos: true, cargandoTurnos: false));
+      return null;
+    }
+
+    final paciente = state.pacienteIdTurnos;
+
+    bool vieja() =>
+        state.medicoId != medico.uid ||
+        state.tipo != tipo ||
+        state.pacienteIdTurnos != paciente;
+
+    emit(state.copiarCon(cargandoTurnos: true, limpiarErrorTurnos: true));
+
+    try {
+      final turnos = await _portal.turnos(
+        medico.uid,
+        tipo,
+        excluirCita: state.original?.id,
+        pacienteId: paciente,
+      );
+      if (vieja()) return null;
+
+      var siguiente = state.copiarCon(
+        turnos: turnos,
+        cargandoTurnos: false,
+        ahora: _ahora,
+      );
+
+      final fecha = siguiente.fecha;
+      if (fecha == null || !siguiente.tieneTurnos(fecha)) {
+        final primero = siguiente.primerDia;
+        siguiente = siguiente.copiarCon(
+          fecha: primero,
+          limpiarFecha: primero == null,
+        );
+      }
+
+      emit(siguiente);
+      return null;
+    } catch (error) {
+      if (vieja()) return null;
+
+      emit(
+        state.copiarCon(
+          cargandoTurnos: false,
+          limpiarTurnos: true,
+          errorTurnos: mensajeDeError(
+            error,
+            generico: 'No pudimos ver los turnos libres de este médico.',
+          ),
+        ),
+      );
+      return error;
     }
   }
 
@@ -460,7 +662,7 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
       // La respuesta de reprogramar no trae el nombre del médico: se
       // completa con lo que ya se sabe, para enseñarlo y guardarlo bien.
       final completa = cita.copiarCon(
-        medico: cita.medico ?? medico.nombre,
+        medico: cita.medico ?? (medico.nombre.isEmpty ? null : medico.nombre),
         especialidad: cita.especialidad ?? medico.especialidad,
         pacienteNombre:
             cita.pacienteNombre ??
@@ -477,33 +679,85 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
         ),
       );
     } catch (error) {
-      emit(
-        state.copiarCon(
-          guardando: false,
-          errorGuardar: mensajeDeError(
+      await _alFallarGuardado(error, actual, hueco, emit);
+    }
+  }
+
+  /// Agendar o reprogramar falló. El mensaje —el del servidor, si lo
+  /// explica— se enseña una sola vez, en un solo lugar.
+  ///
+  /// - Sin red no hay nada que recargar: se queda en el resumen con el
+  ///   mensaje.
+  /// - Con 409 el turno se tomó entretanto (o choca con otra cita del
+  ///   paciente): se vuelven a pedir los turnos del médico y, al agendar,
+  ///   los próximos turnos, y se vuelve a la rejilla con el mensaje y sin
+  ///   ese turno. Lo demás que eligió la persona —para quién, especialidad,
+  ///   médico, modalidad y motivo— se conserva.
+  /// - Con otro error se queda en el resumen con el mensaje; se recargan los
+  ///   turnos y, si el elegido ya no está, se vuelve a la rejilla con ese
+  ///   mismo mensaje.
+  Future<void> _alFallarGuardado(
+    Object error,
+    AgendarState actual,
+    Hueco hueco,
+    Emitter<AgendarState> emit,
+  ) async {
+    final tomado = estadoDe(error) == 409;
+    final mensaje = tomado
+        ? mensajeDelServidor(error) ?? avisoHorarioTomado
+        : mensajeDeError(
             error,
             generico: actual.reprogramando
                 ? 'No se pudo reprogramar la cita.'
                 : 'No se pudo agendar la cita.',
-          ),
+          );
+
+    if (esFaltaDeRed(error)) {
+      emit(state.copiarCon(guardando: false, errorGuardar: mensaje));
+      return;
+    }
+
+    if (tomado) {
+      emit(
+        state.copiarCon(
+          guardando: false,
+          descartados: {
+            ...state.descartados,
+            AgendarState.claveDescartado(
+              actual.pacienteIdTurnos,
+              actual.medicoId ?? '',
+              hueco.inicio,
+            ),
+          },
         ),
       );
 
-      // Quizá alguien tomó ese horario mientras tanto: se refresca lo
-      // ocupado y, si el elegido ya no está libre, se vuelve a elegir.
-      await _cargarOcupados(emit);
+      await Future.wait([
+        _cargarTurnos(emit),
+        if (!actual.reprogramando) _cargarProximos(emit),
+      ]);
 
-      if (state.hueco != null && state.huecoValido == null) {
-        emit(
-          state.copiarCon(
-            paso: PasoAgendar.horario,
-            limpiarHueco: true,
-            aviso: avisoHorarioTomado,
-          ),
-        );
-      }
+      emit(_deVueltaALaHora(mensaje));
+      return;
+    }
+
+    emit(state.copiarCon(guardando: false, errorGuardar: mensaje));
+    await _cargarTurnos(emit);
+
+    if (state.hueco != null &&
+        state.errorTurnos == null &&
+        state.huecoValido == null) {
+      emit(_deVueltaALaHora(mensaje));
     }
   }
+
+  /// La rejilla, sin turno elegido y con [mensaje] como único aviso.
+  AgendarState _deVueltaALaHora(String mensaje) => state.copiarCon(
+    paso: PasoAgendar.horario,
+    limpiarHueco: true,
+    limpiarErrorGuardar: true,
+    aviso: mensaje,
+  );
 
   // ── Dependientes y reinicio ────────────────────────────────────────
 
@@ -517,14 +771,20 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     emit(
       state.copiarCon(
         dependientes: dependientes.isEmpty ? state.dependientes : dependientes,
-        para: elegir != null && dependientes.any((d) => d.uid == elegir)
-            ? elegir
-            : null,
       ),
     );
+
+    if (elegir != null && dependientes.any((d) => d.uid == elegir)) {
+      await _cambiarPara(elegir, emit);
+    }
   }
 
-  void _alEmpezarOtra(AgendarOtraCita event, Emitter<AgendarState> emit) {
+  /// Después del éxito: otra cita desde cero. Los próximos turnos se piden
+  /// de nuevo, porque el que se acaba de tomar ya no está libre.
+  Future<void> _alEmpezarOtra(
+    AgendarOtraCita event,
+    Emitter<AgendarState> emit,
+  ) async {
     emit(
       AgendarState(
         ahora: _ahora,
@@ -533,13 +793,17 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
         medicos: state.medicos,
         especialidades: state.especialidades,
         catalogoCiudades: state.catalogoCiudades,
+        ciudades: state.ciudades,
         dependientes: state.dependientes,
         puedeDependientes: state.puedeDependientes,
         nombreTitular: state.nombreTitular,
+        descartados: state.descartados,
         paso: state.puedeDependientes
             ? PasoAgendar.paciente
             : PasoAgendar.filtros,
       ),
     );
+
+    await _cargarProximos(emit);
   }
 }

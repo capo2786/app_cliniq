@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../citas/data/models/cita.dart';
+import '../data/models/turnos.dart';
 import '../dominio/huecos.dart';
 import 'agendar_state.dart';
 
@@ -32,8 +33,9 @@ class AgendarParaElegido extends AgendarEvent {
   List<Object?> get props => [para];
 }
 
+/// Cambió la ciudad o la modalidad: se vuelven a pedir los próximos turnos
+/// con esos filtros.
 class AgendarFiltrosCambiados extends AgendarEvent {
-  final String? especialidad;
   final String? ciudad;
 
   /// `null` deja la modalidad como estaba; usa [quitarModalidad] para
@@ -42,14 +44,34 @@ class AgendarFiltrosCambiados extends AgendarEvent {
   final bool quitarModalidad;
 
   const AgendarFiltrosCambiados({
-    this.especialidad,
     this.ciudad,
     this.modalidad,
     this.quitarModalidad = false,
   });
 
   @override
-  List<Object?> get props => [especialidad, ciudad, modalidad, quitarModalidad];
+  List<Object?> get props => [ciudad, modalidad, quitarModalidad];
+}
+
+/// Se eligió una especialidad (la cadena vacía es «todas»): se pasa a sus
+/// médicos.
+class AgendarEspecialidadElegida extends AgendarEvent {
+  final String especialidad;
+
+  const AgendarEspecialidadElegida(this.especialidad);
+
+  @override
+  List<Object?> get props => [especialidad];
+}
+
+/// Lo escrito en el buscador de médicos.
+class AgendarBusquedaCambiada extends AgendarEvent {
+  final String texto;
+
+  const AgendarBusquedaCambiada(this.texto);
+
+  @override
+  List<Object?> get props => [texto];
 }
 
 class AgendarMedicoElegido extends AgendarEvent {
@@ -59,6 +81,17 @@ class AgendarMedicoElegido extends AgendarEvent {
 
   @override
   List<Object?> get props => [uid];
+}
+
+/// «El primer turno disponible»: deja elegidos ese médico, esa modalidad y
+/// ese turno, y pasa al paso siguiente. [turno] trae el `doctorId`.
+class AgendarPrimerTurnoElegido extends AgendarEvent {
+  final ProximoTurno turno;
+
+  const AgendarPrimerTurnoElegido(this.turno);
+
+  @override
+  List<Object?> get props => [turno];
 }
 
 class AgendarModalidadElegida extends AgendarEvent {
@@ -121,8 +154,14 @@ class AgendarConfirmado extends AgendarEvent {
   const AgendarConfirmado();
 }
 
-class AgendarOcupadosReintentados extends AgendarEvent {
-  const AgendarOcupadosReintentados();
+/// Volver a pedir los turnos del médico después de un error.
+class AgendarTurnosReintentados extends AgendarEvent {
+  const AgendarTurnosReintentados();
+}
+
+/// Volver a pedir los próximos turnos después de un error.
+class AgendarProximosReintentados extends AgendarEvent {
+  const AgendarProximosReintentados();
 }
 
 /// Se agregó un dependiente desde el paso «para quién»: se recarga la

@@ -60,6 +60,24 @@ class CatalogosState extends Equatable {
   String? nombreDe(String clave, String? codigo) =>
       porCodigo(clave, codigo)?.nombre;
 
+  /// Los códigos del sistema que se ofrecen como opción en un formulario: los
+  /// que el catálogo trae activos, en su orden. Si el catálogo no trae
+  /// ninguno de ellos, todos los del sistema, en el orden de [delSistema]:
+  /// el formulario sigue funcionando (y se enseña el código tal cual), como
+  /// hace el panel.
+  List<String> codigosOfrecidos(String clave, List<String> delSistema) {
+    final activos = <String>[];
+
+    for (final item in items(clave)) {
+      final codigo = item.codigo.toUpperCase();
+      if (delSistema.contains(codigo) && !activos.contains(codigo)) {
+        activos.add(codigo);
+      }
+    }
+
+    return activos.isEmpty ? [...delSistema] : activos;
+  }
+
   /// El elemento marcado como predeterminado por el administrador.
   ItemCatalogo? porDefecto(String clave) {
     for (final item in items(clave)) {

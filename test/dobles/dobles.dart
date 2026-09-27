@@ -8,8 +8,8 @@ import 'package:app_cliniq/core/notificaciones/recordatorios_citas.dart';
 import 'package:app_cliniq/core/service/biometria_service.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/agendar/data/models/medico_portal.dart';
+import 'package:app_cliniq/features/agendar/data/models/turnos.dart';
 import 'package:app_cliniq/features/agendar/data/portal_service.dart';
-import 'package:app_cliniq/features/agendar/dominio/huecos.dart';
 import 'package:app_cliniq/features/auth/data/auth_service.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
@@ -149,39 +149,125 @@ class ProgramadorFalso implements ProgramadorDeRecordatorios {
   Future<void> cancelarTodo() async => cancelaciones++;
 }
 
-/// El portal, con médicos y ocupados programables.
+/// El portal, con próximos turnos y turnos libres programables.
+///
+/// Contesta lo que la prueba le pone —como la API, que es la que calcula
+/// los turnos— y anota cada consulta para comprobar qué se pidió y cuántas
+/// veces.
 class PortalFalso implements PortalService {
+  /// `medicos` de `/portal/proximos-turnos`, con su `proximo`.
   List<MedicoPortal> medicosDisponibles;
-  List<IntervaloOcupado> Function(String doctorId, DateTime dia) ocupadosDe;
 
-  /// Si está puesto, agendar falla con este error.
+  /// `especialidades` de `/portal/proximos-turnos`.
+  List<EspecialidadDisponible> especialidadesDisponibles;
+
+  /// Los turnos libres de `/portal/turnos/:doctorId` por médico y modalidad.
+  List<Turno> Function(String doctorId, TipoCita modalidad) turnosDe;
+
+  /// Las citas que ya tiene cada dependiente (`pacienteId`): la API quita
+  /// los turnos que empiezan a esa hora.
+  Map<String, List<DateTime>> citasDelPaciente = {};
+
+  /// Los que la API suma al reprogramar esa cita (`excluirCita`): su propio
+  /// horario y los de al lado.
+  List<Turno> Function(String citaId) liberadosAlExcluir = (_) => const [];
+
+  /// La `duracion` de la respuesta de turnos; sin ella, la del primero.
+  int? duracionTurnos;
+
+  /// Si están puestos, esas llamadas fallan con este error.
+  Object? errorEnProximos;
+  Object? errorEnTurnos;
   Object? errorAlAgendar;
+  Object? errorAlReprogramar;
 
   final List<NuevaCita> agendadas = [];
   final List<String> reprogramadas = [];
   final List<String> canceladas = [];
-  int consultasDeOcupados = 0;
+
+  /// Cada consulta de próximos turnos, con sus filtros y el paciente.
+  final List<
+    ({
+      String? especialidad,
+      String? ciudad,
+      TipoCita? modalidad,
+      String? pacienteId,
+    })
+  >
+  consultasDeProximos = [];
+
+  /// Cada consulta de turnos: `doctorId/MODALIDAD`.
+  final List<String> consultasDeTurnos = [];
+
+  /// El `excluirCita` de cada consulta de turnos, en el mismo orden.
+  final List<String?> citasExcluidas = [];
+
+  /// El `pacienteId` de cada consulta de turnos, en el mismo orden.
+  final List<String?> pacientesDeTurnos = [];
 
   PortalFalso({
     this.medicosDisponibles = const [],
-    List<IntervaloOcupado> Function(String, DateTime)? ocupadosDe,
-  }) : ocupadosDe = ocupadosDe ?? ((_, _) => const []);
+    this.especialidadesDisponibles = const [],
+    List<Turno> Function(String, TipoCita)? turnosDe,
+  }) : turnosDe = turnosDe ?? ((_, _) => const []);
 
   @override
-  Future<List<MedicoPortal>> medicos({
+  Future<ProximosTurnos> proximosTurnos({
     String? especialidad,
     String? ciudad,
     TipoCita? modalidad,
-  }) async => medicosDisponibles;
+    String? pacienteId,
+  }) async {
+    consultasDeProximos.add((
+      especialidad: especialidad,
+      ciudad: ciudad,
+      modalidad: modalidad,
+      pacienteId: pacienteId,
+    ));
+
+    final error = errorEnProximos;
+    if (error != null) throw error;
+
+    return ProximosTurnos(
+      especialidades: especialidadesDisponibles,
+      medicos: medicosDisponibles,
+    );
+  }
 
   @override
-  Future<List<IntervaloOcupado>> ocupados(
+  Future<TurnosMedico> turnos(
     String doctorId,
-    DateTime desde,
-    DateTime hasta,
-  ) async {
-    consultasDeOcupados++;
-    return ocupadosDe(doctorId, desde);
+    TipoCita modalidad, {
+    DateTime? desde,
+    DateTime? hasta,
+    String? excluirCita,
+    String? pacienteId,
+  }) async {
+    consultasDeTurnos.add('$doctorId/${modalidad.codigo}');
+    citasExcluidas.add(excluirCita);
+    pacientesDeTurnos.add(pacienteId);
+
+    final error = errorEnTurnos;
+    if (error != null) throw error;
+
+    final ocupadas = citasDelPaciente[pacienteId] ?? const [];
+    final turnos = [
+      ...turnosDe(doctorId, modalidad),
+      if (excluirCita != null) ...liberadosAlExcluir(excluirCita),
+    ]..sort((a, b) => a.inicio.compareTo(b.inicio));
+    turnos.removeWhere((t) => ocupadas.contains(t.inicio));
+
+    return TurnosMedico(
+      doctorId: doctorId,
+      modalidad: modalidad,
+      duracion:
+          duracionTurnos ??
+          (turnos.isEmpty
+              ? 30
+              : turnos.first.fin.difference(turnos.first.inicio).inMinutes),
+      turnos: turnos,
+      pacienteId: pacienteId,
+    );
   }
 
   @override
@@ -204,6 +290,9 @@ class PortalFalso implements PortalService {
 
   @override
   Future<Cita> reprogramar(String id, DateTime inicio, DateTime fin) async {
+    final error = errorAlReprogramar;
+    if (error != null) throw error;
+
     reprogramadas.add(id);
 
     return Cita(

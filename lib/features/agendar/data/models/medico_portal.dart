@@ -1,5 +1,6 @@
 import '../../../citas/data/models/cita.dart';
 import '../../dominio/horarios.dart';
+import 'turnos.dart';
 
 /// Lo que el portal sabe de un médico: nada de correo, teléfono ni cédula.
 class MedicoPortal implements MedicoConAgenda {
@@ -21,6 +22,9 @@ class MedicoPortal implements MedicoConAgenda {
   @override
   final List<BloqueoAgenda> bloqueos;
 
+  /// Su próximo turno libre. Solo viene en `/portal/proximos-turnos`.
+  final ProximoTurno? proximo;
+
   const MedicoPortal({
     required this.uid,
     required this.nombre,
@@ -30,6 +34,7 @@ class MedicoPortal implements MedicoConAgenda {
     this.horariosAtencion = const [],
     this.configAgenda,
     this.bloqueos = const [],
+    this.proximo,
   });
 
   /// Las modalidades en el orden de siempre; sin dato, las tres (igual que
@@ -65,6 +70,7 @@ class MedicoPortal implements MedicoConAgenda {
         for (final b in (json['bloqueos'] as List?) ?? const [])
           ?BloqueoAgenda.desdeJson(b),
       ],
+      proximo: ProximoTurno.desdeJson(json['proximo']),
     );
   }
 }

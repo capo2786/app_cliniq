@@ -281,20 +281,24 @@ void main() {
       expect(lote[Catalogos.parentescoDependiente]!.single.codigo, 'MADRE');
     });
 
-    test('cada documento se abre por el nombre corto que manda la API', () {
+    test('cada documento se lee por el nombre corto que manda la API', () {
       expect(
         const DocumentoPendiente(
           clave: 'USO_ACEPTABLE',
           version: '1.0',
           titulo: 'x',
           slug: 'uso-aceptable',
-        ).url,
-        'https://cliniq.gcaicedo-proyectos.com/legal/uso-aceptable',
+        ).slug,
+        'uso-aceptable',
       );
       expect(
-        const DocumentoPendiente(clave: 'NUEVO', version: '1', titulo: 'x').url,
+        const DocumentoPendiente(
+          clave: 'NUEVO',
+          version: '1',
+          titulo: 'x',
+        ).slug,
         isNull,
-        reason: 'sin slug no se arma ninguna dirección',
+        reason: 'sin slug no hay «Leer»',
       );
     });
 

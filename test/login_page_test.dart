@@ -114,9 +114,8 @@ void main() {
     expect(find.text('Entrar con tu huella'), findsNothing);
   });
 
-  testWidgets('«Crea tu cuenta» abre el registro en el navegador', (
-    tester,
-  ) async {
+  testWidgets('«Crea tu cuenta» abre el registro en el navegador '
+      'integrado, sin salir de la aplicación', (tester) async {
     final navegador = NavegadorFalso()..instalar();
     await montar(tester);
 
@@ -125,7 +124,7 @@ void main() {
     expect(navegador.abiertas, [
       'https://cliniq.gcaicedo-proyectos.com/registro',
     ]);
-    expect(navegador.ultimaFuera, isTrue);
+    expect(navegador.ultimaFuera, isFalse);
   });
 
   testWidgets('si no hay navegador, el aviso deja la dirección a la vista', (

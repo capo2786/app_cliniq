@@ -3,23 +3,26 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'avisos.dart';
 
-/// Abre una dirección en el navegador del teléfono.
+/// Abre una página web en el navegador integrado: una hoja del navegador
+/// del sistema (Chrome Custom Tabs, Safari) encima de la aplicación, con su
+/// botón para volver. La persona no sale de la aplicación.
 ///
-/// Si no se puede abrir —no hay navegador, la dirección está mal—, se dice
-/// con la dirección a la vista para que la persona la copie: un botón que no
+/// Es para lo que no es de la clínica ni tiene pantalla propia: un enlace
+/// `EXTERNO` del menú que puso el administrador, el autorregistro del panel.
+/// Si no se puede abrir, se dice con la dirección a la vista: un botón que no
 /// hace nada es peor que un aviso. [queEs] nombra lo que se abre en ese
-/// aviso: «el documento», «el panel web».
+/// aviso: «el registro», «el panel web».
 Future<void> abrirEnlace(
   BuildContext context,
   String url, {
-  String queEs = 'el documento',
+  String queEs = 'la página',
 }) async {
   var abierto = false;
 
   try {
     abierto = await launchUrl(
       Uri.parse(url),
-      mode: LaunchMode.externalApplication,
+      mode: LaunchMode.inAppBrowserView,
     );
   } catch (_) {
     abierto = false;
@@ -28,7 +31,7 @@ Future<void> abrirEnlace(
   if (!abierto && context.mounted) {
     mostrarAviso(
       context,
-      'No pudimos abrir $queEs. Ábrelo en tu navegador: $url',
+      'No pudimos abrir $queEs. Intenta de nuevo en un momento: $url',
       error: true,
     );
   }
@@ -51,6 +54,16 @@ Future<void> llamar(BuildContext context, String numero) =>
 /// Abre la aplicación de correo con esa dirección.
 Future<void> escribirCorreo(BuildContext context, String correo) =>
     _abrirFuera(context, direccionDeCorreo(correo), 'Escribe a $correo.');
+
+/// Un `tel:` o un `mailto:` que llegó escrito (un enlace del menú): se abre
+/// con el marcador o con el correo del teléfono.
+Future<void> abrirContacto(BuildContext context, Uri direccion) => _abrirFuera(
+  context,
+  direccion,
+  direccion.scheme == 'tel'
+      ? 'Llama al ${direccion.path}.'
+      : 'Escribe a ${direccion.path}.',
+);
 
 Future<void> _abrirFuera(
   BuildContext context,

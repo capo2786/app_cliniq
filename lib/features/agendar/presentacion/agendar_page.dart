@@ -39,8 +39,8 @@ import 'pasos/paso_resumen.dart';
 /// pantalla, con un solo botón para seguir y el progreso arriba, y el botón
 /// «atrás» del sistema vuelve un paso en vez de tirar todo lo elegido.
 ///
-/// Crea su propio bloc en cada visita: los médicos y lo ocupado tienen que
-/// llegar frescos cada vez que alguien va a agendar.
+/// Crea su propio bloc en cada visita: los médicos y sus turnos libres
+/// tienen que llegar frescos cada vez que alguien va a agendar.
 class AgendarPage extends StatelessWidget {
   final Cita? reprogramar;
   final String? para;
@@ -61,7 +61,6 @@ class AgendarPage extends StatelessWidget {
         reglas: ReglasAgendamiento.de(
           context.read<ConfigPublicaCubit>().config.agenda,
         ),
-        especialidades: catalogos.especialidades,
         ciudades: catalogos.ciudades,
         puedeDependientes: usuario?.puede(Permisos.dependientes) ?? false,
         reloj: Servicios.reloj,
@@ -293,6 +292,7 @@ class _BarraDeAccion extends StatelessWidget {
     final sinBoton =
         state.cargando ||
         state.error != null ||
+        state.paso == PasoAgendar.filtros ||
         state.paso == PasoAgendar.medico ||
         state.paso == PasoAgendar.modalidad ||
         state.paso == PasoAgendar.listo;

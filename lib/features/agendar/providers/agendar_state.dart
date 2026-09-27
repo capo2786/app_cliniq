@@ -4,6 +4,7 @@ import '../../../core/fechas/fecha_local.dart';
 import '../../citas/data/models/cita.dart';
 import '../../dependientes/data/models/dependiente.dart';
 import '../data/models/medico_portal.dart';
+import '../data/models/turnos.dart';
 import '../dominio/horarios.dart';
 import '../dominio/huecos.dart';
 
@@ -23,16 +24,26 @@ enum PasoAgendar {
   const PasoAgendar(this.titulo);
 }
 
-/// En qué situación está el día elegido.
+/// En qué situación está la rejilla de horarios.
 enum EstadoDia {
+  /// Todavía no hay médico elegido.
   sinMedico,
-  sinFecha,
-  pasado,
-  bloqueado,
-  noAtiende,
+
+  /// Se están pidiendo los turnos del médico.
   cargando,
+
+  /// No se pudieron pedir.
   error,
-  limite,
+
+  /// El médico no tiene ningún turno libre dentro del horizonte.
+  sinTurnos,
+
+  /// Hay turnos, pero no hay día elegido.
+  sinFecha,
+
+  /// El día elegido no tiene turnos libres.
+  diaSinTurnos,
+
   ok,
 }
 
@@ -42,21 +53,38 @@ const String paraMi = '';
 /// El motivo de consulta admite hasta 500 caracteres (igual que el web).
 const int maximoMotivo = 500;
 
+/// «El primer turno disponible»: con qué médico y cuándo.
+typedef PrimerTurno = ({MedicoPortal medico, ProximoTurno turno});
+
 class AgendarState extends Equatable {
   final PasoAgendar paso;
 
-  /// Las reglas de la rejilla, de la configuración de la clínica.
+  /// Las reglas de la clínica: los cortes de mañana, tarde y noche, la
+  /// anticipación y las duraciones por defecto.
   final ReglasAgendamiento reglas;
 
   // Carga inicial
   final bool cargando;
   final String? error;
+
+  /// Los médicos con turnos libres (`/portal/proximos-turnos`), del turno
+  /// más cercano al más lejano, con los filtros de ciudad y modalidad.
   final List<MedicoPortal> medicos;
 
-  /// Los catálogos `ESPECIALIDAD` y `CIUDAD`: solo dan el orden de los
-  /// filtros (las opciones son las que tienen médicos).
-  final List<String> especialidades;
+  /// Las especialidades con médicos que tienen turnos libres, en el orden
+  /// del catálogo, con cuántos médicos y su primer turno.
+  final List<EspecialidadDisponible> especialidades;
+
+  /// El catálogo `CIUDAD`: solo da el orden del filtro.
   final List<String> catalogoCiudades;
+
+  /// Las ciudades donde hay médicos con turnos libres, para el filtro.
+  final List<String> ciudades;
+
+  // Recarga de los próximos turnos (al filtrar o después de un choque)
+  final bool cargandoProximos;
+  final String? errorProximos;
+
   final List<Dependiente> dependientes;
   final bool puedeDependientes;
   final String nombreTitular;
@@ -66,7 +94,13 @@ class AgendarState extends Equatable {
   final String filtroEspecialidad;
   final String filtroCiudad;
   final TipoCita? filtroModalidad;
-  final String? medicoId;
+
+  /// Lo escrito en el buscador de médicos.
+  final String busqueda;
+
+  /// El médico elegido. Se guarda entero, y no solo su id, para que siga
+  /// ahí aunque la lista de médicos se recargue sin él.
+  final MedicoPortal? medico;
   final TipoCita tipo;
   final DateTime? fecha;
   final Hueco? hueco;
@@ -75,10 +109,15 @@ class AgendarState extends Equatable {
   /// La cita que se reprograma, o `null` al agendar una nueva.
   final Cita? original;
 
-  // Lo ocupado del médico el día elegido
-  final List<IntervaloOcupado> ocupados;
-  final bool cargandoOcupados;
-  final String? errorOcupados;
+  // Los turnos libres del médico en la modalidad elegida
+  final TurnosMedico? turnos;
+  final bool cargandoTurnos;
+  final String? errorTurnos;
+
+  /// Los turnos que el servidor rechazó por estar tomados
+  /// (`doctorId@AAAA-MM-DDTHH:mm:ss`). No se vuelven a ofrecer en esta
+  /// visita aunque una respuesta los traiga.
+  final Set<String> descartados;
 
   // Guardar
   final bool guardando;
@@ -100,6 +139,9 @@ class AgendarState extends Equatable {
     this.medicos = const [],
     this.especialidades = const [],
     this.catalogoCiudades = const [],
+    this.ciudades = const [],
+    this.cargandoProximos = false,
+    this.errorProximos,
     this.dependientes = const [],
     this.puedeDependientes = true,
     this.nombreTitular = '',
@@ -107,15 +149,17 @@ class AgendarState extends Equatable {
     this.filtroEspecialidad = '',
     this.filtroCiudad = '',
     this.filtroModalidad,
-    this.medicoId,
+    this.busqueda = '',
+    this.medico,
     this.tipo = TipoCita.presencial,
     this.fecha,
     this.hueco,
     this.motivo = '',
     this.original,
-    this.ocupados = const [],
-    this.cargandoOcupados = false,
-    this.errorOcupados,
+    this.turnos,
+    this.cargandoTurnos = false,
+    this.errorTurnos,
+    this.descartados = const {},
     this.guardando = false,
     this.errorGuardar,
     this.agendada,
@@ -130,36 +174,23 @@ class AgendarState extends Equatable {
       ? PasoAgendar.horario
       : (puedeDependientes ? PasoAgendar.paciente : PasoAgendar.filtros);
 
-  MedicoPortal? get medico =>
-      medicos.where((m) => m.uid == medicoId).firstOrNull;
+  String? get medicoId => medico?.uid;
 
-  /// Las ciudades donde hay médicos, en el orden del catálogo `CIUDAD`; las
-  /// que no están en el catálogo van al final, en orden alfabético.
-  List<String> get ciudades =>
-      _conMedicos(catalogoCiudades, [for (final m in medicos) m.ciudad]);
-
-  /// Las especialidades que tienen al menos un médico, en el orden del
-  /// catálogo; las que no están en el catálogo van al final.
-  ///
-  /// El web ofrece el catálogo entero. En un teléfono, elegir una
-  /// especialidad sin médicos es un callejón sin salida, así que solo se
-  /// ofrecen las que llevan a alguien.
-  List<String> get especialidadesConMedicos =>
-      _conMedicos(especialidades, [for (final m in medicos) m.especialidad]);
-
-  static List<String> _conMedicos(
+  /// Las ciudades en el orden del catálogo `CIUDAD`; las que no están en el
+  /// catálogo van al final, en orden alfabético.
+  static List<String> ordenarCiudades(
     List<String> catalogo,
-    List<String?> deLosMedicos,
+    List<MedicoPortal> medicos,
   ) {
     final presentes = {
-      for (final valor in deLosMedicos)
-        if (valor != null && valor.trim().isNotEmpty)
-          normalizarTexto(valor): valor.trim(),
+      for (final m in medicos)
+        if (m.ciudad != null && m.ciudad!.trim().isNotEmpty)
+          normalizarTexto(m.ciudad): m.ciudad!.trim(),
     };
 
     final ordenadas = <String>[
-      for (final e in catalogo)
-        if (presentes.remove(normalizarTexto(e)) != null) e,
+      for (final c in catalogo)
+        if (presentes.remove(normalizarTexto(c)) != null) c,
     ];
 
     final resto = presentes.values.toList()
@@ -168,7 +199,23 @@ class AgendarState extends Equatable {
     return [...ordenadas, ...resto];
   }
 
-  List<MedicoPortal> get medicosFiltrados {
+  // ── Especialidades y médicos ───────────────────────────────────────
+
+  /// La especialidad elegida, o `null` si se eligió ver todas.
+  EspecialidadDisponible? get especialidadElegida {
+    final elegida = normalizarTexto(filtroEspecialidad);
+    if (elegida.isEmpty) return null;
+
+    return especialidades
+        .where((e) => normalizarTexto(e.nombre) == elegida)
+        .firstOrNull;
+  }
+
+  /// Los médicos de la especialidad elegida (o todos), sin el buscador.
+  ///
+  /// La ciudad y la modalidad ya las filtra la API; se vuelven a mirar aquí
+  /// por si la lista es de antes de cambiar un filtro.
+  List<MedicoPortal> get medicosDeLaEspecialidad {
     final esp = normalizarTexto(filtroEspecialidad);
     final ciudad = normalizarTexto(filtroCiudad);
     final modalidad = filtroModalidad;
@@ -183,6 +230,62 @@ class AgendarState extends Equatable {
         .toList();
   }
 
+  /// Los de la especialidad que coinciden con el buscador: cada palabra
+  /// escrita tiene que estar en el nombre, sin importar tildes ni
+  /// mayúsculas.
+  List<MedicoPortal> get medicosFiltrados {
+    final palabras = normalizarTexto(busqueda)
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .toList();
+    final todos = medicosDeLaEspecialidad;
+    if (palabras.isEmpty) return todos;
+
+    return todos.where((m) {
+      final nombre = normalizarTexto(m.nombre);
+      return palabras.every(nombre.contains);
+    }).toList();
+  }
+
+  /// «El primer turno disponible» de la especialidad elegida —el que manda
+  /// la API para ella— o, con todas, el más cercano de cualquier médico.
+  PrimerTurno? get primerTurno {
+    final delaEspecialidad = especialidadElegida?.proximo;
+    final doctorId = delaEspecialidad?.doctorId;
+
+    if (delaEspecialidad != null && doctorId != null) {
+      final medico = medicosDeLaEspecialidad
+          .where((m) => m.uid == doctorId)
+          .firstOrNull;
+      if (medico != null) return (medico: medico, turno: delaEspecialidad);
+    }
+
+    return _primeroDe(medicosDeLaEspecialidad);
+  }
+
+  /// Si se está confirmando «El primer turno disponible» contra la API: ya
+  /// hay turno elegido y se piden los turnos del médico sin salir del paso.
+  bool get confirmandoPrimerTurno =>
+      paso == PasoAgendar.medico && cargandoTurnos && hueco != null;
+
+  /// El turno más cercano entre todos los médicos (para «Todas las
+  /// especialidades»).
+  PrimerTurno? get primerTurnoGeneral => _primeroDe(medicos);
+
+  static PrimerTurno? _primeroDe(List<MedicoPortal> medicos) {
+    PrimerTurno? primero;
+
+    for (final m in medicos) {
+      final proximo = m.proximo;
+      if (proximo == null) continue;
+      if (primero == null || proximo.inicio.isBefore(primero.turno.inicio)) {
+        primero = (medico: m, turno: proximo.conMedico(m.uid));
+      }
+    }
+
+    return primero;
+  }
+
   List<TipoCita> get modalidadesMedico =>
       medico?.modalidadesOfrecidas ?? const [];
 
@@ -192,100 +295,124 @@ class AgendarState extends Equatable {
     return dependientes.where((d) => d.uid == para).firstOrNull?.nombre ?? '';
   }
 
-  int get duracion => duracionDe(medico, tipo, reglas);
+  /// El dependiente para quien se piden los turnos (`pacienteId`): la API
+  /// quita los que chocan con sus propias citas. Para el titular, `null`.
+  ///
+  /// Al reprogramar es el de la cita, si era de un dependiente.
+  String? get pacienteIdTurnos {
+    final o = original;
+    if (o != null) {
+      final id = o.pacienteId ?? '';
+      return o.paraDependiente && id.isNotEmpty ? id : null;
+    }
 
-  BloqueoAgenda? get bloqueo {
-    final f = fecha;
-    return f == null ? null : bloqueoEn(medico, f);
+    return para == paraMi ? null : para;
   }
 
-  List<HorarioRango> get _rangos {
-    final f = fecha;
+  // ── Turnos del médico ──────────────────────────────────────────────
+
+  /// Los turnos cargados, solo si son del médico, la modalidad y el
+  /// paciente elegidos.
+  TurnosMedico? get turnosActuales {
+    final t = turnos;
     final m = medico;
 
-    return f != null && m != null
-        ? rangosDelDia(m.horariosAtencion, f)
-        : const [];
+    return t != null &&
+            m != null &&
+            t.doctorId == m.uid &&
+            t.modalidad == tipo &&
+            t.pacienteId == pacienteIdTurnos
+        ? t
+        : null;
   }
 
-  /// Lo ocupado sin la propia cita que se reprograma: su horario queda libre.
-  List<IntervaloOcupado> get ocupadosSinOriginal {
-    final o = original;
-    if (o == null) return ocupados;
+  /// Minutos de la cita: los que dice la API para estos turnos o, mientras
+  /// no llegan, los del médico o la clínica.
+  int get duracion {
+    final deLaApi = turnosActuales?.duracion ?? 0;
 
-    return ocupados
-        .where((c) => !(c.inicio == o.inicio && c.fin == o.fin))
-        .toList();
+    return deLaApi > 0 ? deLaApi : duracionDe(medico, tipo, reglas);
+  }
+
+  /// `pacienteId|doctorId@AAAA-MM-DDTHH:mm:ss` (sin paciente para el
+  /// titular); sin [inicio], solo el prefijo. Va con el paciente porque un
+  /// turno puede chocar con una cita suya y no con las de otro.
+  static String claveDescartado(
+    String? pacienteId,
+    String doctorId,
+    DateTime? inicio,
+  ) =>
+      '${pacienteId ?? ''}|$doctorId@${inicio == null ? '' : aTextoLocal(inicio)}';
+
+  /// Los turnos que todavía se pueden ofrecer: sin los que ya pasaron (con
+  /// la anticipación de la clínica) ni los que el servidor rechazó.
+  List<Turno> get turnosLibres {
+    final t = turnosActuales;
+    if (t == null) return const [];
+
+    final prefijo = claveDescartado(t.pacienteId, t.doctorId, null);
+
+    return turnosVigentes(
+      t.turnos,
+      limite: ahoraConAnticipacion(ahora, reglas),
+      descartados: {
+        for (final clave in descartados)
+          if (clave.startsWith(prefijo))
+            ?leerFechaLocal(clave.substring(prefijo.length)),
+      },
+    );
   }
 
   EstadoDia get estadoDia {
-    final f = fecha;
-
     if (medico == null) return EstadoDia.sinMedico;
+    if (cargandoTurnos) return EstadoDia.cargando;
+    if (errorTurnos != null) return EstadoDia.error;
+    if (turnosActuales == null) return EstadoDia.cargando;
+    if (turnosLibres.isEmpty) return EstadoDia.sinTurnos;
+
+    final f = fecha;
     if (f == null) return EstadoDia.sinFecha;
-    if (f.isBefore(inicioDelDia(ahora))) return EstadoDia.pasado;
-    if (bloqueo != null) return EstadoDia.bloqueado;
-    if (_rangos.isEmpty) return EstadoDia.noAtiende;
-    if (cargandoOcupados) return EstadoDia.cargando;
-    if (errorOcupados != null) return EstadoDia.error;
-    if (limiteAlcanzado(medico, ocupadosSinOriginal, f)) {
-      return EstadoDia.limite;
-    }
+    if (!tieneTurnos(f)) return EstadoDia.diaSinTurnos;
 
     return EstadoDia.ok;
   }
 
+  /// Si ese día tiene algún turno libre.
+  bool tieneTurnos(DateTime dia) =>
+      turnosLibres.any((t) => mismoDia(t.inicio, dia));
+
+  /// Las fichas del día elegido.
   List<Hueco> get huecos {
     final f = fecha;
     if (f == null || estadoDia != EstadoDia.ok) return const [];
 
-    return calcularHuecos(
-      fecha: f,
-      rangos: _rangos,
-      duracion: duracion,
-      margen: margenDe(medico),
-      citas: ocupadosSinOriginal,
-      ahora: ahoraConAnticipacion(ahora, reglas),
-      reglas: reglas,
-    );
+    return huecosDelDia(turnosLibres, f, reglas);
   }
 
   Map<Periodo, List<Hueco>> get grupos => agruparPorPeriodo(huecos);
 
-  int get libres => huecos.where((h) => !h.ocupado).length;
+  int get libres => huecos.length;
 
-  /// El horario elegido, solo mientras siga libre y válido.
+  /// El horario elegido, solo mientras siga entre los turnos libres.
   Hueco? get huecoValido {
     final h = hueco;
     if (h == null) return null;
 
-    return huecos.any((x) => x.hora == h.hora && !x.ocupado) ? h : null;
+    return huecos.any(h.mismoHorario) ? h : null;
   }
 
-  /// El primer día que se ofrece: hoy si todavía cabe una cita.
-  DateTime? get primerDia {
-    final m = medico;
-    return m == null ? null : primerDiaConAtencion(m, duracion, ahora, reglas);
-  }
+  /// El primer día con turnos libres.
+  DateTime? get primerDia => diasConTurnos(turnosLibres).firstOrNull;
 
-  /// Los días de la tira: los próximos con atención desde el primero.
+  /// Los días de la tira: los que tienen turnos libres.
   List<DateTime> get diasDisponibles {
-    final m = medico;
-    final primero = primerDia;
-    if (m == null || primero == null) return const [];
-
-    final dias = diasConAtencion(
-      m,
-      primero,
-      reglas: reglas,
-      hasta: sumarDias(inicioDelDia(ahora), reglas.diasHorizonte),
-    );
+    final dias = diasConTurnos(turnosLibres);
     final f = fecha;
 
-    // Si el día elegido quedó fuera (la cita original, por ejemplo), se
-    // agrega para que siempre se vea marcado.
-    if (f != null && !dias.any((d) => mismoDia(d, f))) {
-      return [...dias, f]..sort();
+    // Si el día elegido quedó sin turnos (el de la cita que se reprograma,
+    // por ejemplo), se agrega para que siempre se vea marcado.
+    if (f != null && dias.isNotEmpty && !dias.any((d) => mismoDia(d, f))) {
+      return [...dias, inicioDelDia(f)]..sort();
     }
 
     return dias;
@@ -311,8 +438,12 @@ class AgendarState extends Equatable {
     String? error,
     bool limpiarError = false,
     List<MedicoPortal>? medicos,
-    List<String>? especialidades,
+    List<EspecialidadDisponible>? especialidades,
     List<String>? catalogoCiudades,
+    List<String>? ciudades,
+    bool? cargandoProximos,
+    String? errorProximos,
+    bool limpiarErrorProximos = false,
     List<Dependiente>? dependientes,
     bool? puedeDependientes,
     String? nombreTitular,
@@ -321,7 +452,9 @@ class AgendarState extends Equatable {
     String? filtroCiudad,
     TipoCita? filtroModalidad,
     bool limpiarFiltroModalidad = false,
-    String? medicoId,
+    String? busqueda,
+    MedicoPortal? medico,
+    bool limpiarMedico = false,
     TipoCita? tipo,
     DateTime? fecha,
     bool limpiarFecha = false,
@@ -330,10 +463,12 @@ class AgendarState extends Equatable {
     String? motivo,
     Cita? original,
     bool limpiarOriginal = false,
-    List<IntervaloOcupado>? ocupados,
-    bool? cargandoOcupados,
-    String? errorOcupados,
-    bool limpiarErrorOcupados = false,
+    TurnosMedico? turnos,
+    bool limpiarTurnos = false,
+    bool? cargandoTurnos,
+    String? errorTurnos,
+    bool limpiarErrorTurnos = false,
+    Set<String>? descartados,
     bool? guardando,
     String? errorGuardar,
     bool limpiarErrorGuardar = false,
@@ -351,6 +486,11 @@ class AgendarState extends Equatable {
       medicos: medicos ?? this.medicos,
       especialidades: especialidades ?? this.especialidades,
       catalogoCiudades: catalogoCiudades ?? this.catalogoCiudades,
+      ciudades: ciudades ?? this.ciudades,
+      cargandoProximos: cargandoProximos ?? this.cargandoProximos,
+      errorProximos: limpiarErrorProximos
+          ? null
+          : (errorProximos ?? this.errorProximos),
       dependientes: dependientes ?? this.dependientes,
       puedeDependientes: puedeDependientes ?? this.puedeDependientes,
       nombreTitular: nombreTitular ?? this.nombreTitular,
@@ -360,17 +500,19 @@ class AgendarState extends Equatable {
       filtroModalidad: limpiarFiltroModalidad
           ? null
           : (filtroModalidad ?? this.filtroModalidad),
-      medicoId: medicoId ?? this.medicoId,
+      busqueda: busqueda ?? this.busqueda,
+      medico: limpiarMedico ? null : (medico ?? this.medico),
       tipo: tipo ?? this.tipo,
       fecha: limpiarFecha ? null : (fecha ?? this.fecha),
       hueco: limpiarHueco ? null : (hueco ?? this.hueco),
       motivo: motivo ?? this.motivo,
       original: limpiarOriginal ? null : (original ?? this.original),
-      ocupados: ocupados ?? this.ocupados,
-      cargandoOcupados: cargandoOcupados ?? this.cargandoOcupados,
-      errorOcupados: limpiarErrorOcupados
+      turnos: limpiarTurnos ? null : (turnos ?? this.turnos),
+      cargandoTurnos: cargandoTurnos ?? this.cargandoTurnos,
+      errorTurnos: limpiarErrorTurnos
           ? null
-          : (errorOcupados ?? this.errorOcupados),
+          : (errorTurnos ?? this.errorTurnos),
+      descartados: descartados ?? this.descartados,
       guardando: guardando ?? this.guardando,
       errorGuardar: limpiarErrorGuardar
           ? null
@@ -390,6 +532,9 @@ class AgendarState extends Equatable {
     medicos,
     especialidades,
     catalogoCiudades,
+    ciudades,
+    cargandoProximos,
+    errorProximos,
     dependientes,
     puedeDependientes,
     nombreTitular,
@@ -397,15 +542,17 @@ class AgendarState extends Equatable {
     filtroEspecialidad,
     filtroCiudad,
     filtroModalidad,
-    medicoId,
+    busqueda,
+    medico,
     tipo,
     fecha,
     hueco,
     motivo,
     original,
-    ocupados,
-    cargandoOcupados,
-    errorOcupados,
+    turnos,
+    cargandoTurnos,
+    errorTurnos,
+    descartados,
     guardando,
     errorGuardar,
     agendada,

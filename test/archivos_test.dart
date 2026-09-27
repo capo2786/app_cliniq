@@ -301,5 +301,91 @@ void main() {
         throwsA(isA<ErrorAlAbrirArchivo>()),
       );
     });
+
+    Dio conCabeceras(Map<String, List<String>> cabeceras, List<int> bytes) {
+      return Dio()
+        ..interceptors.add(
+          InterceptorsWrapper(
+            onRequest: (pedido, manejador) => manejador.resolve(
+              Response<List<int>>(
+                requestOptions: pedido,
+                statusCode: 200,
+                data: bytes,
+                headers: Headers.fromMap(cabeceras),
+              ),
+            ),
+          ),
+        );
+    }
+
+    test('con solo el identificador, el nombre y el tipo salen de las '
+        'cabeceras de la misma descarga', () async {
+      final servicio = ArchivosService(
+        conCabeceras({
+          'content-type': ['image/png'],
+          'content-disposition': [
+            "inline; filename=\"captura.png\"; "
+                "filename*=UTF-8''captura%20de%20mam%C3%A1.png",
+          ],
+        }, png(8)),
+      );
+
+      final descargado = await servicio.descargarConDatos('a9');
+
+      expect(descargado.bytes, png(8));
+      expect(descargado.meta.id, 'a9');
+      expect(descargado.meta.nombre, 'captura de mamá.png');
+      expect(descargado.meta.mime, 'image/png');
+      expect(descargado.meta.esImagen, isTrue);
+      expect(descargado.meta.tamano, png(8).length);
+    });
+
+    test('sin cabeceras, el tipo se reconoce por el contenido', () async {
+      final servicio = ArchivosService(conCabeceras({}, pdf(4)));
+
+      final descargado = await servicio.descargarConDatos('a2');
+
+      expect(descargado.meta.mime, 'application/pdf');
+      expect(descargado.meta.nombre, 'adjunto.pdf');
+      expect(descargado.meta.esPdf, isTrue);
+    });
+
+    test('el nombre de Content-Disposition, con y sin codificar', () {
+      expect(nombreDeLaDescarga(null), isNull);
+      expect(nombreDeLaDescarga('inline'), isNull);
+      expect(nombreDeLaDescarga('attachment; filename="a b.pdf"'), 'a b.pdf');
+      expect(
+        nombreDeLaDescarga('attachment; filename=receta.pdf'),
+        'receta.pdf',
+      );
+      expect(
+        nombreDeLaDescarga("inline; filename*=utf-8''examen%C3%B3.pdf"),
+        'examenó.pdf',
+      );
+    });
+
+    test('unos bytes ya bajados se abren sin volver a pedirlos', () async {
+      final abiertos = <(String, String)>[];
+      final servicio = ArchivosService(
+        api.dio,
+        carpetaTemporal: () async => temporal,
+        abrir: (ruta, mime) async => abiertos.add((ruta, mime)),
+      );
+
+      await servicio.abrirBytesConElSistema(
+        const ArchivoMeta(
+          id: 'a7',
+          nombre: 'orden.pdf',
+          mime: 'application/pdf',
+          tamano: 9,
+        ),
+        pdf(4),
+      );
+
+      expect(api.pedidos, isEmpty);
+      final (ruta, _) = abiertos.single;
+      expect(ruta, endsWith('/a7/orden.pdf'));
+      expect(await File(ruta).readAsBytes(), pdf(4));
+    });
   });
 }

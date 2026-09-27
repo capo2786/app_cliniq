@@ -1,5 +1,6 @@
-# Uncomment this line to define a global platform for your project
-# platform :ios, '15.0'
+# La videoconsulta usa el SDK de Jitsi (jitsi_meet_flutter_sdk), que pide
+# iOS 15.1 o posterior.
+platform :ios, '15.1'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

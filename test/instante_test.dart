@@ -2,6 +2,7 @@
 
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/fechas/instante.dart';
+import 'package:app_cliniq/core/formato/instantes.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 
@@ -67,6 +68,33 @@ void main() {
 
       expect(reloj.instante(), DateTime.utc(2026, 9, 28, 14));
       expect(enHoraDeLaClinica(reloj.instante()), reloj.ahora());
+    });
+  });
+
+  group('Cómo se dicen', () {
+    // Las 09:00 del 28 de septiembre en Guayaquil.
+    final ahora = DateTime.utc(2026, 9, 28, 14);
+
+    test('hace cuánto: minutos, horas, ayer, días y, más atrás, la fecha', () {
+      expect(haceCuanto(ahora, ahora), 'hace un momento');
+      expect(
+        haceCuanto(ahora.subtract(const Duration(minutes: 5)), ahora),
+        'hace 5 min',
+      );
+      expect(
+        haceCuanto(ahora.subtract(const Duration(hours: 3)), ahora),
+        'hace 3 h',
+      );
+      // Las 23:00 de ayer en la clínica son las 04:00 UTC de hoy: es «ayer»
+      // aunque en UTC sea el mismo día.
+      expect(haceCuanto(DateTime.utc(2026, 9, 28, 4), ahora), 'ayer');
+      expect(haceCuanto(DateTime.utc(2026, 9, 24, 14), ahora), 'hace 4 días');
+      expect(haceCuanto(DateTime.utc(2026, 9, 1, 14), ahora), '1 sep 2026');
+    });
+
+    test('momentos y sellos en la hora de la clínica', () {
+      expect(momentoLegible(ahora), 'Lunes 28 de septiembre, 09:00');
+      expect(selloLegible(ahora), '28/09/2026 · 09:00');
     });
   });
 }

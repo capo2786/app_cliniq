@@ -23,6 +23,7 @@ import '../providers/citas_event.dart';
 import '../providers/citas_state.dart';
 import 'widgets/detalle_cita.dart';
 import 'widgets/tarjeta_cita.dart';
+import '../../avisos/presentacion/widgets/boton_campana.dart';
 
 /// Las citas del paciente y de sus dependientes: próximas e historial.
 class CitasPage extends StatelessWidget {
@@ -53,7 +54,11 @@ class CitasPage extends StatelessWidget {
         backgroundColor: AppColors.fondo,
         appBar: AppBar(
           title: const Text('Mis citas'),
-          actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+          actions: const [
+            BotonCampana(),
+            BotonCerrarSesion(),
+            SizedBox(width: 6),
+          ],
         ),
         body: FondoDegradado(
           child: !puedeVer

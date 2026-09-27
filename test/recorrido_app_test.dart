@@ -37,7 +37,14 @@ void main() {
 
   // Todo relativo a hoy, para que la prueba valga cualquier día.
   final hoy = RelojClinicaDeHoy.hoy();
+  final manana = sumarDias(hoy, 1);
   final pasadoManana = sumarDias(hoy, 2);
+
+  /// Un turno libre como lo manda la API: hora local sin zona.
+  Map<String, dynamic> turno(DateTime dia, String inicio, String fin) => {
+    'inicio': '${fechaIso(dia)}T$inicio:00',
+    'fin': '${fechaIso(dia)}T$fin:00',
+  };
 
   Map<String, dynamic> usuario() => {
     'uid': 'u1',
@@ -78,6 +85,7 @@ void main() {
     ],
     'configAgenda': {'duraciones': {}, 'margenMinutos': 0, 'limiteDiario': 0},
     'bloqueos': [],
+    'proximo': {...turno(manana, '09:00', '09:30'), 'modalidad': 'PRESENCIAL'},
   };
 
   setUp(() {
@@ -203,8 +211,39 @@ void main() {
         ],
       ),
       ...rutasDeLaClinica(),
-      'GET /portal/medicos': (_) => (estado: 200, cuerpo: [medico()]),
-      'GET /portal/disponibilidad/doc1': (_) => (estado: 200, cuerpo: []),
+      'GET /portal/proximos-turnos': (_) => (
+        estado: 200,
+        cuerpo: {
+          'especialidades': [
+            {
+              'nombre': 'Pediatría',
+              'medicos': 1,
+              'proximo': {
+                ...turno(manana, '09:00', '09:30'),
+                'doctorId': 'doc1',
+                'modalidad': 'PRESENCIAL',
+              },
+            },
+          ],
+          'medicos': [medico()],
+        },
+      ),
+      'GET /portal/turnos/doc1': (o) => (
+        estado: 200,
+        cuerpo: {
+          'doctorId': 'doc1',
+          'modalidad': o.queryParameters['modalidad'],
+          'duracion': 30,
+          'turnos': [
+            turno(manana, '09:00', '09:30'),
+            turno(manana, '09:30', '10:00'),
+            turno(manana, '15:00', '15:30'),
+            turno(pasadoManana, '10:00', '10:30'),
+          ],
+        },
+      ),
+      'GET /portal/arco': (_) => (estado: 200, cuerpo: []),
+      'GET /portal/encuestas/pendientes': (_) => (estado: 200, cuerpo: []),
       'POST /portal/citas': (o) {
         final datos = o.data as Map;
         return (
@@ -345,6 +384,18 @@ void main() {
     expect(find.text('Términos y condiciones de uso'), findsNWidgets(2));
     expect(find.byKey(const Key('documento-terminos')), findsOneWidget);
 
+    // Mis derechos sobre mis datos: siempre en el perfil, nativo.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('mis-derechos')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tocar(tester, find.byKey(const Key('mis-derechos')));
+    expect(find.text('Mis derechos sobre mis datos'), findsWidgets);
+    expect(find.text('Aún no has hecho solicitudes'), findsOneWidget);
+    await tocar(tester, find.byTooltip('Atrás'));
+    expect(find.text('Aún no has hecho solicitudes'), findsNothing);
+
     // 7. Agendar, paso a paso hasta los horarios.
     await tocar(tester, find.byKey(const Key('pestana-agendar-cita')));
     await esperar(tester, 8);
@@ -353,10 +404,17 @@ void main() {
 
     await tocar(tester, find.text('Continuar'));
     expect(find.text('¿Qué necesitas?'), findsOneWidget);
-    await tocar(tester, find.text('Continuar'));
+    expect(
+      find.text('1 médico · próximo turno mañana a las 09:00'),
+      findsNWidgets(2),
+      reason: 'el de «Todas las especialidades» y el de Pediatría',
+    );
+    await tocar(tester, find.text('Pediatría'));
     expect(find.text('Elige al médico'), findsOneWidget);
+    expect(find.text('EL PRIMER TURNO DISPONIBLE'), findsOneWidget);
 
-    await tocar(tester, find.text('Luis Mora'));
+    // La tarjeta del médico, no la del primer turno (que va arriba).
+    await tocar(tester, find.text('Luis Mora').last);
     expect(find.text('¿Cómo quieres la consulta?'), findsOneWidget);
 
     await tocar(tester, find.text('Telemedicina'));
@@ -407,9 +465,12 @@ void main() {
     await tocar(tester, find.text('Mantener la cita'));
 
     expect(api.pedidas, contains('POST /legal/aceptar'));
+    expect(api.pedidas, contains('GET /portal/proximos-turnos'));
+    expect(api.pedidas, contains('GET /portal/turnos/doc1'));
     expect(
       api.pedidas.where((p) => p.startsWith('GET /portal/disponibilidad')),
-      isNotEmpty,
+      isEmpty,
+      reason: 'los huecos ya no se calculan en la aplicación',
     );
     final excepcion = tester.takeException();
     if (excepcion is FlutterError) debugPrint(excepcion.toStringDeep());
