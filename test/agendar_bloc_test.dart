@@ -674,7 +674,11 @@ void main() {
 
       expect(s.paso, PasoAgendar.horario);
       expect(s.aviso, mensaje, reason: 'el mensaje del servidor');
-      expect(s.errorGuardar, mensaje);
+      expect(
+        s.errorGuardar,
+        isNull,
+        reason: 'el mensaje va una sola vez: como aviso de la rejilla',
+      );
       expect(s.guardando, isFalse);
       expect(portal.consultasDeTurnos, hasLength(turnosAntes + 1));
       expect(portal.consultasDeProximos, hasLength(proximosAntes + 1));
@@ -743,6 +747,57 @@ void main() {
       await bloc.close();
     });
 
+    /// Hasta el resumen con el turno de las 15:30 de Ana, presencial.
+    Future<AgendarBloc> enElResumen() async {
+      final bloc = await enLaRejilla('ped', TipoCita.presencial);
+      bloc
+        ..add(AgendarHuecoElegido(bloc.state.huecos.first))
+        ..add(const AgendarContinuado())
+        ..add(const AgendarMotivoCambiado('Control'))
+        ..add(const AgendarContinuado());
+      await hasta(bloc, (s) => s.paso == PasoAgendar.resumen);
+      return bloc;
+    }
+
+    test('otro error que explica el servidor: su mensaje, una vez, en el '
+        'resumen, si el turno sigue libre', () async {
+      const mensaje = 'El motivo de consulta es demasiado corto.';
+      portal.errorAlAgendar = errorHttp(400, mensaje);
+
+      final bloc = await enElResumen();
+      final recarga = trasRecargar(bloc, (s) => s.cargandoTurnos);
+      bloc.add(const AgendarConfirmado());
+      final s = await recarga;
+
+      expect(s.paso, PasoAgendar.resumen);
+      expect(s.errorGuardar, mensaje);
+      expect(s.aviso, isNull, reason: 'una sola vez');
+      expect(s.huecoValido?.hora, '15:30');
+
+      await bloc.close();
+    });
+
+    test('otro error que explica el servidor, con el turno ya ocupado: a la '
+        'rejilla con ese mismo mensaje como único aviso', () async {
+      const mensaje = 'No se pudo reservar ese horario.';
+      portal.errorAlAgendar = errorHttp(422, mensaje);
+
+      final bloc = await enElResumen();
+      portal.turnosDe = (doctor, modalidad) => [
+        for (final t in turnosDeLaApi(doctor, modalidad))
+          if (t != hoy1530) t,
+      ];
+
+      bloc.add(const AgendarConfirmado());
+      final s = await hasta(bloc, (s) => s.paso == PasoAgendar.horario);
+
+      expect(s.aviso, mensaje);
+      expect(s.errorGuardar, isNull);
+      expect(horas(s), ['19:30']);
+
+      await bloc.close();
+    });
+
     test('agendar otra cita vuelve a pedir los próximos turnos', () async {
       final bloc = await enLaRejilla('ped', TipoCita.presencial);
       bloc
@@ -762,6 +817,129 @@ void main() {
       expect(portal.consultasDeProximos, hasLength(consultas + 1));
       expect(s.medico, isNull);
       expect(s.motivo, isEmpty);
+
+      await bloc.close();
+    });
+  });
+
+  group('Para quién (pacienteId)', () {
+    test('con un dependiente preelegido, los próximos turnos se piden una '
+        'vez y ya sin sus citas', () async {
+      final bloc = crear()..add(const AgendarIniciado(para: 'dep1'));
+      final s = await hasta(bloc, (s) => !s.cargando);
+
+      expect(s.para, 'dep1');
+      expect(portal.consultasDeProximos, hasLength(1));
+      expect(portal.consultasDeProximos.single.pacienteId, 'dep1');
+
+      await bloc.close();
+    });
+
+    test('para el titular no se manda pacienteId', () async {
+      final bloc = await enLaRejilla('ped', TipoCita.presencial);
+
+      expect(portal.consultasDeProximos.single.pacienteId, isNull);
+      expect(portal.pacientesDeTurnos, everyElement(isNull));
+
+      await bloc.close();
+    });
+
+    test('cambiar para quién vuelve a pedir los próximos turnos y la '
+        'rejilla, con el pacienteId del dependiente', () async {
+      // Tomás ya tiene una cita a las 15:30: la API no se la ofrece.
+      portal.citasDelPaciente = {
+        'dep1': [hoy1530.inicio],
+      };
+
+      final bloc = await enLaRejilla('ped', TipoCita.presencial);
+      expect(horas(bloc.state), ['15:30', '19:30']);
+      final proximosAntes = portal.consultasDeProximos.length;
+      final turnosAntes = portal.consultasDeTurnos.length;
+
+      var recarga = trasRecargar(bloc, (s) => s.cargandoTurnos);
+      bloc.add(const AgendarParaElegido('dep1'));
+      var s = await recarga;
+      await hasta(bloc, (s) => !s.cargandoProximos);
+
+      expect(portal.consultasDeProximos, hasLength(proximosAntes + 1));
+      expect(portal.consultasDeProximos.last.pacienteId, 'dep1');
+      expect(portal.consultasDeTurnos, hasLength(turnosAntes + 1));
+      expect(portal.pacientesDeTurnos.last, 'dep1');
+      expect(horas(s), ['19:30'], reason: 'sin el turno en que ya tiene cita');
+      expect(s.medicoId, 'ped', reason: 'lo demás elegido se conserva');
+
+      // El mismo paciente otra vez no pide nada.
+      bloc.add(const AgendarParaElegido('dep1'));
+      bloc.add(const AgendarBusquedaCambiada('x'));
+      await hasta(bloc, (s) => s.busqueda == 'x');
+      expect(portal.consultasDeProximos, hasLength(proximosAntes + 1));
+
+      // De vuelta al titular: sin pacienteId.
+      recarga = trasRecargar(bloc, (s) => s.cargandoTurnos);
+      bloc.add(const AgendarParaElegido(paraMi));
+      s = await recarga;
+      await hasta(bloc, (s) => !s.cargandoProximos);
+      expect(portal.consultasDeProximos.last.pacienteId, isNull);
+      expect(portal.pacientesDeTurnos.last, isNull);
+      expect(horas(s), ['15:30', '19:30']);
+
+      await bloc.close();
+    });
+
+    test('sin médico elegido, cambiar para quién solo vuelve a pedir los '
+        'próximos turnos', () async {
+      final bloc = await abierto();
+
+      final recarga = trasRecargar(bloc, cargandoProximos);
+      bloc.add(const AgendarParaElegido('dep1'));
+      await recarga;
+
+      expect(portal.consultasDeProximos.last.pacienteId, 'dep1');
+      expect(portal.consultasDeTurnos, isEmpty);
+
+      await bloc.close();
+    });
+
+    test('un dependiente recién agregado y elegido también cambia los '
+        'turnos', () async {
+      final bloc = await abierto();
+
+      final recarga = trasRecargar(bloc, cargandoProximos);
+      bloc.add(const AgendarDependientesRecargados(elegir: 'dep1'));
+      final s = await recarga;
+
+      expect(s.para, 'dep1');
+      expect(portal.consultasDeProximos.last.pacienteId, 'dep1');
+
+      await bloc.close();
+    });
+
+    test('un turno rechazado para un dependiente se vuelve a ofrecer para '
+        'otro paciente, si la API lo trae', () async {
+      const mensaje = 'Tomás ya tiene una cita a esa hora.';
+      portal.errorAlAgendar = errorHttp(409, mensaje);
+
+      final bloc = await abierto();
+      bloc.add(const AgendarParaElegido('dep1'));
+      await hasta(bloc, (s) => s.para == 'dep1' && !s.cargandoProximos);
+      bloc.add(const AgendarMedicoElegido('ped'));
+      await hasta(bloc, (s) => s.medicoId == 'ped' && conTurnos(s));
+      bloc
+        ..add(const AgendarModalidadElegida(TipoCita.presencial))
+        ..add(AgendarHuecoElegido(bloc.state.huecos.first))
+        ..add(const AgendarContinuado())
+        ..add(const AgendarMotivoCambiado('Control'))
+        ..add(const AgendarContinuado());
+      await hasta(bloc, (s) => s.paso == PasoAgendar.resumen);
+
+      bloc.add(const AgendarConfirmado());
+      var s = await hasta(bloc, (s) => s.aviso != null);
+      expect(horas(s), ['19:30']);
+
+      final recarga = trasRecargar(bloc, (s) => s.cargandoTurnos);
+      bloc.add(const AgendarParaElegido(paraMi));
+      s = await recarga;
+      expect(horas(s), ['15:30', '19:30']);
 
       await bloc.close();
     });
@@ -876,6 +1054,41 @@ void main() {
       },
     );
 
+    test('la cita de un dependiente se reprograma con su pacienteId; la del '
+        'titular, sin', () async {
+      final deTomas = Cita(
+        id: 'c10',
+        inicio: DateTime(2026, 9, 29, 9),
+        fin: DateTime(2026, 9, 29, 9, 30),
+        tipo: TipoCita.presencial,
+        estado: EstadoCita.programada,
+        doctorId: 'ped',
+        pacienteId: 'dep1',
+        paraDependiente: true,
+      );
+
+      var bloc = crear()..add(AgendarIniciado(reprogramar: deTomas));
+      await hasta(bloc, (s) => !s.cargando && conTurnos(s));
+      expect(portal.pacientesDeTurnos, ['dep1']);
+      expect(portal.citasExcluidas, ['c10']);
+      await bloc.close();
+
+      // La del titular puede traer su propio id: no se manda.
+      final delTitular = Cita(
+        id: 'c11',
+        inicio: DateTime(2026, 9, 29, 9),
+        fin: DateTime(2026, 9, 29, 9, 30),
+        tipo: TipoCita.presencial,
+        estado: EstadoCita.programada,
+        doctorId: 'ped',
+        pacienteId: 'u1',
+      );
+      bloc = crear()..add(AgendarIniciado(reprogramar: delTitular));
+      await hasta(bloc, (s) => !s.cargando && conTurnos(s));
+      expect(portal.pacientesDeTurnos.last, isNull);
+      await bloc.close();
+    });
+
     test('con un médico que ya no atiende por el portal, el mensaje del '
         'servidor y nada que reintentar', () async {
       portal.errorEnTurnos = errorHttp(
@@ -888,8 +1101,8 @@ void main() {
 
       expect(
         s.error,
-        'El médico no está disponible en el portal. Puedes cancelarla y '
-        'agendar con otro médico.',
+        'El médico no está disponible en el portal.',
+        reason: 'solo el mensaje del servidor, una vez',
       );
 
       await bloc.close();

@@ -67,19 +67,25 @@ class TurnosMedico extends Equatable {
   /// En orden y sin repetidos.
   final List<Turno> turnos;
 
+  /// El dependiente para quien se pidieron (sin sus propias citas), o
+  /// `null` si son para el titular.
+  final String? pacienteId;
+
   const TurnosMedico({
     required this.doctorId,
     required this.modalidad,
     required this.duracion,
     this.turnos = const [],
+    this.pacienteId,
   });
 
-  /// Lee la respuesta a lo pedido: el médico y la modalidad son los de la
-  /// consulta, que es con lo que el bloc la reconoce.
+  /// Lee la respuesta a lo pedido: el médico, la modalidad y el paciente
+  /// son los de la consulta, que es con lo que el bloc la reconoce.
   factory TurnosMedico.desdeJson(
     Map<dynamic, dynamic> json, {
     required String doctorId,
     required TipoCita modalidad,
+    String? pacienteId,
   }) {
     final vistos = <DateTime>{};
     final turnos = <Turno>[
@@ -99,11 +105,18 @@ class TurnosMedico extends Equatable {
                 ? 0
                 : turnos.first.fin.difference(turnos.first.inicio).inMinutes),
       turnos: turnos,
+      pacienteId: pacienteId,
     );
   }
 
   @override
-  List<Object?> get props => [doctorId, modalidad, duracion, turnos];
+  List<Object?> get props => [
+    doctorId,
+    modalidad,
+    duracion,
+    turnos,
+    pacienteId,
+  ];
 }
 
 /// El próximo turno libre de un médico (`medicos[].proximo`) o de una

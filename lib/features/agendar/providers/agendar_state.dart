@@ -295,14 +295,33 @@ class AgendarState extends Equatable {
     return dependientes.where((d) => d.uid == para).firstOrNull?.nombre ?? '';
   }
 
+  /// El dependiente para quien se piden los turnos (`pacienteId`): la API
+  /// quita los que chocan con sus propias citas. Para el titular, `null`.
+  ///
+  /// Al reprogramar es el de la cita, si era de un dependiente.
+  String? get pacienteIdTurnos {
+    final o = original;
+    if (o != null) {
+      final id = o.pacienteId ?? '';
+      return o.paraDependiente && id.isNotEmpty ? id : null;
+    }
+
+    return para == paraMi ? null : para;
+  }
+
   // ── Turnos del médico ──────────────────────────────────────────────
 
-  /// Los turnos cargados, solo si son del médico y la modalidad elegidos.
+  /// Los turnos cargados, solo si son del médico, la modalidad y el
+  /// paciente elegidos.
   TurnosMedico? get turnosActuales {
     final t = turnos;
     final m = medico;
 
-    return t != null && m != null && t.doctorId == m.uid && t.modalidad == tipo
+    return t != null &&
+            m != null &&
+            t.doctorId == m.uid &&
+            t.modalidad == tipo &&
+            t.pacienteId == pacienteIdTurnos
         ? t
         : null;
   }
@@ -315,10 +334,15 @@ class AgendarState extends Equatable {
     return deLaApi > 0 ? deLaApi : duracionDe(medico, tipo, reglas);
   }
 
-  /// `doctorId@AAAA-MM-DDTHH:mm:ss`; sin [inicio], solo el prefijo del
-  /// médico.
-  static String claveDescartado(String doctorId, DateTime? inicio) =>
-      '$doctorId@${inicio == null ? '' : aTextoLocal(inicio)}';
+  /// `pacienteId|doctorId@AAAA-MM-DDTHH:mm:ss` (sin paciente para el
+  /// titular); sin [inicio], solo el prefijo. Va con el paciente porque un
+  /// turno puede chocar con una cita suya y no con las de otro.
+  static String claveDescartado(
+    String? pacienteId,
+    String doctorId,
+    DateTime? inicio,
+  ) =>
+      '${pacienteId ?? ''}|$doctorId@${inicio == null ? '' : aTextoLocal(inicio)}';
 
   /// Los turnos que todavía se pueden ofrecer: sin los que ya pasaron (con
   /// la anticipación de la clínica) ni los que el servidor rechazó.
@@ -326,7 +350,7 @@ class AgendarState extends Equatable {
     final t = turnosActuales;
     if (t == null) return const [];
 
-    final prefijo = claveDescartado(t.doctorId, null);
+    final prefijo = claveDescartado(t.pacienteId, t.doctorId, null);
 
     return turnosVigentes(
       t.turnos,

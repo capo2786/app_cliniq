@@ -7,6 +7,7 @@ import 'package:app_cliniq/features/agendar/data/models/turnos.dart';
 import 'package:app_cliniq/features/agendar/presentacion/pasos/paso_filtros.dart';
 import 'package:app_cliniq/features/agendar/presentacion/pasos/paso_horario.dart';
 import 'package:app_cliniq/features/agendar/presentacion/pasos/paso_medico.dart';
+import 'package:app_cliniq/features/agendar/presentacion/pasos/paso_resumen.dart';
 import 'package:app_cliniq/features/agendar/providers/agendar_bloc.dart';
 import 'package:app_cliniq/features/agendar/providers/agendar_event.dart';
 import 'package:app_cliniq/features/agendar/providers/agendar_state.dart';
@@ -100,6 +101,7 @@ void main() {
     PasoAgendar.filtros => PasoFiltros(state: s),
     PasoAgendar.medico => PasoMedico(state: s),
     PasoAgendar.horario => PasoHorario(state: s),
+    PasoAgendar.resumen => PasoResumen(state: s),
     _ => Text('Paso: ${s.paso.titulo}'),
   };
 
@@ -417,9 +419,33 @@ void main() {
       await tester.pump();
 
       expect(bloc.state.paso, PasoAgendar.horario);
-      expect(find.text(mensaje), findsOneWidget);
+      expect(find.text(mensaje), findsOneWidget, reason: 'una sola vez');
+      expect(find.textContaining('inesperado'), findsNothing);
       expect(find.text('15:30'), findsNothing);
       expect(find.text('11:45'), findsOneWidget);
+    });
+
+    testWidgets('otro error que explica el servidor sale una sola vez, en '
+        'el resumen', (tester) async {
+      const mensaje = 'El motivo de consulta es demasiado corto.';
+      portal.errorAlAgendar = errorHttp(400, mensaje);
+      final bloc = await enLaRejilla(tester);
+
+      await tocar(tester, find.text('15:30'));
+      bloc
+        ..add(const AgendarContinuado())
+        ..add(const AgendarMotivoCambiado('Dolor'))
+        ..add(const AgendarContinuado())
+        ..add(const AgendarConfirmado());
+      await hastaQue(
+        tester,
+        () => bloc.state.errorGuardar != null && !bloc.state.cargandoTurnos,
+      );
+      await tester.pump();
+
+      expect(bloc.state.paso, PasoAgendar.resumen);
+      expect(find.text(mensaje), findsOneWidget);
+      expect(find.textContaining('inesperado'), findsNothing);
     });
 
     testWidgets('al reprogramar, con la cita de ahora y sin ofrecer otro '

@@ -97,12 +97,21 @@ void main() {
         especialidad: 'Pediatría',
         ciudad: '',
         modalidad: TipoCita.telemedicina,
+        pacienteId: 'dep1',
       );
 
       expect(api.ultimo('GET /portal/proximos-turnos').queryParameters, {
         'especialidad': 'Pediatría',
         'modalidad': 'TELEMEDICINA',
+        'pacienteId': 'dep1',
       });
+
+      // Para el titular no va pacienteId.
+      await portal.proximosTurnos(pacienteId: '');
+      expect(
+        api.ultimo('GET /portal/proximos-turnos').queryParameters,
+        isEmpty,
+      );
     });
 
     test('lee las especialidades en su orden, con cuántos médicos y el '
@@ -189,8 +198,8 @@ void main() {
       ],
     };
 
-    test('pide la modalidad y, si se pasan, el rango y la cita que se '
-        'reprograma', () async {
+    test('pide la modalidad y, si se pasan, el rango, la cita que se '
+        'reprograma y el dependiente', () async {
       api.rutas['GET /portal/turnos/doc1'] = (_) => respuesta();
 
       await portal.turnos('doc1', TipoCita.presencial);
@@ -204,12 +213,14 @@ void main() {
         desde: DateTime(2026, 9, 28, 15),
         hasta: DateTime(2026, 10, 5),
         excluirCita: 'c9',
+        pacienteId: 'dep1',
       );
       expect(api.ultimo('GET /portal/turnos/doc1').queryParameters, {
         'modalidad': 'TELEMEDICINA',
         'desde': '2026-09-28',
         'hasta': '2026-10-05',
         'excluirCita': 'c9',
+        'pacienteId': 'dep1',
       });
     });
 
@@ -221,7 +232,17 @@ void main() {
 
       expect(turnos.doctorId, 'doc1');
       expect(turnos.modalidad, TipoCita.presencial);
+      expect(turnos.pacienteId, isNull);
       expect(turnos.duracion, 30);
+      expect(
+        (await portal.turnos(
+          'doc1',
+          TipoCita.presencial,
+          pacienteId: 'dep1',
+        )).pacienteId,
+        'dep1',
+        reason: 'se recuerda para quién se pidieron',
+      );
       expect(turnos.turnos, [
         Turno(
           inicio: DateTime(2026, 9, 28, 8),

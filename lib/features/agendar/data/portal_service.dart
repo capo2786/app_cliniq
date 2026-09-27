@@ -49,10 +49,14 @@ class PortalService {
   /// `GET /portal/proximos-turnos`: las especialidades con cuántos médicos
   /// tienen turnos libres y el primero de ellos, y esos médicos con su
   /// próximo turno. Los filtros son opcionales.
+  ///
+  /// [pacienteId] es el dependiente para quien se agenda: la API quita los
+  /// turnos en que ya tiene una cita. Para el titular no se manda.
   Future<ProximosTurnos> proximosTurnos({
     String? especialidad,
     String? ciudad,
     TipoCita? modalidad,
+    String? pacienteId,
   }) async {
     final respuesta = await _dio.get<dynamic>(
       '/portal/proximos-turnos',
@@ -61,6 +65,7 @@ class PortalService {
           'especialidad': especialidad,
         if (ciudad != null && ciudad.isNotEmpty) 'ciudad': ciudad,
         if (modalidad != null) 'modalidad': modalidad.codigo,
+        ..._paciente(pacienteId),
       },
     );
 
@@ -77,13 +82,15 @@ class PortalService {
   /// de reserva de la clínica.
   ///
   /// Al reprogramar, [excluirCita] es la cita que se mueve: su propio
-  /// horario y los de al lado cuentan como libres.
+  /// horario y los de al lado cuentan como libres. [pacienteId], como en
+  /// [proximosTurnos].
   Future<TurnosMedico> turnos(
     String doctorId,
     TipoCita modalidad, {
     DateTime? desde,
     DateTime? hasta,
     String? excluirCita,
+    String? pacienteId,
   }) async {
     final respuesta = await _dio.get<dynamic>(
       '/portal/turnos/$doctorId',
@@ -93,6 +100,7 @@ class PortalService {
         if (hasta != null) 'hasta': fechaIso(hasta),
         if (excluirCita != null && excluirCita.isNotEmpty)
           'excluirCita': excluirCita,
+        ..._paciente(pacienteId),
       },
     );
 
@@ -105,6 +113,7 @@ class PortalService {
       datos,
       doctorId: doctorId,
       modalidad: modalidad,
+      pacienteId: pacienteId == null || pacienteId.isEmpty ? null : pacienteId,
     );
   }
 
@@ -143,4 +152,8 @@ class PortalService {
 
     return Cita.desdeJson(respuesta.data as Map);
   }
+
+  static Map<String, String> _paciente(String? pacienteId) => {
+    if (pacienteId != null && pacienteId.isNotEmpty) 'pacienteId': pacienteId,
+  };
 }

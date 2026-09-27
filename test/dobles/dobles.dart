@@ -164,6 +164,10 @@ class PortalFalso implements PortalService {
   /// Los turnos libres de `/portal/turnos/:doctorId` por médico y modalidad.
   List<Turno> Function(String doctorId, TipoCita modalidad) turnosDe;
 
+  /// Las citas que ya tiene cada dependiente (`pacienteId`): la API quita
+  /// los turnos que empiezan a esa hora.
+  Map<String, List<DateTime>> citasDelPaciente = {};
+
   /// Los que la API suma al reprogramar esa cita (`excluirCita`): su propio
   /// horario y los de al lado.
   List<Turno> Function(String citaId) liberadosAlExcluir = (_) => const [];
@@ -181,8 +185,15 @@ class PortalFalso implements PortalService {
   final List<String> reprogramadas = [];
   final List<String> canceladas = [];
 
-  /// Cada consulta de próximos turnos, con sus filtros.
-  final List<({String? especialidad, String? ciudad, TipoCita? modalidad})>
+  /// Cada consulta de próximos turnos, con sus filtros y el paciente.
+  final List<
+    ({
+      String? especialidad,
+      String? ciudad,
+      TipoCita? modalidad,
+      String? pacienteId,
+    })
+  >
   consultasDeProximos = [];
 
   /// Cada consulta de turnos: `doctorId/MODALIDAD`.
@@ -190,6 +201,9 @@ class PortalFalso implements PortalService {
 
   /// El `excluirCita` de cada consulta de turnos, en el mismo orden.
   final List<String?> citasExcluidas = [];
+
+  /// El `pacienteId` de cada consulta de turnos, en el mismo orden.
+  final List<String?> pacientesDeTurnos = [];
 
   PortalFalso({
     this.medicosDisponibles = const [],
@@ -202,11 +216,13 @@ class PortalFalso implements PortalService {
     String? especialidad,
     String? ciudad,
     TipoCita? modalidad,
+    String? pacienteId,
   }) async {
     consultasDeProximos.add((
       especialidad: especialidad,
       ciudad: ciudad,
       modalidad: modalidad,
+      pacienteId: pacienteId,
     ));
 
     final error = errorEnProximos;
@@ -225,17 +241,21 @@ class PortalFalso implements PortalService {
     DateTime? desde,
     DateTime? hasta,
     String? excluirCita,
+    String? pacienteId,
   }) async {
     consultasDeTurnos.add('$doctorId/${modalidad.codigo}');
     citasExcluidas.add(excluirCita);
+    pacientesDeTurnos.add(pacienteId);
 
     final error = errorEnTurnos;
     if (error != null) throw error;
 
+    final ocupadas = citasDelPaciente[pacienteId] ?? const [];
     final turnos = [
       ...turnosDe(doctorId, modalidad),
       if (excluirCita != null) ...liberadosAlExcluir(excluirCita),
     ]..sort((a, b) => a.inicio.compareTo(b.inicio));
+    turnos.removeWhere((t) => ocupadas.contains(t.inicio));
 
     return TurnosMedico(
       doctorId: doctorId,
@@ -246,6 +266,7 @@ class PortalFalso implements PortalService {
               ? 30
               : turnos.first.fin.difference(turnos.first.inicio).inMinutes),
       turnos: turnos,
+      pacienteId: pacienteId,
     );
   }
 

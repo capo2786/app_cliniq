@@ -496,6 +496,9 @@ margen, límite diario, anticipación, horizonte y rejilla):
 - `GET /portal/turnos/:doctorId?modalidad=…`: los turnos de un médico, de hoy
   al horizonte de la clínica. Al reprogramar se manda `excluirCita` y el
   horario de la propia cita (y los de al lado) se ofrecen libres.
+- Si la cita es para un dependiente, las dos rutas llevan su `pacienteId` y
+  la API quita los turnos en que ya tiene una cita; para el titular no se
+  manda. Cambiar «¿Para quién?» vuelve a pedir los dos.
 
 `lib/features/agendar/dominio/huecos.dart` solo presenta: los días con
 turnos, las fichas de un día en mañana, tarde y noche con los cortes de la
@@ -507,7 +510,8 @@ Sin red no se inventa nada: se dice que no se pudo y se ofrece reintentar.
 Si al agendar o reprogramar la API responde 409 (el turno se tomó
 entretanto), se enseña su mensaje, se vuelven a pedir los turnos y los
 próximos turnos, se conserva todo lo elegido y se vuelve a la hora sin ese
-turno.
+turno. Cualquier error que explica el servidor se enseña con su mensaje, una
+sola vez y en un solo lugar.
 
 Una diferencia a propósito con el web: solo se ofrecen las especialidades
 con algún médico disponible. En un teléfono, elegir una especialidad sin
