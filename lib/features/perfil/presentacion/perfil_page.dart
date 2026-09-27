@@ -154,6 +154,9 @@ class _VistaPerfil extends StatelessWidget {
                         alCambiar2fa: () => _cambiar2fa(context, usuario),
                       ),
                       const SizedBox(height: 26),
+                      const EtiquetaSeccion('Privacidad'),
+                      const _Privacidad(),
+                      const SizedBox(height: 26),
                       const EtiquetaSeccion('Documentos aceptados'),
                       const _DocumentosAceptados(),
                       _DocumentosDeLaClinica(usuario: usuario),
@@ -478,6 +481,39 @@ class _Seguridad extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// «Mis derechos sobre mis datos» (ARCO). No es un elemento del menú: está
+/// siempre aquí, porque es un derecho legal.
+class _Privacidad extends StatelessWidget {
+  const _Privacidad();
+
+  @override
+  Widget build(BuildContext context) {
+    return TarjetaTranslucida(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: ListTile(
+        key: const Key('mis-derechos'),
+        leading: Icon(Icons.shield_outlined, color: AppColors.primarioClaro),
+        title: const Text(
+          'Mis derechos sobre mis datos',
+          style: TextStyle(color: AppColors.texto, fontWeight: FontWeight.w700),
+        ),
+        subtitle: const Text(
+          'Ejerce tus derechos de protección de datos y sigue tus solicitudes.',
+          style: TextStyle(color: AppColors.textoSecundario, fontSize: 12),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppColors.textoSecundario,
+        ),
+        onTap: () => abrirDestino(
+          context,
+          const DestinoNativo(PantallaNativa.privacidad),
         ),
       ),
     );

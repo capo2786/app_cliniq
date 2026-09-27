@@ -90,6 +90,9 @@ class FormatoFecha {
   static String diaMedio(DateTime f) =>
       '${diaCorto(f)} ${f.day} ${_mesesCortos[f.month - 1]}';
 
+  /// «28 de septiembre»
+  static String diaYMes(DateTime f) => '${f.day} de ${_meses[f.month - 1]}';
+
   /// «28 sep»
   static String diaYMesCorto(DateTime f) =>
       '${f.day} ${_mesesCortos[f.month - 1]}';

@@ -9,6 +9,7 @@ import '../features/citas/data/videollamada_service.dart';
 import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/legal/data/legal_service.dart';
+import '../features/privacidad/data/arco_service.dart';
 import 'archivos/archivos_service.dart';
 import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
@@ -103,6 +104,9 @@ class Servicios {
 
   /// Los avisos de la campana (`/notificaciones`).
   static final AvisosService avisos = AvisosService(ApiClient().dio, cache);
+
+  /// Mis solicitudes de derechos sobre mis datos (`/portal/arco`).
+  static final ArcoService arco = ArcoService(ApiClient().dio, cache);
 
   static final PortalService portal = PortalService(ApiClient().dio);
 

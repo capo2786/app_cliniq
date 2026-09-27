@@ -254,6 +254,47 @@ Map<String, List<Map<String, dynamic>>> catalogosJson() => {
     _item('CERRADA', 'Cerrada', icono: 'candado'),
     _item('CANCELADA', 'Cancelada', icono: 'close'),
   ],
+  // Portabilidad desactivada por la clínica (no llega) y Oposición antes
+  // que Rectificación: se ofrecen los activos, en su orden.
+  Catalogos.tipoArco: [
+    _item(
+      'ACCESO',
+      'Acceso',
+      descripcion: 'Saber qué datos tuyos tenemos y para qué los usamos.',
+      color: '#0a7fb5',
+      icono: 'ojo',
+    ),
+    _item(
+      'OPOSICION',
+      'Oposición',
+      descripcion: 'Pedir que dejemos de usar tus datos para algo concreto.',
+      color: '#c77700',
+      icono: 'ban',
+      orden: 1,
+    ),
+    _item(
+      'RECTIFICACION',
+      'Rectificación',
+      descripcion: 'Corregir datos que estén mal o incompletos.',
+      color: '#5a6e73',
+      icono: 'edit',
+      orden: 2,
+    ),
+    _item(
+      'ELIMINACION',
+      'Eliminación',
+      descripcion: 'Pedir que borremos tus datos cuando ya no hagan falta.',
+      color: '#d12e4c',
+      icono: 'trash',
+      orden: 3,
+    ),
+  ],
+  Catalogos.estadoArco: [
+    _item('RECIBIDA', 'Recibida', color: '#0a7fb5', icono: 'correo'),
+    _item('EN_PROCESO', 'En proceso', color: '#c77700', icono: 'reloj'),
+    _item('RESUELTA', 'Resuelta', color: '#00996a', icono: 'check'),
+    _item('RECHAZADA', 'Rechazada', color: '#d12e4c', icono: 'ban'),
+  ],
 };
 
 CatalogosState catalogosDePrueba([

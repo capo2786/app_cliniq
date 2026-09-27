@@ -90,9 +90,11 @@ arranca con valores inventados.**
 | Archivos | `archivos.tamanoMaximoMb`, `archivos.tipos` | Selectores y validación antes de subir |
 | Seguridad | `seguridad.passwordMinimo`, `bloqueoMinutos`, `otpMinutos`, `resetMinutos`, `reenvioSegundos` | Acceso, código, recuperación, cambiar contraseña |
 | Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes |
+| Plazo legal de una solicitud ARCO | `general.arcoPlazoDias` | Mis derechos sobre mis datos |
 | Modalidades (nombre, descripción, color, icono) | `GET /catalogos/lote` → `MODALIDAD_CITA` | Citas, agendar |
 | Cómo prepararse | `PREPARACION_CITA` (`<MODALIDAD>_<n>`) | Detalle, próxima cita, agendar, recordatorios |
 | Estados de citas y consultas | `ESTADO_CITA`, `ESTADO_CONSULTA` | Pastillas y explicaciones |
+| Derechos ARCO y sus estados | `TIPO_ARCO` (se ofrecen los activos, en su orden, con su descripción), `ESTADO_ARCO` | Mis derechos sobre mis datos |
 | Motivos para cancelar | `MOTIVO_CANCELACION_PACIENTE` | Cancelar una cita |
 | Parentescos | `PARENTESCO_DEPENDIENTE` (dependientes), `PARENTESCO` (contacto de emergencia) | Formularios |
 | Especialidades y ciudades | `ESPECIALIDAD`, `CIUDAD` | Orden de los filtros de agendar |
@@ -333,6 +335,7 @@ lib/
                               las pantallas que abre cada una y «Muy pronto»
     inicio/                   el inicio y la barra de pestañas
     avisos/                   la campana de la cabecera y la lista de avisos
+    privacidad/               mis derechos sobre mis datos (solicitudes ARCO)
     citas/                    mis citas, detalle, cancelar, las horas para cambiar y la videoconsulta
     consultas/                consultas en línea: lista, consulta nueva paso a paso y detalle con la conversación
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
@@ -455,6 +458,25 @@ de cada pestaña.
   `enlace` se abre con el enrutador: una pestaña cierra la lista y la
   enseña; lo demás se abre encima. Si el enlace no es del paciente
   (`/admin/...`), se queda en la lista y lo dice.
+
+## Mis derechos sobre mis datos (ARCO)
+
+En el perfil, siempre (no es un elemento del menú: es un derecho legal),
+«Mis derechos sobre mis datos» abre la lista de solicitudes
+(`GET /portal/arco`): tipo y estado con los nombres, colores e iconos de
+`TIPO_ARCO` y `ESTADO_ARCO`, cuándo se envió, el plazo en la hora de la
+clínica («Respuesta a más tardar el 12 de octubre (en 15 días)», o que ya
+venció, con el camino a soporte), la respuesta de la clínica y el historial.
+Las abiertas van primero. El encabezado explica el plazo legal con
+`general.arcoPlazoDias`. Sin red, la última copia (`arco:<uid>`, se borra al
+cerrar sesión); sin copia, el error con «Reintentar».
+
+«Nueva solicitud» (`POST /portal/arco {tipo, detalle}`) ofrece los derechos
+activos de `TIPO_ARCO`, en su orden y con su descripción, y el detalle con
+los mismos límites que el panel y el API (de 10 a 2000 caracteres, sin los
+espacios de los extremos). El botón va en la `BarraDeAccion`, sobre el
+teclado. Si el servidor no la acepta, se enseña su mensaje y el formulario
+queda como estaba.
 
 ## Documentos legales
 
@@ -725,6 +747,7 @@ fvm flutter test
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
 | `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
+| `privacidad_test.dart` | ARCO: el servicio y su copia, el detalle y sus límites, vencida, el orden, el plazo en palabras, los derechos activos del catálogo, el plazo de la configuración, la lista, el vacío, el error y la solicitud nueva (y su rechazo) |
 | `avisos_test.dart` | La campana: el servicio y su copia, el contador (encendido, latidos, en segundo plano, sin red, apagado), la lista (leer, leer todos, borrar y deshacer, ver más), la fecha relativa, la pantalla y la campana en el tablero según el menú |
 | `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |

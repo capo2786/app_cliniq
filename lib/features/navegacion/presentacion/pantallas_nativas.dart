@@ -10,6 +10,7 @@ import '../../consultas/presentacion/detalle_consulta_page.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
 import '../../legal/presentacion/documento_legal_page.dart';
 import '../../perfil/presentacion/perfil_page.dart';
+import '../../privacidad/presentacion/privacidad_page.dart';
 import '../dominio/destinos.dart';
 import 'muy_pronto_page.dart';
 
@@ -45,9 +46,7 @@ Widget pantallaNativa(
       titulo: titulo ?? 'Videoconsulta',
     ),
     PantallaNativa.avisos => AvisosPage(titulo: titulo),
-    PantallaNativa.privacidad => MuyProntoPage(
-      titulo: titulo ?? 'Mis derechos sobre mis datos',
-    ),
+    PantallaNativa.privacidad => const PrivacidadPage(),
     PantallaNativa.encuesta => MuyProntoPage(titulo: titulo ?? 'Encuesta'),
     PantallaNativa.legal => DocumentoLegalPage(
       slug: destino.parametro('slug'),
