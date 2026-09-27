@@ -52,17 +52,20 @@ fvm flutter run
 
 ## Servicios
 
-La aplicación consume `https://api-cliniq.gcaicedo-proyectos.com/api`. Del
-panel web, `https://cliniq.gcaicedo-proyectos.com`, solo abre el registro de
-pacientes (`/registro`) y, para el personal que entra por error, el propio
-panel, las dos en el navegador integrado. Ambas se pueden cambiar al compilar,
-sin tocar el código:
+La aplicación consume `https://api-cliniq.gcaicedo-proyectos.com/api`. El
+panel web, `https://cliniq.gcaicedo-proyectos.com`, no se abre nunca desde la
+aplicación: su dirección se enseña, como texto para copiar, al personal que
+entra por error, y es el dominio de los enlaces de los correos que abren la
+aplicación (ver «Enlaces de los correos»). Las dos se pueden cambiar al
+compilar, sin tocar el código:
 
 ```bash
 flutter build apk --dart-define=API_URL=https://otro-servidor/api --dart-define=WEB_URL=https://otro-panel
 ```
 
-La configuración vive en `lib/core/config/entorno.dart`.
+La configuración vive en `lib/core/config/entorno.dart`. Si cambia
+`WEB_URL`, cambia también el dominio de los App Links
+(`AndroidManifest.xml`) y de los Universal Links (`Runner.entitlements`).
 
 **Solo HTTPS.** Android 9+ e iOS bloquean el HTTP plano y la aplicación no
 lleva excepciones de tráfico en claro. Para probar contra un backend local por
@@ -90,8 +93,8 @@ arranca con valores inventados.**
 | Ventana de la sala de video | `telemedicina.minutosAntes`, `minutosDespues` | Botón de la videoconsulta, «Sala abierta» |
 | Consultas en línea | `telemedicina.horasRespuesta`, `diasSeguimiento`, `maxArchivosConsulta` | Textos y tope de archivos |
 | Archivos | `archivos.tamanoMaximoMb`, `archivos.tipos` | Selectores y validación antes de subir |
-| Seguridad | `seguridad.passwordMinimo`, `bloqueoMinutos`, `otpMinutos`, `resetMinutos`, `reenvioSegundos` | Acceso, código, recuperación, cambiar contraseña |
-| Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes |
+| Seguridad | `seguridad.passwordMinimo`, `bloqueoMinutos`, `otpMinutos`, `resetMinutos`, `reenvioSegundos` | Acceso, código, recuperación, cambiar contraseña, registro («Reenviar enlace») y contraseña nueva |
+| Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes y registro |
 | Plazo legal de una solicitud ARCO | `general.arcoPlazoDias` | Mis derechos sobre mis datos |
 | Días para responder una encuesta | `general.encuestasDiasVentana` | La encuesta que ya no está disponible |
 | Horas de respuesta de soporte | `general.soporteHorasSla` (por severidad), `soporteHorasAviso` | Ticket nuevo |
@@ -106,7 +109,7 @@ arranca con valores inventados.**
 | Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios, perfil y Mi salud |
 | Soporte | `CATEGORIA_TICKET` (las de la clínica), `SEVERIDAD_TICKET` (las activas, en su orden), `ESTADO_TICKET` | Ticket nuevo, mis tickets y la conversación |
 | Artículos de ayuda | `GET /ayuda` (el servidor ya reemplaza las `{{variables}}`) | Centro de ayuda |
-| Documentos legales | `GET /legal/documentos` (clave, slug, versión, título), `mis-aceptaciones` y el texto de cada uno, `GET /legal/documentos/:slug` (Markdown con los datos de la clínica ya sustituidos) | Aceptación y perfil; se leen dentro de la aplicación, con copia para leerlos sin red |
+| Documentos legales | `GET /legal/documentos` (clave, slug, versión, título), `mis-aceptaciones` y el texto de cada uno, `GET /legal/documentos/:slug` (Markdown con los datos de la clínica ya sustituidos) | Aceptación, perfil y registro; se leen dentro de la aplicación, con copia para leerlos sin red |
 | Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil»), los accesos rápidos y la campana de avisos (si trae `/notificaciones`) |
 
 La configuración, los catálogos y los documentos legales son públicos (se
@@ -159,7 +162,8 @@ antes de tocarla.
 | --- | --- |
 | `local_auth` | Entrar con huella o rostro |
 | `package_info_plus` | Versión instalada, en el pie del acceso y del perfil |
-| `url_launcher` | Abrir en el navegador integrado (`LaunchMode.inAppBrowserView`: Chrome Custom Tabs o Safari encima de la aplicación) el registro, el panel web y los enlaces externos del menú; llamar o escribir a la clínica (`tel:`, `mailto:`) |
+| `url_launcher` | Solo llamar o escribir a la clínica (`tel:`, `mailto:`, con el marcador y el correo del teléfono). Nada más sale de la aplicación: sin navegador, sin Custom Tabs, sin Safari |
+| `app_links` ^7.2.1 | Recibir los enlaces de los correos que abren la aplicación (App Links en Android, Universal Links en iOS) y llevarlos a su pantalla (ver «Enlaces de los correos») |
 | `flutter_svg` | Pintar el logotipo de la clínica cuando llega en SVG (`clinica.logo`) |
 
 ### Adjuntos de las consultas en línea
@@ -175,7 +179,7 @@ antes de tocarla.
 
 | Paquete | Para qué |
 | --- | --- |
-| `flutter_inappwebview` ^6.1.5 | La sala de Jitsi de la clínica en un WebView de la propia aplicación: navegación limitada a la sala, la cámara y el micrófono solo para el servidor de video, un guion al cargar y los eventos de la página. Solo Android e iOS |
+| `flutter_inappwebview` ^6.1.5 | La sala de Jitsi de la clínica en un WebView de la propia aplicación: navegación limitada a la sala, la cámara y el micrófono solo para el servidor de video, un guion al cargar y los eventos de la página. También las páginas de fuera (enlaces externos del menú, enlaces web de los artículos y de los documentos), en la pantalla de páginas web. Solo Android e iOS |
 | `permission_handler` ^13.0.2 | Pedir la cámara y el micrófono antes de abrir la sala, y abrir los ajustes del teléfono si ya no se puede preguntar |
 
 ### Fechas y recordatorios
@@ -217,9 +221,15 @@ El identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   su carpeta privada) y que Google Play restringe: se quitan con
   `tools:node="remove"`.
 - `<queries>` declara lo que se abre con otra aplicación del teléfono:
-  `http`/`https` (el navegador integrado), `tel:` y `mailto:` (llamar o
-  escribir a la clínica), `IMAGE_CAPTURE` (cámara) y `application/pdf`
-  (visor).
+  `tel:` y `mailto:` (llamar o escribir a la clínica), `IMAGE_CAPTURE`
+  (cámara) y `application/pdf` (visor). Sin `http`/`https`: la aplicación
+  no abre el navegador.
+- **App Links.** Un `intent-filter` con `android:autoVerify="true"` para
+  `https://cliniq.gcaicedo-proyectos.com/confirmar-correo` y `/restablecer`
+  (los enlaces de los correos), y `flutter_deeplinking_enabled` en `false`:
+  los enlaces los recibe `app_links` y los enruta la aplicación; con el de
+  Flutter encendido, además, Flutter intentaría abrirlos como una ruta con
+  nombre. Ver «Enlaces de los correos».
 
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
@@ -251,6 +261,14 @@ Tras cambiar dependencias, `cd ios && pod install --repo-update` (el
 identificador es `ec.cliniq.sage.app`. El `AppDelegate` se registra como delegado
 del centro de notificaciones para que los recordatorios se vean también con
 la aplicación abierta.
+
+**Universal Links** (iOS): `ios/Runner/Runner.entitlements` trae
+`com.apple.developer.associated-domains` con
+`applinks:cliniq.gcaicedo-proyectos.com`, y el proyecto lo usa en Debug,
+Release y Profile (`CODE_SIGN_ENTITLEMENTS`). `Info.plist` lleva
+`FlutterDeepLinkingEnabled` en `false`, por la misma razón que Android. El
+identificador de la aplicación (App ID) necesita la capacidad «Associated
+Domains» en la cuenta de Apple; ver «Enlaces de los correos».
 
 ## Compilación
 
@@ -339,7 +357,7 @@ lib/
   core/
     arranque/                 que un fallo al arrancar se vea
     catalogos/                los catálogos de la clínica, completos y sin valores de partida
-    config/entorno.dart       API_URL, WEB_URL
+    config/entorno.dart       API_URL, WEB_URL (el dominio de los enlaces de los correos)
     configuracion/            la configuración pública de la clínica: modelo, servicio, cubit
     archivos/                 adjuntos: ArchivoMeta, validación antes de subir, selectores y descargas
     fechas/fecha_local.dart   la hora «congelada» de la API y el reloj de la clínica
@@ -355,13 +373,16 @@ lib/
     red/                      el sondeo de la red y el cartel de sin conexión
     storage/                  llavero, credenciales y caché cifrada
     tema/                     tokens, la paleta de la marca y el tema de Material
+    web/                      las páginas de fuera: qué se abre y qué se bloquea, y el WebView
     servicios.dart            la raíz de composición
   features/
     arranque/                 la espera de los datos de la clínica y de la sesión
-    auth/                     acceso, segundo factor, recuperación, sesión
+    auth/                     acceso, segundo factor, recuperación, sesión, registro de
+                              pacientes, confirmar el correo y la contraseña nueva
     legal/                    documentos legales de la API, su aceptación y su lectura nativa
     navegacion/               el menú del servidor, el enrutador de las rutas del sistema,
-                              las pantallas que abre cada una y «Muy pronto»
+                              las pantallas que abre cada una, «Muy pronto» y los
+                              enlaces de los correos que abren la aplicación
     inicio/                   el inicio y la barra de pestañas
     avisos/                   la campana de la cabecera y la lista de avisos
     privacidad/               mis derechos sobre mis datos (solicitudes ARCO)
@@ -460,8 +481,8 @@ de la campana y los enlaces de los textos (`abrirRuta`, en
 La consulta y el fragmento de la ruta se ignoran. Una ruta del menú que la
 aplicación no sabe abrir no se enseña (ni en la barra ni en los accesos); un
 enlace externo del menú (una dirección que puso el administrador) se abre en
-el navegador integrado; `tel:` y `mailto:`, con el marcador y el correo del
-teléfono. Las pantallas de cada destino se arman en un solo lugar,
+la pantalla de páginas web de la aplicación (ver «Páginas de fuera»); `tel:`
+y `mailto:`, con el marcador y el correo del teléfono. Las pantallas de cada destino se arman en un solo lugar,
 `navegacion/presentacion/pantallas_nativas.dart` (`pantallaNativa`): ahí se
 conectan las que falten.
 
@@ -539,13 +560,12 @@ y se pinta con `TextoMarkdown` (`core/presentacion/widgets/texto_markdown.dart`)
 entiende lo mismo que el panel (`core/markdown.ts`) —párrafos, títulos `#` a
 `###`, **negrita**, listas y enlaces `http`, `https`, `mailto` o rutas
 internas— y nada más, así que no hay HTML que sanear. Un enlace interno
-(`/legal/privacidad`) abre su pantalla con el enrutador; uno web, el
-navegador integrado. Queda una copia por documento (`legal:texto:<slug>`,
-de la clínica: sobrevive al cierre de sesión) para leerlo sin red; un 404
-dice «Documento no encontrado» y no enseña la copia vieja. Lo usan la
-aceptación de documentos y el perfil. El registro de pacientes no está en la
-aplicación: se abre en el navegador integrado, y ahí el panel enseña los
-suyos.
+(`/legal/privacidad`) abre su pantalla con el enrutador; uno web, la
+pantalla de páginas web de la aplicación. Queda una copia por documento
+(`legal:texto:<slug>`, de la clínica: sobrevive al cierre de sesión) para
+leerlo sin red; un 404 dice «Documento no encontrado» y no enseña la copia
+vieja. Lo usan la aceptación de documentos, el perfil y el registro de
+pacientes.
 
 ## Pantalla de acceso
 
@@ -557,7 +577,9 @@ solo botón con el degradado de la marca. Al pie, la **versión instalada**.
 
 - **«¿Olvidaste tu contraseña?»** pide el enlace con
   `POST /auth/password/olvido`. La API contesta siempre lo mismo, exista o no
-  el correo; el enlace abre la página web para crear la contraseña nueva.
+  el correo. El enlace del correo, abierto en el teléfono, abre la
+  aplicación en la pantalla de la contraseña nueva (ver «Enlaces de los
+  correos»); en una computadora, el panel.
 - **Verificación en dos pasos.** Si la cuenta la tiene, la API contesta
   `{requiere2fa, desafio, destino}` y la misma tarjeta pasa al paso del
   código de seis dígitos (`POST /auth/login/2fa`).
@@ -569,9 +591,9 @@ solo botón con el degradado de la marca. Al pie, la **versión instalada**.
   venció». Un 401 en las rutas del acceso no es eso: son credenciales o un
   código equivocados.
 - **Crear cuenta.** El pie dice «¿No tienes cuenta? Crea tu cuenta» y abre
-  el autorregistro del panel web (`/registro`) en el navegador integrado,
-  encima de la aplicación: ahí se piden la cédula y los términos y se
-  confirma el correo.
+  el registro de la aplicación, una pantalla propia con su diseño (ver
+  «Registro de pacientes»). Al volver con la cuenta creada, el correo queda
+  escrito en el acceso.
 - **Correo sin confirmar.** Una cuenta del autorregistro que todavía no abrió
   su enlace recibe 403 con `codigo: CORREO_NO_VERIFICADO`: la tarjeta dice
   «Confirma tu correo para entrar» y ofrece «Reenviar el enlace»
@@ -582,7 +604,9 @@ solo botón con el degradado de la marca. Al pie, la **versión instalada**.
   personal de la clínica, también el administrador: su comodín `*` no abre
   el portal) no entra: se descarta el token sin guardar sesión ni
   credenciales y se explica «Esta aplicación es para pacientes. El personal
-  de la clínica usa el panel web: …», con un botón para abrirlo. Lo mismo al
+  de la clínica usa el panel web desde una computadora, en esta dirección:»,
+  con la dirección del panel (`WEB_URL`) como texto seleccionable y un botón
+  para copiarla: no es un enlace y la aplicación no la abre. Lo mismo al
   restaurar una sesión guardada.
 
 ### Entrar con la huella
@@ -598,6 +622,199 @@ que cualquiera con el teléfono en la mano entrara tocando un botón.
 
 La huella se apaga desde el perfil, y apagarla borra la contraseña guardada.
 Las reglas viven en `lib/features/auth/data/acceso.dart`.
+
+## Registro de pacientes
+
+«Crea tu cuenta», en el acceso, abre `RegistroPage`
+(`features/auth/presentacion/registro_page.dart`): el registro del panel web
+(`/registro`) con el diseño de la aplicación. Pide lo mismo, con las mismas
+reglas y los mismos mensajes que el panel (`core/validadores.ts`,
+`ui/fortaleza`) y que el API (`validarRegistro` en `auth-ms`); las reglas
+viven en `features/auth/dominio/registro.dart` y son puras.
+
+| Campo | Regla |
+| --- | --- |
+| Nombres y apellidos * | De 3 a 120 caracteres; se envía sin espacios de más |
+| Correo electrónico * | Con forma de correo (y dominio con punto, como exige el API), hasta 120; se envía en minúsculas |
+| Teléfono | Opcional; de 7 a 15 dígitos, espacios, guiones y un «+» inicial |
+| Documento * | El tipo, de `TIPO_DOCUMENTO` (cédula por defecto); el número, obligatorio: la cédula con el módulo 10 si la clínica lo pide (`general.validarCedula`; si no, diez dígitos), el pasaporte de 5 a 20 letras o números; se envía en mayúsculas |
+| Fecha de nacimiento * | Con el selector del sistema; no futura (el selector no ofrece días después de hoy, en la hora de la clínica) |
+| Sexo | Opcional, de `SEXO`, con «Prefiero no decirlo» |
+| Contraseña * | El mínimo de la clínica (`seguridad.passwordMinimo`) y el máximo del API (128). Debajo, la barra de fortaleza del panel con sus pistas («Débil: usa al menos N caracteres», «Aceptable: combina mayúsculas, números o símbolos», «Buena», «Muy buena») |
+| Repite la contraseña * | Igual a la primera |
+| Documentos legales * | Los que el API da por aceptados al crear la cuenta: **Términos y condiciones** y **Política de privacidad** (claves `TERMINOS` y `PRIVACIDAD`, del sistema, como en el panel), con el título, la versión y el slug de `GET /legal/documentos`, si aplican a pacientes. Cada uno con «Leer» (el lector de la aplicación, `/legal/:slug` por el enrutador) y su casilla |
+
+Debajo de las casillas se listan, para leerlos, los demás documentos
+vigentes de los pacientes (aviso legal, uso aceptable, consentimiento de
+telemedicina…): el registro no los acepta —el API solo registra términos y
+privacidad con `aceptaTerminos: true`, como lo manda el panel—, así que se
+aceptan al entrar por primera vez, en la pantalla de aceptación. Sin la
+lista de documentos (sin red y sin copia) se dice con «Reintentar» y no se
+puede enviar: no se acepta lo que no se pudo leer. Si la clínica no tuviera
+vigente ninguno de los dos, queda una sola casilla sin enlaces, como en el
+panel.
+
+«Crear mi cuenta» va en la `BarraDeAccion`, sobre el teclado. Si falta algo,
+cada campo dice qué y la pantalla baja al primero con error; no se envía
+nada. El envío es `POST /auth/registro` (pública) con los campos que deja
+pasar el gateway (`CAMPOS_REGISTRO`) y `aceptaTerminos: true`. Si el
+servidor no crea la cuenta (400 con el motivo, 409 si el correo o el
+documento ya tienen cuenta, 429 si se crearon demasiadas desde la misma
+conexión), su mensaje se ve una sola vez, sobre el botón, y el formulario
+queda como estaba. Los campos tienen su `textInputAction` (del documento se
+sigue a la fecha si falta) y sus pistas de autocompletado (nombre, correo,
+teléfono, contraseña nueva, para que el gestor de contraseñas la guarde).
+
+Creada la cuenta, **«Revisa tu correo»**: el correo al que se mandó el
+enlace, «Reenviar enlace» (`POST /auth/registro/reenviar`), apagado los
+segundos de `seguridad.reenvioSegundos` con la cuenta a la vista («Reenviar
+en 42 s»), y «Volver a ingresar», que vuelve al acceso con el correo
+escrito. El estado vive en `RegistroBloc` (`features/auth/providers/`).
+
+## Enlaces de los correos (App Links y Universal Links)
+
+Los dos correos de la cuenta traen un enlace al panel, armado por el API
+con `general.frontendUrl` (o `FRONTEND_URL`):
+`https://cliniq.gcaicedo-proyectos.com/confirmar-correo?token=…` al crear la
+cuenta y `https://cliniq.gcaicedo-proyectos.com/restablecer?token=…` al
+pedir una contraseña nueva (`auth-ms/src/auth/notifications/auth-mailer.service.ts`;
+son las mismas rutas del panel, `app.routes.ts`). Tocados en el teléfono
+con la aplicación instalada, **abren la aplicación**:
+
+- `/confirmar-correo` → `ConfirmarCorreoPage`: confirma sola
+  (`POST /auth/registro/confirmar { token }`) y dice «¡Listo! Tu cuenta está
+  activa» con «Ingresar»; un enlace vencido o ya usado (400) dice el motivo
+  del servidor y deja pedir otro con el correo (`/auth/registro/reenviar`);
+  sin red, «Reintentar» con el mismo enlace.
+- `/restablecer` → `RestablecerPage`: la contraseña nueva y su
+  confirmación, con el mínimo de la clínica y la barra de fortaleza
+  (`POST /auth/password/restablecer { token, newPassword }`); guardada,
+  «Contraseña actualizada» con «Ingresar»; un enlace vencido dice el motivo
+  y ofrece «Pedir otro enlace».
+
+Los recibe `app_links` y los lee `leerEnlaceEntrante`
+(`features/navegacion/dominio/enlaces_entrantes.dart`: `https`, el servidor
+de `WEB_URL`, una de las dos rutas y el `token`); `ReceptorDeEnlaces`
+abre la pantalla encima de lo que se esté viendo, con la aplicación cerrada
+o abierta. Solo esas dos rutas abren la aplicación: el resto del panel sigue
+en el navegador. **Sin la aplicación instalada** (o en una computadora), el
+mismo enlace abre el panel, que confirma o restablece igual: los correos no
+cambian.
+
+### Lo que tiene que llenar el dueño
+
+La verificación la hacen Android e iOS contra dos archivos que sirve el
+panel: `public/.well-known/assetlinks.json` y
+`public/.well-known/apple-app-site-association` (sin extensión), en el
+repositorio `dashboard-cliniq`. El nginx del contenedor del panel los sirve
+como `application/json`, sin redirecciones y con 404 si faltan (nunca la
+página del panel). Traen dos marcadores que hay que reemplazar:
+
+1. **La huella SHA-256 del certificado de firma de Android** →
+   `sha256_cert_fingerprints` de `assetlinks.json` (reemplaza
+   `REEMPLAZAR:CON:LA:HUELLA:SHA-256:DEL:CERTIFICADO:DE:FIRMA:DE:LA:APLICACION`).
+   - Si la aplicación se publica en Google Play con la firma de apps de
+     Google (lo normal), la huella es la de **la clave de firma de apps de
+     Google**, no la de subida: Play Console → la aplicación → *Probar y
+     publicar* → *Configuración* → *Integridad de la app* → *Firma de apps*
+     → «Certificado de la clave de firma de apps» → **SHA-256**. En esa
+     misma página, «Digital Asset Links JSON» da el archivo ya armado.
+   - Para probar un APK firmado en la computadora (sin pasar por Play),
+     agrega también la huella de esa clave, la de `android/key.properties`:
+     `keytool -list -v -keystore <storeFile> -alias <keyAlias>` (o
+     `cd android && ./gradlew signingReport`), línea «SHA256:». Para una
+     compilación de depuración, la del almacén de depuración:
+     `keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android`.
+   - Van como texto, en mayúsculas y con dos puntos
+     (`"AB:CD:…:EF"`), una por elemento de la lista; puede haber varias.
+2. **El Team ID de Apple** → `appIDs` de `apple-app-site-association`:
+   reemplaza `REEMPLAZAR_TEAM_ID` para que quede
+   `<TEAM_ID>.ec.cliniq.sage.app`. El Team ID (diez caracteres) está en
+   developer.apple.com → *Account* → *Membership details* → **Team ID**. El
+   proyecto de Xcode tiene hoy `DEVELOPMENT_TEAM = 47K98K5Q7X`: si es el
+   equipo que firma la publicación, ese es el valor.
+3. **La capacidad en Apple.** El App ID `ec.cliniq.sage.app` necesita
+   «Associated Domains»: con la firma automática de Xcode se activa sola al
+   compilar con `Runner.entitlements`; con firma manual, en
+   developer.apple.com → *Certificates, Identifiers & Profiles* →
+   *Identifiers* → `ec.cliniq.sage.app` → marcar **Associated Domains**, y
+   volver a generar el perfil de aprovisionamiento.
+4. **Publicar el panel** con los dos archivos (la rama `main` del panel se
+   despliega sola) y comprobar desde cualquier computadora:
+   ```bash
+   curl -sI https://cliniq.gcaicedo-proyectos.com/.well-known/assetlinks.json
+   curl -sI https://cliniq.gcaicedo-proyectos.com/.well-known/apple-app-site-association
+   ```
+   Los dos: `HTTP/1.1 200` y `Content-Type: application/json`, sin
+   redirección. Google lo confirma en
+   `https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://cliniq.gcaicedo-proyectos.com&relation=delegate_permission/common.handle_all_urls`
+   (tiene que listar `ec.cliniq.sage.app` con la huella) y Apple, que lo
+   descarga a su red, en
+   `https://app-site-association.cdn-apple.com/a/v1/cliniq.gcaicedo-proyectos.com`
+   (puede tardar hasta un día en tomar un cambio).
+
+Si algún día cambia el dominio del panel (`WEB_URL`), cambian con él: el
+`android:host` del `intent-filter` en `AndroidManifest.xml`, el
+`applinks:` de `Runner.entitlements`, los dos archivos en el dominio nuevo y
+`general.frontendUrl` (o `FRONTEND_URL`) en el API.
+
+### Qué verificar en el teléfono
+
+- **Android** (con una compilación firmada con una clave cuya huella está en
+  `assetlinks.json`: la de Play, desde una prueba interna, o la de subida):
+  - después de instalarla, `adb shell pm get-app-links ec.cliniq.sage.app`
+    dice `cliniq.gcaicedo-proyectos.com: verified` (si no, forzar la
+    verificación con `adb shell pm verify-app-links --re-verify ec.cliniq.sage.app`
+    y volver a mirar);
+  - `adb shell am start -a android.intent.action.VIEW -c android.intent.category.BROWSABLE -d "https://cliniq.gcaicedo-proyectos.com/confirmar-correo?token=prueba"`
+    abre la aplicación, sin preguntar con qué, en «El enlace no es válido o
+    ya venció» (el token es de mentira); lo mismo con `/restablecer`, en
+    «Crea una contraseña nueva»;
+  - de punta a punta: crear una cuenta desde la aplicación, tocar el enlace
+    del correo en Gmail → la aplicación abre «¡Listo! Tu cuenta está activa»
+    e «Ingresar» entra; «¿Olvidaste tu contraseña?», tocar el enlace →
+    «Crea una contraseña nueva», guardar, entrar con la nueva;
+  - con la aplicación abierta en otra pantalla, y con la aplicación cerrada:
+    en los dos casos se abre la pantalla del enlace;
+  - cualquier otra dirección del panel (por ejemplo `/login`) sigue
+    abriéndose en el navegador.
+- **iOS** (TestFlight o Xcode en un teléfono de verdad; en el simulador no
+  se verifica):
+  - tocar el enlace en Mail o en Notas abre la aplicación; al mantenerlo
+    presionado se ofrece «Abrir en Cliniq». Escrito en la barra de Safari no
+    abre la aplicación: así funcionan los Universal Links;
+  - si la aplicación se instaló antes de que el archivo estuviera publicado,
+    borrarla e instalarla de nuevo (iOS lo descarga al instalar);
+  - los mismos recorridos que en Android.
+- **Sin la aplicación** (o en una computadora): los dos enlaces abren el
+  panel y confirman o restablecen como siempre.
+
+## Páginas de fuera
+
+Un enlace externo del menú (el que puso el administrador) y los enlaces
+`http(s)` de los artículos de ayuda y de los documentos legales se abren en
+`PaginaWebPage` (`core/presentacion/pagina_web_page.dart`, por
+`abrirPaginaWeb` de `core/presentacion/enlaces.dart`): un WebView de la
+aplicación (`flutter_inappwebview`, el de la videoconsulta) bajo la cabecera
+de Cliniq, con el título (el nombre del enlace, si no el de la página, si
+no el servidor), el servidor con su candado, «Cerrar» y «Recargar», y la
+barra de carga. Nunca Chrome Custom Tabs, Safari ni el navegador del
+teléfono.
+
+- Dentro de la página se navega como siempre; las ventanas nuevas
+  (`target="_blank"`) se cargan en la misma pantalla. El botón atrás vuelve
+  a la página anterior y, en la primera, cierra.
+- `tel:` y `mailto:` tocados van al marcador o al correo del teléfono (lo
+  único que sale de la aplicación, con `url_launcher`); una página no puede
+  abrirlos sola. Todo lo demás (`intent:`, `market:`, `whatsapp:`, `file:`,
+  `javascript:`…) se bloquea.
+- La página no recibe permisos (cámara, micrófono, ubicación) ni puente con
+  la aplicación. Si no carga, lo dice con «Reintentar».
+
+Las decisiones son funciones puras (`core/web/navegacion_web.dart`); el
+WebView vive solo en `core/web/vista_web.dart`, detrás de
+`FabricaDeVistaWeb` (`Servicios.vistaWeb`), así que las pruebas abren la
+pantalla con una vista de mentira.
 
 ## Fechas: la hora de la clínica «congelada»
 
@@ -735,7 +952,8 @@ red se enseña esa copia; sin copia, el error con «Reintentar».
   widgets (párrafos, títulos, negrita, listas y enlaces). Un enlace nunca
   saca de la aplicación: las rutas de ayuda, soporte y Mi salud abren su
   pantalla, las de otros módulos van al enrutador (`abrirRuta`), la web se
-  abre en el navegador integrado y `mailto:` sigue igual. Al final de cada
+  abre en la pantalla de páginas web de la aplicación y `mailto:` y `tel:`
+  siguen igual. Al final de cada
   artículo, «¿No resolviste tu duda?» abre soporte con el ticket nuevo.
 - **Soporte** (`/soporte/tickets`): el ticket nuevo valida con los límites
   del servidor (asunto 3–150, descripción 10–5000, mensaje hasta 5000) y
@@ -901,7 +1119,7 @@ fvm flutter test
 | --- | --- |
 | `configuracion_test.dart` | `GET /configuracion/publica`: pública, copia sin red, sin copia no hay valores, lectura estricta, la zona horaria |
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
-| `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
+| `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en la pantalla de páginas web y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
 | `privacidad_test.dart` | ARCO: el servicio y su copia, el detalle y sus límites, vencida, el orden, el plazo en palabras, los derechos activos del catálogo, el plazo de la configuración, la lista, el vacío, el error y la solicitud nueva (y su rechazo) |
 | `encuestas_test.dart` | Las pendientes como citas, su copia, responder (comentario, 409), el aviso del inicio y su texto, la encuesta (formulario, no disponible, sin lista, lo que falta, gracias, la siguiente, ya respondida, el error del servidor), la pantalla y el aviso en el tablero |
@@ -925,7 +1143,11 @@ fvm flutter test
 | `turnos_portal_test.dart` | `GET /portal/proximos-turnos` y `GET /portal/turnos/:doctorId`: lo que se pide y cómo se lee |
 | `pasos_agendar_test.dart` | Los pasos de especialidad, médico (con el buscador) y horario, pintados |
 | `citas_bloc_test.dart` | La copia sin conexión, cancelar y los recordatorios según la configuración (y cancelados si se apagan) |
-| `login_page_test.dart` | La pantalla de acceso con el nombre, el eslogan y el logotipo de la clínica, crear cuenta, el personal, el bloqueo, el código y el reenvío con los tiempos de la configuración |
+| `login_page_test.dart` | La pantalla de acceso con el nombre, el eslogan y el logotipo de la clínica, crear cuenta (el registro de la aplicación, y el correo de vuelta), el personal (la dirección del panel para copiar, sin enlace), el bloqueo, el código y el reenvío con los tiempos de la configuración |
+| `registro_test.dart` | Las reglas del registro con los mensajes del panel (nombre, correo, teléfono, documento con `validarCedula`, fecha, contraseña con el mínimo de la clínica y el máximo del API, confirmación), la fortaleza y sus pistas, qué documentos se aceptan al registrarse y cuáles al entrar, lo que se envía, y `RegistroBloc`: documentos, casillas, sin documentos, envío, 409 una vez, doble toque, la espera de la clínica contada a mano y el reenvío |
+| `registro_page_test.dart` | La pantalla del registro: los campos y catálogos del panel, lo que falta, cédula y pasaporte, la fortaleza, «Leer» por el enrutador, sin documentos con «Reintentar», el envío de punta a punta con «Revisa tu correo», la espera, «Reenviar enlace» y «Volver a ingresar», y el mensaje del servidor una sola vez |
+| `enlaces_de_correo_test.dart` | Qué enlaces abren la aplicación (servidor, https, rutas, ruta base, token), el receptor (abre la pantalla, no la repite, ignora lo demás), confirmar el correo (confirmada, vencido con reenvío, incompleto, sin red) y la contraseña nueva (reglas, guardada, vencida, incompleta) |
+| `pagina_web_test.dart` | Las páginas de fuera: qué navegación se carga, va al marcador o al correo, o se bloquea; ventanas nuevas; qué error cuenta; qué dirección se abre y con qué título; la pantalla (cabecera, cerrar, `tel:`, atrás con historial, «Reintentar», «Recargar») |
 | `instante_test.dart` | Los instantes reales y la hora de la clínica |
 | `archivos_test.dart` | La validación de adjuntos con el tamaño y los tipos de la configuración (WEBP y HEIC por su firma), los nombres y la descarga para abrir un PDF |
 | `consultas_servicio_test.dart` | Cada ruta de `/portal/consultas`: método, ruta, cuerpo, el multipart `archivo` y la copia sin red |
@@ -953,9 +1175,18 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
 ## Pendientes
 
 - **Probar en teléfonos de verdad**: huella, recordatorios, arranque, icono,
-  la cámara (ahora pide permiso la primera vez), la galería, abrir un PDF, el
-  navegador integrado y la videoconsulta (Android e iOS, en debug y en
-  release). Ninguna compilación de Android o iOS se ha hecho todavía.
+  la cámara (ahora pide permiso la primera vez), la galería, abrir un PDF, la
+  pantalla de páginas web, el registro y la videoconsulta (Android e iOS, en
+  debug y en release). Ninguna compilación de Android o iOS se ha hecho
+  todavía.
+- **Enlaces de los correos**: llenar la huella de Android y el Team ID de
+  Apple en los archivos `.well-known` del panel y verificar en el teléfono
+  (ver «Enlaces de los correos»).
+- **Páginas de fuera, en el teléfono**: un enlace externo del menú abre la
+  pantalla con su nombre y «Cerrar»; dentro se navega, atrás vuelve y en la
+  primera cierra; un `tel:` o `mailto:` de la página abre el marcador o el
+  correo; un enlace a otra aplicación (WhatsApp, la tienda) no hace nada; en
+  la lista de recientes de Android no aparece ninguna tarea nueva.
 - **Videoconsulta, en el teléfono** (Android e iOS, debug y release, con el
   médico entrando desde el panel web):
   - al tocar «Entrar», la ventana se abre encima de la cita y el sistema
