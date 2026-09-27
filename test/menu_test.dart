@@ -1,36 +1,21 @@
 // test/menu_test.dart
 
-import 'package:app_cliniq/core/catalogos/catalogos_cubit.dart';
-import 'package:app_cliniq/core/storage/almacen_claves.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
-import 'package:app_cliniq/core/storage/credenciales_service.dart';
-import 'package:app_cliniq/core/tema/tema_app.dart';
-import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
-import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
-import 'package:app_cliniq/features/auth/providers/auth_state.dart';
-import 'package:app_cliniq/features/avisos/data/avisos_service.dart';
-import 'package:app_cliniq/features/avisos/providers/campana_cubit.dart';
-import 'package:app_cliniq/features/citas/data/citas_service.dart';
-import 'package:app_cliniq/features/citas/providers/citas_bloc.dart';
 import 'package:app_cliniq/features/consultas/presentacion/consultas_page.dart';
-import 'package:app_cliniq/features/consultas/providers/consultas_bloc.dart';
 import 'package:app_cliniq/features/dependientes/presentacion/dependientes_page.dart';
-import 'package:app_cliniq/features/dependientes/providers/dependientes_bloc.dart';
-import 'package:app_cliniq/features/inicio/presentacion/dashboard_page.dart';
 import 'package:app_cliniq/features/navegacion/data/menu_service.dart';
 import 'package:app_cliniq/features/navegacion/dominio/destinos.dart';
 import 'package:app_cliniq/features/navegacion/presentacion/muy_pronto_page.dart';
 import 'package:app_cliniq/features/navegacion/providers/menu_cubit.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/clinica.dart';
-import 'dobles/consultas.dart';
 import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/navegador_falso.dart';
+import 'dobles/tablero.dart';
 
 /// La navegación sale del menú del servidor: la barra, los accesos rápidos,
 /// qué abre cada enlace y el enrutador de las rutas del sistema.
@@ -325,63 +310,8 @@ void main() {
   });
 
   group('El tablero', () {
-    late MenuCubit menuCubit;
-
-    Future<void> montar(WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 2.75;
-      addTearDown(tester.view.reset);
-
-      final llavero = AlmacenClavesEnMemoria();
-      // La sesión ya abierta, como la deja el acceso.
-      final auth = AuthBloc(
-        servicio: AuthServiceFalso(),
-        almacen: AlmacenDeSesion(llavero),
-        credenciales: CredencialesService(llavero),
-        fijarToken: (_) {},
-        restaurarAlCrear: false,
-      )..emit(AuthAutenticado(_usuario()));
-      addTearDown(auth.close);
-
-      menuCubit = MenuCubit(servicio());
-      addTearDown(menuCubit.close);
-
-      final dioVacio = DioGrabador({
-        'GET /agenda/paciente/mis-citas': (_) => <Object?>[],
-        'GET /portal/dependientes': (_) => <Object?>[],
-      }).dio;
-
-      await tester.pumpWidget(
-        conDatosDeLaClinica(
-          MultiBlocProvider(
-            providers: [
-              BlocProvider.value(value: auth),
-              BlocProvider.value(value: menuCubit),
-              BlocProvider(
-                create: (context) => CitasBloc(
-                  citas: CitasService(dioVacio, CacheEnMemoria()),
-                  portal: PortalFalso(),
-                  recordatorios: ProgramadorFalso(),
-                  config: configDePrueba,
-                  catalogos: () => context.read<CatalogosCubit>().state,
-                ),
-              ),
-              BlocProvider(create: (_) => ConsultasBloc(ConsultasFalso())),
-              BlocProvider(
-                create: (_) => DependientesBloc(DependientesFalso()),
-              ),
-              BlocProvider(
-                create: (_) => CampanaCubit(AvisosService(api.dio, cache)),
-              ),
-            ],
-            child: MaterialApp(
-              theme: temaCliniq(),
-              home: const DashboardPage(),
-            ),
-          ),
-        ),
-      );
-    }
+    Future<void> montar(WidgetTester tester) =>
+        montarTablero(tester, dio: api.dio, cache: cache, usuario: _usuario());
 
     setUp(sondeoConRed);
 

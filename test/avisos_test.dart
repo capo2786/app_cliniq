@@ -2,7 +2,6 @@
 
 import 'dart:async';
 
-import 'package:app_cliniq/core/catalogos/catalogos_cubit.dart';
 import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 import 'package:app_cliniq/core/formato/fechas.dart';
 import 'package:app_cliniq/core/network/api_client.dart';
@@ -18,25 +17,18 @@ import 'package:app_cliniq/features/avisos/data/avisos_service.dart';
 import 'package:app_cliniq/features/avisos/presentacion/avisos_page.dart';
 import 'package:app_cliniq/features/avisos/providers/avisos_cubit.dart';
 import 'package:app_cliniq/features/avisos/providers/campana_cubit.dart';
-import 'package:app_cliniq/features/citas/data/citas_service.dart';
-import 'package:app_cliniq/features/citas/providers/citas_bloc.dart';
-import 'package:app_cliniq/features/consultas/providers/consultas_bloc.dart';
-import 'package:app_cliniq/features/dependientes/providers/dependientes_bloc.dart';
-import 'package:app_cliniq/features/inicio/presentacion/dashboard_page.dart';
-import 'package:app_cliniq/features/navegacion/data/menu_service.dart';
 import 'package:app_cliniq/features/navegacion/dominio/destinos.dart';
 import 'package:app_cliniq/features/navegacion/presentacion/enrutador.dart';
-import 'package:app_cliniq/features/navegacion/providers/menu_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/adaptador_http.dart';
 import 'dobles/clinica.dart';
-import 'dobles/consultas.dart';
 import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/esperas.dart';
+import 'dobles/tablero.dart';
 
 /// La campana: el contador, la lista de avisos y a dónde lleva cada uno.
 void main() {
@@ -476,55 +468,7 @@ void main() {
     });
 
     Future<void> montar(WidgetTester tester) async {
-      tester.view.physicalSize = const Size(1080, 2400);
-      tester.view.devicePixelRatio = 2.75;
-      addTearDown(tester.view.reset);
-
-      final llavero = AlmacenClavesEnMemoria();
-      final auth = AuthBloc(
-        servicio: AuthServiceFalso(),
-        almacen: AlmacenDeSesion(llavero),
-        credenciales: CredencialesService(llavero),
-        fijarToken: (_) {},
-        restaurarAlCrear: false,
-      )..emit(AuthAutenticado(usuarioDePrueba()));
-      addTearDown(auth.close);
-
-      await tester.pumpWidget(
-        conDatosDeLaClinica(
-          MultiBlocProvider(
-            providers: [
-              BlocProvider.value(value: auth),
-              BlocProvider(
-                create: (_) => MenuCubit(MenuService(api.dio, cache)),
-              ),
-              BlocProvider(
-                create: (context) => CitasBloc(
-                  citas: CitasService(api.dio, CacheEnMemoria()),
-                  portal: PortalFalso(),
-                  recordatorios: ProgramadorFalso(),
-                  config: configDePrueba,
-                  catalogos: () => context.read<CatalogosCubit>().state,
-                ),
-              ),
-              BlocProvider(create: (_) => ConsultasBloc(ConsultasFalso())),
-              BlocProvider(
-                create: (_) => DependientesBloc(DependientesFalso()),
-              ),
-              BlocProvider(
-                create: (_) => CampanaCubit(
-                  servicio(),
-                  latidos: () => const Stream.empty(),
-                ),
-              ),
-            ],
-            child: MaterialApp(
-              theme: temaCliniq(),
-              home: const DashboardPage(),
-            ),
-          ),
-        ),
-      );
+      await montarTablero(tester, dio: api.dio, cache: cache);
       await tester.pumpAndSettle();
     }
 

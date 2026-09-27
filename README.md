@@ -91,6 +91,7 @@ arranca con valores inventados.**
 | Seguridad | `seguridad.passwordMinimo`, `bloqueoMinutos`, `otpMinutos`, `resetMinutos`, `reenvioSegundos` | Acceso, código, recuperación, cambiar contraseña |
 | Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes |
 | Plazo legal de una solicitud ARCO | `general.arcoPlazoDias` | Mis derechos sobre mis datos |
+| Días para responder una encuesta | `general.encuestasDiasVentana` | La encuesta que ya no está disponible |
 | Modalidades (nombre, descripción, color, icono) | `GET /catalogos/lote` → `MODALIDAD_CITA` | Citas, agendar |
 | Cómo prepararse | `PREPARACION_CITA` (`<MODALIDAD>_<n>`) | Detalle, próxima cita, agendar, recordatorios |
 | Estados de citas y consultas | `ESTADO_CITA`, `ESTADO_CONSULTA` | Pastillas y explicaciones |
@@ -336,6 +337,7 @@ lib/
     inicio/                   el inicio y la barra de pestañas
     avisos/                   la campana de la cabecera y la lista de avisos
     privacidad/               mis derechos sobre mis datos (solicitudes ARCO)
+    encuestas/                la encuesta de una cita atendida y el aviso del inicio
     citas/                    mis citas, detalle, cancelar, las horas para cambiar y la videoconsulta
     consultas/                consultas en línea: lista, consulta nueva paso a paso y detalle con la conversación
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
@@ -477,6 +479,26 @@ los mismos límites que el panel y el API (de 10 a 2000 caracteres, sin los
 espacios de los extremos). El botón va en la `BarraDeAccion`, sobre el
 teclado. Si el servidor no la acepta, se enseña su mensaje y el formulario
 queda como estaba.
+
+## Encuestas
+
+Las citas atendidas de los últimos `general.encuestasDiasVentana` días sin
+encuesta (`GET /portal/encuestas/pendientes`; el servidor decide cuáles) se
+leen como citas, igual que en el panel. Si hay, el inicio lo avisa bajo la
+próxima cita («¿Cómo te fue en tu consulta?»), y el aviso abre la encuesta
+de la más reciente. Se piden al entrar, al volver a la aplicación y al
+deslizar el inicio; sin red, la última copia (`encuestas:<uid>`, se borra al
+cerrar sesión).
+
+La pantalla (`/portal/encuesta/:citaId`) es la del panel: la cita (médico,
+especialidad, día, modalidad del catálogo y para quién), de 1 a 5 estrellas,
+cuánto recomendaría al médico de 0 a 10 y un comentario opcional de hasta
+1000 caracteres (`POST /portal/encuestas`). Sin contestar las dos preguntas
+dice qué falta; enviada, «¡Gracias por tu opinión!» y «Responder la
+siguiente»; si ya estaba respondida (409), lo dice; si la cita ya no está
+entre las pendientes, «ya no está disponible» con los días de la
+configuración. Sin la lista (sin red), se responde igual. El botón va en la
+`BarraDeAccion`, sobre el teclado.
 
 ## Documentos legales
 
@@ -748,6 +770,7 @@ fvm flutter test
 | `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
 | `privacidad_test.dart` | ARCO: el servicio y su copia, el detalle y sus límites, vencida, el orden, el plazo en palabras, los derechos activos del catálogo, el plazo de la configuración, la lista, el vacío, el error y la solicitud nueva (y su rechazo) |
+| `encuestas_test.dart` | Las pendientes como citas, su copia, responder (comentario, 409), el aviso del inicio y su texto, la encuesta (formulario, no disponible, sin lista, lo que falta, gracias, la siguiente, ya respondida, el error del servidor), la pantalla y el aviso en el tablero |
 | `avisos_test.dart` | La campana: el servicio y su copia, el contador (encendido, latidos, en segundo plano, sin red, apagado), la lista (leer, leer todos, borrar y deshacer, ver más), la fecha relativa, la pantalla y la campana en el tablero según el menú |
 | `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |

@@ -8,6 +8,7 @@ import '../../citas/presentacion/citas_page.dart';
 import '../../consultas/presentacion/consultas_page.dart';
 import '../../consultas/presentacion/detalle_consulta_page.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
+import '../../encuestas/presentacion/encuesta_page.dart';
 import '../../legal/presentacion/documento_legal_page.dart';
 import '../../perfil/presentacion/perfil_page.dart';
 import '../../privacidad/presentacion/privacidad_page.dart';
@@ -47,7 +48,9 @@ Widget pantallaNativa(
     ),
     PantallaNativa.avisos => AvisosPage(titulo: titulo),
     PantallaNativa.privacidad => const PrivacidadPage(),
-    PantallaNativa.encuesta => MuyProntoPage(titulo: titulo ?? 'Encuesta'),
+    PantallaNativa.encuesta => EncuestaPage(
+      citaId: destino.parametro('citaId'),
+    ),
     PantallaNativa.legal => DocumentoLegalPage(
       slug: destino.parametro('slug'),
       titulo: titulo,

@@ -8,6 +8,7 @@ import '../features/citas/data/citas_service.dart';
 import '../features/citas/data/videollamada_service.dart';
 import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
+import '../features/encuestas/data/encuestas_service.dart';
 import '../features/legal/data/legal_service.dart';
 import '../features/privacidad/data/arco_service.dart';
 import 'archivos/archivos_service.dart';
@@ -107,6 +108,12 @@ class Servicios {
 
   /// Mis solicitudes de derechos sobre mis datos (`/portal/arco`).
   static final ArcoService arco = ArcoService(ApiClient().dio, cache);
+
+  /// Las encuestas de las citas atendidas (`/portal/encuestas`).
+  static final EncuestasService encuestas = EncuestasService(
+    ApiClient().dio,
+    cache,
+  );
 
   static final PortalService portal = PortalService(ApiClient().dio);
 

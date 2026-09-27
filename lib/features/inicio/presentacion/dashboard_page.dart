@@ -22,6 +22,7 @@ import '../../citas/providers/citas_event.dart';
 import '../../consultas/providers/consultas_bloc.dart';
 import '../../consultas/providers/consultas_event.dart';
 import '../../dependientes/providers/dependientes_bloc.dart';
+import '../../encuestas/providers/encuestas_cubit.dart';
 import '../../navegacion/data/menu_service.dart';
 import '../../navegacion/dominio/destinos.dart';
 import '../../navegacion/presentacion/enrutador.dart';
@@ -129,6 +130,7 @@ class _DashboardPageState extends State<DashboardPage>
 
     unawaited(context.read<MenuCubit>().cargar(usuario.uid));
     context.read<CampanaCubit>().reanudar();
+    unawaited(context.read<EncuestasCubit>().cargar(usuario.uid));
 
     if (usuario.puede(Permisos.misCitas)) {
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));

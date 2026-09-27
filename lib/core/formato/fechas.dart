@@ -157,6 +157,9 @@ String tiempoRelativo(DateTime instante, DateTime ahora) {
       : FormatoFecha.fechaMedia(local);
 }
 
+/// «1 día», «15 días».
+String dias(int cantidad) => cantidad == 1 ? '1 día' : '$cantidad días';
+
 /// «1 hora», «12 horas».
 String horas(int cantidad) => cantidad == 1 ? '1 hora' : '$cantidad horas';
 

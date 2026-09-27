@@ -204,6 +204,7 @@ void main() {
       ),
       ...rutasDeLaClinica(),
       'GET /portal/arco': (_) => (estado: 200, cuerpo: []),
+      'GET /portal/encuestas/pendientes': (_) => (estado: 200, cuerpo: []),
       'GET /portal/medicos': (_) => (estado: 200, cuerpo: [medico()]),
       'GET /portal/disponibilidad/doc1': (_) => (estado: 200, cuerpo: []),
       'POST /portal/citas': (o) {

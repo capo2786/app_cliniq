@@ -69,9 +69,6 @@ List<SolicitudArco> ordenarSolicitudes(List<SolicitudArco> solicitudes) =>
       return porEstado != 0 ? porEstado : b.creadaEn.compareTo(a.creadaEn);
     });
 
-/// «1 día», «15 días».
-String dias(int cantidad) => cantidad == 1 ? '1 día' : '$cantidad días';
-
 /// El plazo de una solicitud abierta, en palabras y en la hora de la
 /// clínica: «Respuesta a más tardar el 12 de octubre (en 15 días)», o si ya
 /// pasó, «El plazo de respuesta venció el 12 de octubre.». [hoy] es el día

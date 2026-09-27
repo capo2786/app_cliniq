@@ -25,6 +25,8 @@ import '../../citas/providers/citas_event.dart';
 import '../../citas/providers/citas_state.dart';
 import '../../consultas/dominio/reglas_consultas.dart';
 import '../../consultas/providers/consultas_bloc.dart';
+import '../../encuestas/presentacion/widgets/aviso_encuestas.dart';
+import '../../encuestas/providers/encuestas_cubit.dart';
 import '../../navegacion/data/menu_service.dart';
 import '../../navegacion/dominio/destinos.dart';
 import 'widgets/proxima_cita.dart';
@@ -81,10 +83,12 @@ class _InicioPageState extends State<InicioPage> {
     auth.add(const AuthPerfilRefrescado());
 
     final citas = context.read<CitasBloc>()..add(CitasSolicitadas(usuario.uid));
+    final encuestas = context.read<EncuestasCubit>().cargar(usuario.uid);
 
     await citas.stream
         .firstWhere((s) => !s.cargando)
         .timeout(const Duration(seconds: 15), onTimeout: () => citas.state);
+    await encuestas;
 
     if (mounted) setState(() => _ahora = Servicios.reloj.ahora());
   }
@@ -193,6 +197,13 @@ class _InicioPageState extends State<InicioPage> {
                             cita: proximas.first,
                             ahora: _ahora,
                           ),
+                        AvisoEncuestas(
+                          alResponder: (citaId) => widget.alAbrir(
+                            DestinoNativo(PantallaNativa.encuesta, {
+                              'citaId': citaId,
+                            }),
+                          ),
+                        ),
                         if (widget.accesos.isNotEmpty) ...[
                           const SizedBox(height: 26),
                           const EtiquetaSeccion('Accesos rápidos'),
