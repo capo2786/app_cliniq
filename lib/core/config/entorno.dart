@@ -3,7 +3,7 @@
 /// Los valores se pueden sobrescribir al compilar sin tocar el código:
 ///
 /// ```bash
-/// flutter build apk --dart-define=API_URL=https://api.cliniq.ec/api
+/// flutter build apk --dart-define=API_URL=http://192.168.1.10:3000/api
 /// ```
 ///
 /// Sin `--dart-define` se usan los del servidor actual, así que el flujo de
@@ -11,15 +11,11 @@
 class Entorno {
   const Entorno._();
 
-  /// Dirección base de la API, con el prefijo `/api` incluido.
-  ///
-  /// Hoy es HTTP plano hacia una IP: por eso Android y iOS llevan una
-  /// excepción de tráfico sin cifrar limitada a esa dirección. Cuando la API
-  /// pase a HTTPS, se cambia aquí (o con `API_URL`) y se borran las dos
-  /// excepciones; el README explica dónde están.
+  /// Dirección base de la API, con el prefijo `/api` incluido. Siempre HTTPS:
+  /// Android e iOS bloquean el HTTP plano y la aplicación no lleva excepciones.
   static const String apiUrl = String.fromEnvironment(
     'API_URL',
-    defaultValue: 'http://195.7.5.134:3000/api',
+    defaultValue: 'https://api-cliniq.gcaicedo-proyectos.com/api',
   );
 
   /// Dónde vive el panel web, que publica el texto de los documentos legales.
@@ -28,7 +24,7 @@ class Entorno {
   /// una versión nueva de un documento no obliga a publicar la aplicación.
   static const String webUrl = String.fromEnvironment(
     'WEB_URL',
-    defaultValue: 'http://195.7.5.134:4500',
+    defaultValue: 'https://cliniq.gcaicedo-proyectos.com',
   );
 
   /// Dirección pública de un documento legal por su nombre corto.

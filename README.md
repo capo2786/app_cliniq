@@ -41,36 +41,20 @@ fvm flutter run
 
 ## Servicios
 
-La aplicación consume `http://195.7.5.134:3000/api`. La URL se puede cambiar
-al compilar, sin tocar el código:
+La aplicación consume `https://api-cliniq.gcaicedo-proyectos.com/api`, y los
+documentos legales se abren en el panel web,
+`https://cliniq.gcaicedo-proyectos.com`. Ambas se pueden cambiar al compilar,
+sin tocar el código:
 
 ```bash
-flutter build apk --dart-define=API_URL=https://api.cliniq.ec/api
+flutter build apk --dart-define=API_URL=https://otro-servidor/api --dart-define=WEB_URL=https://otro-panel
 ```
 
-Los documentos legales se abren en el panel web, que por defecto es
-`http://195.7.5.134:4500`; se cambia igual con `--dart-define=WEB_URL=...`.
-Sin `--dart-define` se usan los del servidor actual. La configuración vive en
-`lib/core/config/entorno.dart`.
+La configuración vive en `lib/core/config/entorno.dart`.
 
-### HTTP en claro: temporal
-
-La API todavía responde por **HTTP plano hacia una IP**. Android 9+ e iOS
-bloquean eso por defecto, así que hay dos excepciones, **limitadas a
-`195.7.5.134`** y a nada más:
-
-- **Android**: `android/app/src/main/res/xml/network_security_config.xml`,
-  enlazado desde el `AndroidManifest.xml` con
-  `android:networkSecurityConfig`.
-- **iOS**: el bloque `NSAppTransportSecurity` de `ios/Runner/Info.plist`.
-  Apple advierte que una excepción por IP numérica puede no aplicarse en
-  todas las versiones; si en un iPhone la API no responde, esa es la causa, y
-  la solución de fondo es la misma de abajo.
-
-**Cuando la API pase a HTTPS con un dominio**, hay que: cambiar `API_URL` y
-`WEB_URL` en `entorno.dart`, **borrar** `network_security_config.xml` y su
-atributo en el manifiesto, y **borrar** el bloque `NSAppTransportSecurity`.
-Ninguna de las dos excepciones debe llegar a una versión que ya use HTTPS.
+**Solo HTTPS.** Android 9+ e iOS bloquean el HTTP plano y la aplicación no
+lleva excepciones de tráfico en claro. Para probar contra un backend local por
+HTTP (en el emulador), hay que agregar una excepción temporal y no subirla.
 
 ## Dependencias
 
@@ -254,7 +238,7 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
 2. **Acceso.** Ver «Pantalla de acceso».
 3. **Aceptación legal.** Si `legalPendientes` no está vacío, bloquea todo lo
    demás. Cada documento tiene su botón «Leer», que abre
-   `http://195.7.5.134:4500/legal/<slug>`, y su casilla; «Aceptar y continuar»
+   `https://cliniq.gcaicedo-proyectos.com/legal/<slug>`, y su casilla; «Aceptar y continuar»
    se enciende cuando están todas marcadas, manda `POST /legal/aceptar` y
    relee `/auth/me`. La otra salida es cerrar sesión.
 4. **Inicio.** El saludo sobre el degradado de bienvenida; «Tu próxima cita»

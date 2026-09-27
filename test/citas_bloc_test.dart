@@ -85,17 +85,22 @@ void main() {
       );
     }
 
-    blocTest<CitasBloc, CitasState>(
+    // Estas pruebas esperan el estado final y no un tiempo fijo: con los
+    // archivos de prueba en paralelo, unos milisegundos a veces no alcanzaban.
+    test(
       'con red: trae, guarda la copia y reprograma los recordatorios',
-      build: crear,
-      act: (bloc) => bloc.add(const CitasSolicitadas('u1')),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) async {
-        expect(bloc.state.carga, CargaCitas.lista);
-        expect(bloc.state.citas, hasLength(2));
-        expect(bloc.state.desdeCache, isFalse);
+      () async {
+        final bloc = crear()..add(const CitasSolicitadas('u1'));
+        final s = await bloc.stream.firstWhere(
+          (s) => s.carga == CargaCitas.lista,
+        );
+
+        expect(s.citas, hasLength(2));
+        expect(s.desdeCache, isFalse);
         expect(programador.programados.single, hasLength(2));
         expect(await cache.leer('citas:u1'), isNotNull);
+
+        await bloc.close();
       },
     );
 
@@ -122,17 +127,17 @@ void main() {
       await bloc.close();
     });
 
-    blocTest<CitasBloc, CitasState>(
-      'sin red y sin copia: error, con su mensaje',
-      setUp: () => hayRed = false,
-      build: crear,
-      act: (bloc) => bloc.add(const CitasSolicitadas('u1')),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) {
-        expect(bloc.state.carga, CargaCitas.error);
-        expect(bloc.state.error, contains('Sin conexión'));
-      },
-    );
+    test('sin red y sin copia: error, con su mensaje', () async {
+      hayRed = false;
+      final bloc = crear()..add(const CitasSolicitadas('u1'));
+      final s = await bloc.stream.firstWhere(
+        (s) => s.carga == CargaCitas.error,
+      );
+
+      expect(s.error, contains('Sin conexión'));
+
+      await bloc.close();
+    });
 
     blocTest<CitasBloc, CitasState>(
       'al cerrar sesión se vacía',
@@ -157,9 +162,8 @@ void main() {
       doctorId: 'doc',
     );
 
-    blocTest<CitasBloc, CitasState>(
-      'manda el motivo, marca la cita y avisa',
-      build: () => CitasBloc(
+    test('manda el motivo, marca la cita y avisa', () async {
+      final bloc = CitasBloc(
         citas: CitasService(
           dioFalso(
             (o) async => Response(requestOptions: o, statusCode: 200, data: []),
@@ -169,16 +173,17 @@ void main() {
         portal: PortalFalso(),
         recordatorios: ProgramadorFalso(),
         reloj: reloj,
-      ),
-      seed: () => CitasState(carga: CargaCitas.lista, citas: [cita]),
-      act: (bloc) => bloc.add(
+      )..emit(CitasState(carga: CargaCitas.lista, citas: [cita]));
+
+      bloc.add(
         CitaCancelacionSolicitada(cita: cita, motivo: 'Emergencia médica'),
-      ),
-      wait: const Duration(milliseconds: 10),
-      verify: (bloc) {
-        expect(bloc.state.accion?.exito, isTrue);
-        expect(bloc.state.cancelandoId, isNull);
-      },
-    );
+      );
+      final s = await bloc.stream.firstWhere((s) => s.accion != null);
+
+      expect(s.accion?.exito, isTrue);
+      expect(s.cancelandoId, isNull);
+
+      await bloc.close();
+    });
   });
 }

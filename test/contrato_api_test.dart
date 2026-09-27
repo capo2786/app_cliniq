@@ -286,7 +286,7 @@ void main() {
           version: '1.0',
           titulo: 'x',
         ).url,
-        'http://195.7.5.134:4500/legal/uso-aceptable',
+        'https://cliniq.gcaicedo-proyectos.com/legal/uso-aceptable',
       );
     });
 
