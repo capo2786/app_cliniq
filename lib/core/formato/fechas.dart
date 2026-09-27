@@ -113,3 +113,10 @@ class FormatoFecha {
     return texto[0].toUpperCase() + texto.substring(1);
   }
 }
+
+/// «1 hora», «12 horas».
+String horas(int cantidad) => cantidad == 1 ? '1 hora' : '$cantidad horas';
+
+/// «1 minuto», «10 minutos».
+String minutos(int cantidad) =>
+    cantidad == 1 ? '1 minuto' : '$cantidad minutos';

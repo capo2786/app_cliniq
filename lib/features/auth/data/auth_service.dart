@@ -42,7 +42,8 @@ class RespuestaInesperada implements Exception {
 
   @override
   String toString() =>
-      'La respuesta no parece venir de Cliniq. Revisa tu conexión.';
+      'La respuesta no parece venir del servidor de la clínica. Revisa tu '
+      'conexión.';
 }
 
 /// Todo lo que la aplicación le pide a `/auth` de la API.

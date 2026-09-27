@@ -25,6 +25,7 @@ import '../../legal/providers/legal_bloc.dart';
 import '../providers/perfil_cubit.dart';
 import 'editar_perfil_page.dart';
 import 'widgets/seguridad.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// El perfil: datos personales y clínicos, seguridad de la cuenta,
 /// documentos aceptados y la salida.
@@ -248,7 +249,7 @@ class _Identidad extends StatelessWidget {
                 Flexible(
                   child: Text(
                     usuario.cedula == null
-                        ? 'Paciente de Cliniq'
+                        ? 'Paciente de ${context.config.clinica.nombre}'
                         : '${nombresDeDocumento[usuario.tipoDocumento] ?? 'Documento'} '
                               '${usuario.cedula}',
                     overflow: TextOverflow.ellipsis,

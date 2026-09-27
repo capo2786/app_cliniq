@@ -35,7 +35,7 @@ class EstadoDeLaRed {
 
   /// Lo que se le dice a la persona. Habla de lo que puede hacer, no de HTTP.
   String get explicacion => switch (motivo) {
-    MotivoDeRed.conectado => 'Hay conexión con Cliniq.',
+    MotivoDeRed.conectado => 'Hay conexión con la clínica.',
     MotivoDeRed.sinRed =>
       'El teléfono no tiene conexión. Puedes ver tus citas guardadas; '
           'para agendar o cambiar algo necesitas Internet.',
@@ -44,7 +44,7 @@ class EstadoDeLaRed {
           'un wifi que pide aceptar condiciones en el navegador—. Prueba '
           'con tus datos móviles.',
     MotivoDeRed.servidorCaido =>
-      'El servidor de Cliniq no está respondiendo. No es tu teléfono: '
+      'El servidor de la clínica no está respondiendo. No es tu teléfono: '
           'vuelve a intentarlo en unos minutos.',
   };
 

@@ -9,6 +9,8 @@ import '../../../../core/tema/tokens.dart';
 import '../../providers/auth_bloc.dart';
 import '../../providers/auth_event.dart';
 import '../../providers/auth_state.dart';
+import '../../../../core/configuracion/en_contexto.dart';
+import '../../../../core/formato/fechas.dart';
 
 /// El segundo paso del acceso: el código de seis dígitos del correo.
 ///
@@ -80,7 +82,8 @@ class _PasoCodigoState extends State<PasoCodigo> {
           const SizedBox(height: 12),
           Text(
             'Te enviamos un código de 6 dígitos a ${estado.destino}. '
-            'Escríbelo para terminar de entrar. Vence en 10 minutos.',
+            'Escríbelo para terminar de entrar. Vence en '
+            '${minutos(context.config.seguridad.otpMinutos)}.',
             style: const TextStyle(
               color: AppColors.textoSecundario,
               fontSize: 13,

@@ -47,7 +47,7 @@ String? _porEstado(DioException error) {
   if (estado == 404) return 'No se encontró lo que buscabas.';
   if (estado == 409) return 'La operación choca con un registro existente.';
   if (estado == 423) {
-    return 'La cuenta está bloqueada temporalmente. Intenta en 15 minutos.';
+    return 'La cuenta está bloqueada temporalmente. Intenta más tarde.';
   }
   if (estado >= 500) {
     return 'El servidor tuvo un problema. Intenta en unos minutos.';

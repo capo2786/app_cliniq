@@ -1,6 +1,9 @@
 import '../../../core/catalogos/catalogo_service.dart';
 import '../../../core/catalogos/catalogos_cubit.dart';
+import '../../../core/formato/fechas.dart';
 import '../data/models/cita.dart';
+
+export '../../../core/formato/fechas.dart' show horas;
 
 /*
  * Las horas de anticipación para cancelar o reprogramar son las de la
@@ -16,9 +19,6 @@ String explicacionCambioTardio(int horasMinimasCambio) =>
     'Faltan menos de ${horas(horasMinimasCambio)} para esta cita, así que ya '
     'no se puede cancelar ni reprogramar desde la aplicación. Si no puedes '
     'asistir, comunícate con la clínica.';
-
-/// «1 hora», «12 horas».
-String horas(int cantidad) => cantidad == 1 ? '1 hora' : '$cantidad horas';
 
 /// ¿Todavía se puede pedir el cambio? Faltan al menos las horas mínimas.
 bool aTiempoDeCambiar(Cita cita, DateTime ahora, int horasMinimasCambio) =>

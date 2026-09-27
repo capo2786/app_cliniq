@@ -15,7 +15,6 @@ import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/campos.dart';
 import '../../../core/presentacion/widgets/entrada_animada.dart';
 import '../../../core/presentacion/widgets/estados.dart';
-import '../../../core/presentacion/widgets/logo_cliniq.dart';
 import '../../../core/service/biometria_service.dart';
 import '../../../core/servicios.dart';
 import '../../../core/storage/credenciales_service.dart';
@@ -27,9 +26,9 @@ import '../providers/auth_event.dart';
 import '../providers/auth_state.dart';
 import 'widgets/paso_codigo.dart';
 import 'widgets/recuperar_contrasena.dart';
-
-/// Segundos entre un pedido de enlace de confirmación y el siguiente.
-const int segundosEntreReenvios = 60;
+import '../../../core/configuracion/config_publica_cubit.dart';
+import '../../../core/configuracion/en_contexto.dart';
+import '../../../core/presentacion/widgets/logo_clinica.dart';
 
 /// La pantalla de acceso.
 ///
@@ -137,7 +136,8 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _verificandoHuella = true);
 
     final verificado = await _biometria.verificar(
-      'Verifica tu identidad para entrar a Cliniq',
+      'Verifica tu identidad para entrar a '
+      '${context.read<ConfigPublicaCubit>().config.clinica.nombre}',
     );
 
     if (!mounted) return;
@@ -180,7 +180,8 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  /// Pide otro enlace para confirmar el correo y apaga el botón un minuto.
+  /// Pide otro enlace para confirmar el correo y apaga el botón los segundos
+  /// que diga la clínica (`seguridad.reenvioSegundos`).
   ///
   /// La respuesta es siempre la misma, exista o no la cuenta: se enseña tal
   /// cual. El servidor ignora en silencio los pedidos de más; la espera
@@ -215,7 +216,13 @@ class _LoginPageState extends State<LoginPage> {
 
   void _esperarParaReenviar() {
     _cuentaReenvio?.cancel();
-    setState(() => _esperaReenvio = segundosEntreReenvios);
+    setState(
+      () => _esperaReenvio = context
+          .read<ConfigPublicaCubit>()
+          .config
+          .seguridad
+          .reenvioSegundos,
+    );
 
     _cuentaReenvio = Timer.periodic(const Duration(seconds: 1), (reloj) {
       if (!mounted) {
@@ -478,7 +485,7 @@ class _LoginPageState extends State<LoginPage> {
             const SizedBox(height: 8),
             BotonPrincipal(
               key: const Key('boton-entrar'),
-              texto: 'Entrar a Cliniq',
+              texto: 'Entrar a ${context.config.clinica.nombre}',
               icono: Icons.login_rounded,
               cargando: cargando,
               textoCargando: 'Verificando…',
@@ -563,12 +570,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-/// El logotipo, el nombre y para qué sirve la aplicación.
+/// El logotipo, el nombre y el eslogan de la clínica (de su configuración).
 class _Marca extends StatelessWidget {
   const _Marca();
 
   @override
   Widget build(BuildContext context) {
+    final clinica = context.config.clinica;
+
     return Column(
       children: [
         Container(
@@ -605,16 +614,17 @@ class _Marca extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        // El logotipo de verdad, el mismo del arranque y del icono: un icono
-        // genérico haría que la pantalla pareciera de cualquier aplicación.
-        const InsigniaCliniq(tamano: 96),
+        // El logotipo de la clínica; si no subió ninguno, el de la marca, el
+        // mismo del arranque y del icono.
+        const LogoDeLaClinica(tamano: 96, insignia: true),
         const SizedBox(height: 16),
         ShaderMask(
           shaderCallback: (limites) =>
               AppGradientes.nombreDeMarca.createShader(limites),
-          child: const Text(
-            'Cliniq',
-            style: TextStyle(
+          child: Text(
+            clinica.nombre,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 36,
               fontWeight: FontWeight.w900,
@@ -623,16 +633,18 @@ class _Marca extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 7),
-        const Text(
-          'Tus citas médicas, en tu mano',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: AppColors.textoSecundario,
-            fontSize: 13.5,
-            fontWeight: FontWeight.w500,
+        if (clinica.eslogan.isNotEmpty) ...[
+          const SizedBox(height: 7),
+          Text(
+            clinica.eslogan,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textoSecundario,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }
@@ -697,6 +709,8 @@ class _ErrorDeAcceso extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!estado.bloqueada) return RecuadroAviso.error(estado.mensaje);
 
+    final minutos = context.config.seguridad.bloqueoMinutos;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -708,18 +722,20 @@ class _ErrorDeAcceso extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.lock_clock_outlined,
                 color: AppColors.alerta,
                 size: 20,
               ),
-              SizedBox(width: 9),
+              const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  'Cuenta bloqueada por 15 minutos',
-                  style: TextStyle(
+                  minutos == 1
+                      ? 'Cuenta bloqueada por 1 minuto'
+                      : 'Cuenta bloqueada por $minutos minutos',
+                  style: const TextStyle(
                     color: AppColors.alertaTexto,
                     fontSize: 13.5,
                     fontWeight: FontWeight.w800,

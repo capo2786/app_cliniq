@@ -3,7 +3,6 @@ import '../../../core/fechas/fecha_local.dart';
 import '../../../core/fechas/instante.dart';
 import '../../../core/formato/fechas.dart';
 import '../data/models/campo_formulario.dart';
-import '../../citas/dominio/reglas_citas.dart' show horas;
 import '../data/models/consulta.dart';
 
 /// Hasta cuántos caracteres admite la descripción y cada mensaje (los mismos

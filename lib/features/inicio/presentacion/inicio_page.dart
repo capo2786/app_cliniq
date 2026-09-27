@@ -11,7 +11,7 @@ import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/cerrar_sesion.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
-import '../../../core/presentacion/widgets/logo_cliniq.dart';
+import '../../../core/presentacion/widgets/logo_clinica.dart';
 import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
@@ -25,6 +25,7 @@ import '../../citas/providers/citas_state.dart';
 import '../../consultas/dominio/reglas_consultas.dart';
 import '../../consultas/providers/consultas_bloc.dart';
 import 'widgets/proxima_cita.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// Las pestañas a las que se puede saltar desde los accesos rápidos.
 enum DestinoRapido { agendar, consultas, citas, dependientes, perfil }
@@ -83,32 +84,36 @@ class _InicioPageState extends State<InicioPage> {
       backgroundColor: AppColors.fondoProfundo,
       appBar: AppBar(
         titleSpacing: 20,
-        title: const Row(
+        title: Row(
           children: [
-            LogoCliniq(tamano: 34),
-            SizedBox(width: 11),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Cliniq',
-                  style: TextStyle(
-                    color: AppColors.texto,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0.2,
+            const LogoDeLaClinica(tamano: 34),
+            const SizedBox(width: 11),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    context.config.clinica.nombre,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.texto,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.2,
+                    ),
                   ),
-                ),
-                Text(
-                  'Portal del paciente',
-                  style: TextStyle(
-                    color: AppColors.primarioClaro,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
+                  const Text(
+                    'Portal del paciente',
+                    style: TextStyle(
+                      color: AppColors.primarioClaro,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

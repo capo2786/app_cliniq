@@ -6,6 +6,8 @@ import '../../../../core/presentacion/widgets/campos.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/auth_service.dart';
+import '../../../../core/configuracion/en_contexto.dart';
+import '../../../../core/formato/fechas.dart';
 
 /// Abre la hoja para pedir el enlace de recuperación de contraseña.
 Future<void> mostrarRecuperarContrasena(
@@ -28,9 +30,10 @@ Future<void> mostrarRecuperarContrasena(
 /// Pedir un enlace para crear una contraseña nueva.
 ///
 /// La API responde siempre lo mismo, exista o no el correo, para no revelar
-/// quién tiene cuenta. El enlace llega al correo y abre la página web de
-/// Cliniq, donde se escribe la contraseña nueva; la aplicación no necesita
-/// hacer nada más.
+/// quién tiene cuenta. El enlace llega al correo y abre la página web de la
+/// clínica, donde se escribe la contraseña nueva; la aplicación no necesita
+/// hacer nada más. Vence en los minutos que diga la configuración
+/// (`seguridad.resetMinutos`).
 class _RecuperarContrasena extends StatefulWidget {
   final String correoInicial;
   final AuthService servicio;
@@ -129,7 +132,9 @@ class _RecuperarContrasenaState extends State<_RecuperarContrasena> {
             const SizedBox(height: 18),
             if (respuesta != null) ...[
               RecuadroAviso(
-                mensaje: respuesta,
+                mensaje:
+                    '$respuesta El enlace vence en '
+                    '${minutos(context.config.seguridad.resetMinutos)}.',
                 icono: Icons.mark_email_read_outlined,
                 color: AppColors.exito,
                 colorTexto: AppColors.texto,

@@ -1,6 +1,8 @@
 // test/login_page_test.dart
 
 import 'package:app_cliniq/core/app/version_instalada.dart';
+import 'package:app_cliniq/core/configuracion/config_publica.dart';
+import 'package:app_cliniq/core/presentacion/widgets/logo_cliniq.dart';
 import 'package:app_cliniq/core/storage/almacen_claves.dart';
 import 'package:app_cliniq/core/storage/credenciales_service.dart';
 import 'package:app_cliniq/core/tema/tema_app.dart';
@@ -15,6 +17,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'dobles/clinica.dart';
 import 'dobles/dobles.dart';
 import 'dobles/navegador_falso.dart';
 
@@ -44,6 +47,7 @@ void main() {
     WidgetTester tester, {
     bool huella = false,
     bool restaurar = false,
+    ConfigPublica? config,
   }) async {
     // Un teléfono de tamaño común, para que todo quepa como en la realidad.
     tester.view.physicalSize = const Size(1080, 2400);
@@ -61,14 +65,17 @@ void main() {
     addTearDown(bloc.close);
 
     await tester.pumpWidget(
-      BlocProvider<AuthBloc>.value(
-        value: bloc,
-        child: MaterialApp(
-          theme: temaCliniq(),
-          home: LoginPage(
-            credenciales: credenciales,
-            biometria: BiometriaFalsa(hay: huella),
-            servicio: servicio,
+      conDatosDeLaClinica(
+        config: config,
+        BlocProvider<AuthBloc>.value(
+          value: bloc,
+          child: MaterialApp(
+            theme: temaCliniq(),
+            home: LoginPage(
+              credenciales: credenciales,
+              biometria: BiometriaFalsa(hay: huella),
+              servicio: servicio,
+            ),
           ),
         ),
       ),
@@ -86,12 +93,16 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
   }
 
-  testWidgets('muestra la marca, el formulario, crear cuenta y la versión', (
+  testWidgets('muestra la clínica, el formulario, crear cuenta y la versión', (
     tester,
   ) async {
     await montar(tester);
 
-    expect(find.text('Cliniq'), findsOneWidget);
+    // El nombre, el eslogan y el botón, de la configuración de la clínica.
+    expect(find.text('Clínica Andina'), findsOneWidget);
+    expect(find.text('Tu salud, cerca'), findsOneWidget);
+    expect(find.text('Entrar a Clínica Andina'), findsOneWidget);
+    expect(find.text('Cliniq'), findsNothing);
     expect(find.text('Accede a tu cuenta'), findsOneWidget);
     expect(find.byKey(const Key('campo-correo')), findsOneWidget);
     expect(find.byKey(const Key('campo-contrasena')), findsOneWidget);
@@ -208,6 +219,33 @@ void main() {
     expect(find.text('Reenviar el enlace'), findsOneWidget);
   });
 
+  testWidgets('la espera para reenviar es la de la clínica', (tester) async {
+    servicio.alEntrar = (_, _) async =>
+        throw errorHttp(403, 'Confirma tu correo.', 'CORREO_NO_VERIFICADO');
+    await montar(
+      tester,
+      config: configDePrueba(seguridad: {'reenvioSegundos': 10}),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('campo-correo')),
+      'ana@correo.com',
+    );
+    await tester.enterText(find.byKey(const Key('campo-contrasena')), 'x');
+    await tocar(tester, find.byKey(const Key('boton-entrar')));
+
+    final boton = find.byKey(const Key('boton-reenviar-enlace'));
+    bool habilitado() => tester.widget<TextButton>(boton).onPressed != null;
+
+    await tocar(tester, boton);
+    expect(find.text('Reenviar el enlace (10 s)'), findsOneWidget);
+
+    // El reloj de la prueba avanza solo en la pantalla, sin esperar de
+    // verdad.
+    await tester.pump(const Duration(seconds: 10));
+    expect(habilitado(), isTrue);
+  });
+
   testWidgets('si reenviar falla por la red, se dice y no hay que esperar', (
     tester,
   ) async {
@@ -260,9 +298,8 @@ void main() {
     expect(find.text('Correo o contraseña incorrectos.'), findsOneWidget);
   });
 
-  testWidgets('cuenta bloqueada: explica los 15 minutos y ofrece recuperar', (
-    tester,
-  ) async {
+  testWidgets('cuenta bloqueada: explica los minutos de la clínica y ofrece '
+      'recuperar', (tester) async {
     servicio.alEntrar = (_, _) async => throw errorHttp(
       423,
       'Cuenta bloqueada temporalmente por varios intentos fallidos. '
@@ -283,6 +320,65 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Recuperar contraseña'), findsOneWidget);
+  });
+
+  testWidgets('con otra configuración de bloqueo, otros minutos', (
+    tester,
+  ) async {
+    servicio.alEntrar = (_, _) async => throw errorHttp(423);
+    await montar(
+      tester,
+      config: configDePrueba(seguridad: {'bloqueoMinutos': 30}),
+    );
+
+    await tester.enterText(
+      find.byKey(const Key('campo-correo')),
+      'ana@correo.com',
+    );
+    await tester.enterText(find.byKey(const Key('campo-contrasena')), 'mala');
+    await tocar(tester, find.byKey(const Key('boton-entrar')));
+
+    expect(find.text('Cuenta bloqueada por 30 minutos'), findsOneWidget);
+    expect(find.textContaining('15'), findsNothing);
+  });
+
+  testWidgets('un logotipo propio de la clínica reemplaza al de marca', (
+    tester,
+  ) async {
+    // Un PNG de 1×1 como data URL.
+    const png =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA'
+        'DUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    await montar(tester, config: configDePrueba(clinica: {'logo': png}));
+
+    expect(find.byType(Image), findsOneWidget);
+    expect(find.byType(InsigniaCliniq), findsNothing);
+  });
+
+  testWidgets('sin logotipo propio se ve el de marca', (tester) async {
+    await montar(tester);
+
+    expect(find.byType(InsigniaCliniq), findsOneWidget);
+  });
+
+  testWidgets('el código de dos pasos vence en los minutos de la clínica', (
+    tester,
+  ) async {
+    servicio.alEntrar = (_, _) async =>
+        const SegundoFactorRequerido(desafio: 'd1', destino: 'a***@correo.com');
+    await montar(tester, config: configDePrueba(seguridad: {'otpMinutos': 5}));
+
+    await tester.enterText(
+      find.byKey(const Key('campo-correo')),
+      'ana@correo.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('campo-contrasena')),
+      'secreta1',
+    );
+    await tocar(tester, find.byKey(const Key('boton-entrar')));
+
+    expect(find.textContaining('Vence en 5 minutos.'), findsOneWidget);
   });
 
   testWidgets('con verificación en dos pasos aparece el paso del código', (

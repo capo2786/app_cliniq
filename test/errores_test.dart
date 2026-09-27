@@ -34,7 +34,12 @@ void main() {
 
     test('sin mensaje, uno por código', () {
       expect(mensajeDeError(errorHttp(403)), contains('permiso'));
-      expect(mensajeDeError(errorHttp(423)), contains('15 minutos'));
+      expect(mensajeDeError(errorHttp(423)), contains('bloqueada'));
+      expect(
+        mensajeDeError(errorHttp(423)),
+        isNot(contains('15')),
+        reason: 'los minutos los dice la configuración, no el código',
+      );
       expect(mensajeDeError(errorHttp(503)), contains('servidor'));
     });
 

@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../features/auth/providers/auth_bloc.dart';
 import '../../../features/auth/providers/auth_event.dart';
 import '../../tema/tokens.dart';
+import '../../configuracion/config_publica_cubit.dart';
 
 /// Cerrar sesión, disponible desde la barra de cada pantalla de contenido.
 ///
@@ -30,6 +31,8 @@ class BotonCerrarSesion extends StatelessWidget {
 
 /// Pregunta y, si la persona confirma, cierra la sesión.
 Future<void> confirmarCierreDeSesion(BuildContext context) async {
+  final clinica = context.read<ConfigPublicaCubit>().config.clinica.nombre;
+
   final salir = await showDialog<bool>(
     context: context,
     builder: (contextoDialogo) => AlertDialog(
@@ -51,10 +54,10 @@ Future<void> confirmarCierreDeSesion(BuildContext context) async {
           ),
         ],
       ),
-      content: const Text(
-        '¿Deseas salir de tu cuenta de Cliniq? Tus recordatorios de citas '
+      content: Text(
+        '¿Deseas salir de tu cuenta de $clinica? Tus recordatorios de citas '
         'dejarán de sonar en este teléfono hasta que vuelvas a entrar.',
-        style: TextStyle(color: AppColors.textoSuave, height: 1.4),
+        style: const TextStyle(color: AppColors.textoSuave, height: 1.4),
       ),
       actions: [
         TextButton(

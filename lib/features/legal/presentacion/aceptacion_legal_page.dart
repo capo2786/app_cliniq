@@ -19,6 +19,7 @@ import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
 import '../data/legal_service.dart';
 import '../providers/legal_bloc.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// Los documentos legales pendientes, antes de todo lo demás.
 ///
@@ -80,14 +81,14 @@ class _VistaLegal extends StatelessWidget {
                       'Para aceptar los documentos necesitas '
                       'conexión.',
                 ),
-                const EntradaAnimada(
+                EntradaAnimada(
                   child: TarjetaEncabezado(
                     icono: Icons.gavel_rounded,
                     titulo: 'Documentos por aceptar',
                     descripcion:
-                        'Para usar Cliniq necesitamos que leas y '
-                        'aceptes estos documentos. Cada uno se abre en tu '
-                        'navegador.',
+                        'Para atenderte en ${context.config.clinica.nombre} '
+                        'necesitamos que leas y aceptes estos documentos. '
+                        'Cada uno se abre en tu navegador.',
                   ),
                 ),
                 const SizedBox(height: 22),

@@ -6,7 +6,8 @@ import '../../../core/network/errores.dart';
 class ErrorDeAcceso {
   final String mensaje;
 
-  /// La cuenta quedó bloqueada 15 minutos por varios intentos fallidos.
+  /// La cuenta quedó bloqueada por varios intentos fallidos (los minutos
+  /// los dice la configuración, `seguridad.bloqueoMinutos`).
   final bool bloqueada;
 
   /// La cuenta se creó desde el autorregistro y todavía no confirmó el
@@ -35,9 +36,11 @@ const String mensajeCodigoIncorrecto =
     'El código no es correcto o ya venció. Revisa tu correo o vuelve a '
     'iniciar sesión para recibir uno nuevo.';
 
+/// Si el servidor no explica el bloqueo. Sin minutos: los dice la pantalla,
+/// con los de la configuración de la clínica.
 const String mensajeCuentaBloqueada =
-    'Tu cuenta quedó bloqueada 15 minutos por varios intentos fallidos. '
-    'Espera y vuelve a intentarlo, o recupera tu contraseña.';
+    'Tu cuenta quedó bloqueada por varios intentos fallidos. Espera y vuelve '
+    'a intentarlo, o recupera tu contraseña.';
 
 /// Traduce el error de un intento de acceso.
 ///
@@ -45,9 +48,9 @@ const String mensajeCuentaBloqueada =
 ///
 /// - **401** es la respuesta a unas credenciales equivocadas (o a un código
 ///   de verificación que no vale), no una sesión vencida.
-/// - **423** es la cuenta bloqueada: cinco intentos fallidos en quince
-///   minutos la cierran otros quince. El servidor dice cuántos minutos
-///   faltan y ese texto se respeta; si no llega, se explica igual.
+/// - **423** es la cuenta bloqueada tras varios intentos fallidos (cuántos y
+///   por cuánto tiempo lo configura la clínica). El servidor dice cuántos
+///   minutos faltan y ese texto se respeta; si no llega, se explica igual.
 /// - **403 con `codigo: CORREO_NO_VERIFICADO`** es una cuenta del
 ///   autorregistro que todavía no abrió el enlace de su correo.
 ErrorDeAcceso errorDeAcceso(Object error, {bool esCodigo = false}) {

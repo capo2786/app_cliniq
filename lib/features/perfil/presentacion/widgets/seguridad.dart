@@ -6,6 +6,7 @@ import '../../../../core/presentacion/widgets/botones.dart';
 import '../../../../core/presentacion/widgets/campos.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../providers/perfil_cubit.dart';
+import '../../../../core/configuracion/en_contexto.dart';
 
 /// Abre la hoja para cambiar la contraseña.
 Future<void> mostrarCambiarContrasena(BuildContext context) {
@@ -82,6 +83,7 @@ class _CambiarContrasenaState extends State<_CambiarContrasena> {
       },
       builder: (context, state) {
         final error = _error;
+        final minimo = context.config.seguridad.passwordMinimo;
 
         return Padding(
           padding: EdgeInsets.fromLTRB(
@@ -106,10 +108,10 @@ class _CambiarContrasenaState extends State<_CambiarContrasena> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  const Text(
-                    'Usa al menos 8 caracteres. Si entras con huella, se '
-                    'actualiza sola.',
-                    style: TextStyle(
+                  Text(
+                    'Usa al menos $minimo caracteres. Si entras con huella, '
+                    'se actualiza sola.',
+                    style: const TextStyle(
                       color: AppColors.textoSecundario,
                       fontSize: 13,
                       height: 1.4,
@@ -140,12 +142,12 @@ class _CambiarContrasenaState extends State<_CambiarContrasena> {
                   const EtiquetaCampo('Contraseña nueva'),
                   CampoCliniq(
                     controller: _nueva,
-                    pista: 'Mínimo 8 caracteres',
+                    pista: 'Mínimo $minimo caracteres',
                     icono: Icons.lock_reset_rounded,
                     oculto: !_ver,
                     validator: (v) {
-                      if (v == null || v.length < 8) {
-                        return 'Debe tener al menos 8 caracteres.';
+                      if (v == null || v.length < minimo) {
+                        return 'Debe tener al menos $minimo caracteres.';
                       }
                       if (v == _actual.text) {
                         return 'Tiene que ser distinta de la actual.';

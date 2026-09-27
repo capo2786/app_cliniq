@@ -195,7 +195,7 @@ class PerfilCubit extends Cubit<PerfilState> {
     }
 
     final verificado = await _biometria.verificar(
-      'Confirma que quieres entrar a Cliniq con tu huella',
+      'Confirma que quieres entrar con tu huella',
     );
     if (!verificado) return;
 
