@@ -1,5 +1,6 @@
 import '../../../core/configuracion/config_publica.dart';
 import '../../../core/fechas/fecha_local.dart';
+import '../../../core/fechas/instante.dart';
 import '../../../core/formato/fechas.dart';
 import '../data/models/cita.dart';
 
@@ -91,14 +92,37 @@ const String avisoPermisosDeVideo =
     'permiso para usar la cámara y el micrófono: acéptalo para que el médico '
     'te vea y te escuche.';
 
-/// Cuando el SDK de video no está o falló y la sala se abrió en el navegador
-/// integrado (el respaldo).
-const String avisoVideoEnElNavegador =
-    'No pudimos abrir la videoconsulta dentro de la aplicación, así que la '
-    'abrimos en el navegador integrado. Acepta ahí los permisos de la cámara '
-    'y el micrófono.';
-
 /// El asunto de la sala: lleva el nombre de la clínica.
 String asuntoDeLaSala(String clinica) => clinica.trim().isEmpty
     ? 'Videoconsulta'
     : 'Videoconsulta · ${clinica.trim()}';
+
+/// La cabecera de la ventana de la videoconsulta: «Videoconsulta con Ana
+/// Pérez», o solo «Videoconsulta» si no se sabe con quién.
+String tituloDeLaVideoconsulta(String? medico) {
+  final nombre = (medico ?? '').trim();
+  return nombre.isEmpty ? 'Videoconsulta' : 'Videoconsulta con $nombre';
+}
+
+/// A qué hora termina la cita, en la hora de la clínica, para la cabecera
+/// («Termina a las 10:20»); `null` si no se sabe.
+///
+/// Con la cita, su fin: ya es hora de la clínica. Sin ella (se llegó por un
+/// enlace y la cita no está entre las cargadas), sale de cuándo cierra la
+/// sala según el servidor —un instante real, el fin más los minutos de
+/// después de la clínica—, pasado a la hora de la clínica.
+DateTime? finDeLaVideoconsulta({
+  Cita? cita,
+  DateTime? cierraEn,
+  required VentanaDeSala ventana,
+}) {
+  if (cita != null) return cita.fin;
+  if (cierraEn == null) return null;
+
+  return enHoraDeLaClinica(
+    cierraEn.subtract(Duration(minutes: ventana.minutosDespues)),
+  );
+}
+
+/// «Termina a las 10:20».
+String terminaALas(DateTime fin) => 'Termina a las ${FormatoFecha.hora(fin)}';

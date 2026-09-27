@@ -1,10 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../../../core/fechas/instante.dart';
-import '../../../core/integraciones/costuras.dart';
 import '../../../core/network/errores.dart';
+import 'permisos_de_video.dart';
 
 /// La sala de una videoconsulta (`Videollamada`): a dónde entrar y con qué
 /// permiso.
@@ -12,11 +13,11 @@ class Videollamada extends Equatable {
   final String dominio;
   final String sala;
 
-  /// El token firmado que abre la sala (el SDK lo usa; también va dentro de
-  /// [url]).
+  /// El token firmado que abre la sala (también va dentro de [url]).
   final String jwt;
 
-  /// `https://dominio/sala?jwt=…`: el respaldo, en el navegador integrado.
+  /// `https://dominio/sala?jwt=…`. La aplicación arma la suya (con los
+  /// ajustes de Jitsi); de esta solo toma el dominio si no llega aparte.
   final String url;
 
   /// Desde y hasta cuándo deja entrar el servidor (instantes reales).
@@ -137,53 +138,45 @@ String mensajeDeVideollamada(Object error) {
   );
 }
 
-/// Lo que hace falta para entrar a una sala de Jitsi con el SDK.
+/// Lo que hace falta para abrir una sala de Jitsi dentro de la aplicación.
 class DatosDeSala extends Equatable {
-  /// `https://<dominio>`: el servidor de video de la clínica.
-  final String servidor;
+  /// El servidor de video de la clínica, sin esquema: `meet.clinica.ec`.
+  final String dominio;
   final String sala;
 
-  /// El token firmado por el servidor, que abre la sala.
+  /// El token firmado por el servidor, que abre la sala. Trae el nombre de
+  /// quien entra, como lo ven los demás.
   final String token;
 
-  /// El nombre de quien entra, como lo ven los demás.
-  final String nombreVisible;
-
-  /// El asunto de la sala, con el nombre de la clínica.
-  final String asunto;
+  /// Hasta cuándo deja entrar el servidor (un instante real).
+  final DateTime? cierraEn;
 
   const DatosDeSala({
-    required this.servidor,
+    required this.dominio,
     required this.sala,
     required this.token,
-    this.nombreVisible = '',
-    this.asunto = '',
+    this.cierraEn,
   });
 
   /// Los de la sala que dio el servidor, o `null` si le falta algo: el
   /// dominio (o, si no llega, el de la dirección de la sala), el nombre de
   /// la sala o el token.
-  static DatosDeSala? de(
-    Videollamada sala, {
-    String nombreVisible = '',
-    String asunto = '',
-  }) {
+  static DatosDeSala? de(Videollamada sala) {
     final dominio = dominioLimpio(
       sala.dominio.isNotEmpty ? sala.dominio : Uri.tryParse(sala.url)?.host,
     );
     if (dominio.isEmpty || sala.sala.isEmpty || sala.jwt.isEmpty) return null;
 
     return DatosDeSala(
-      servidor: 'https://$dominio',
+      dominio: dominio,
       sala: sala.sala,
       token: sala.jwt,
-      nombreVisible: nombreVisible,
-      asunto: asunto,
+      cierraEn: sala.cierraEn,
     );
   }
 
   @override
-  List<Object?> get props => [servidor, sala, token, nombreVisible, asunto];
+  List<Object?> get props => [dominio, sala, token, cierraEn];
 }
 
 /// El dominio de video sin esquema ni barras (`meet.clinica.ec`), como lo
@@ -193,53 +186,99 @@ String dominioLimpio(String? dominio) => (dominio ?? '')
     .replaceFirst(RegExp(r'^https?://', caseSensitive: false), '')
     .replaceAll(RegExp(r'/+$'), '');
 
-/// El SDK de video, tras una interfaz: la aplicación entra a la sala con él,
-/// y las pruebas lo cambian por un doble sin plataforma. El de verdad es
-/// `SalaJitsi` (`sala_jitsi.dart`).
-abstract class SalaDeVideo {
-  /// Si el SDK funciona en esta plataforma (Android e iOS; en la web, no).
-  bool get disponible;
+/// Lo que la sala le cuenta a la pantalla que la contiene.
+class OyenteDeSala {
+  /// La página de la sala terminó de cargar.
+  final VoidCallback alCargar;
 
-  /// Abre la sala. Devuelve si se abrió.
-  Future<bool> entrar(DatosDeSala datos);
+  /// Entró a la conferencia.
+  final VoidCallback alEntrar;
+
+  /// Colgó, la echaron, el médico terminó la sala o Jitsi quiso llevarla
+  /// fuera de la sala: se vuelve a la cita.
+  final VoidCallback alTerminar;
+
+  /// La sala no cargó; [mensaje] es lo que hay que decirle a la persona.
+  final ValueChanged<String> alFallar;
+
+  const OyenteDeSala({
+    required this.alCargar,
+    required this.alEntrar,
+    required this.alTerminar,
+    required this.alFallar,
+  });
 }
 
-/// Abre una dirección en el navegador integrado. Devuelve si se abrió.
-typedef AbrirEnNavegador = Future<bool> Function(Uri direccion);
+/// La sala de video dentro de la aplicación, tras una interfaz: la de
+/// verdad es la página de Jitsi en un WebView (`SalaJitsi`, en
+/// `sala_jitsi.dart`), y las pruebas la cambian por un doble sin plataforma.
+abstract class SalaDeVideo {
+  /// El widget de la sala, que llena el espacio que se le dé. [asunto] va a
+  /// los ajustes de Jitsi.
+  Widget construir(
+    DatosDeSala datos, {
+    required String asunto,
+    required OyenteDeSala oyente,
+  });
+}
 
-Future<bool> _abrirEnElNavegadorIntegrado(Uri direccion) =>
-    launchUrl(direccion, mode: LaunchMode.inAppBrowserView);
+/// La videoconsulta de una cita de telemedicina.
+///
+/// Todo lo que la pantalla necesita para abrirla sale de aquí: pedir la
+/// sala al servidor, pedir la cámara y el micrófono y dibujar la sala. Así
+/// las pruebas cambian las tres cosas con un solo doble.
+abstract class ServicioVideollamada {
+  /// Si se puede entrar desde la aplicación. Apagado, la tarjeta de la cita
+  /// explica que el enlace llega por correo.
+  bool get disponible;
+
+  /// La cámara y el micrófono del teléfono.
+  PermisosDeVideo get permisos;
+
+  /// La sala embebida.
+  SalaDeVideo get sala;
+
+  /// Pide la sala de la cita al servidor. Si no se puede, lanza
+  /// [ErrorDeVideollamada] con lo que hay que decirle a la persona.
+  Future<DatosDeSala> pedirSala(String citaId);
+}
 
 /// La videoconsulta dentro de la aplicación.
 ///
-/// Pide la sala al servidor (dominio, sala y token firmado) y entra con el
-/// SDK oficial de Jitsi, con el nombre de quien entra y el asunto de la
-/// clínica: la persona no sale de la aplicación, y el SDK pide la cámara y
-/// el micrófono como cualquier llamada. Recién si el SDK no está (la web) o
-/// falla, se abre la dirección firmada de la sala en el navegador integrado
-/// ([SalaAbierta.enElNavegador], y la pantalla lo avisa).
+/// Pide la sala al servidor (dominio, sala y token firmado) y la pantalla
+/// la abre en una ventana propia, sobre la cita: la página de Jitsi en un
+/// WebView bajo la cabecera de Cliniq ([SalaDeVideo]). La persona nunca
+/// sale de la aplicación: ni navegador, ni pestañas personalizadas, ni una
+/// actividad de Jitsi aparte. Funciona en Android e iOS; en la web no se
+/// ofrece.
 class VideollamadaEnLaApp implements ServicioVideollamada {
   final VideollamadaService _servicio;
-  final SalaDeVideo _sala;
-  final AbrirEnNavegador _abrirEnNavegador;
+
+  @override
+  final SalaDeVideo sala;
+
+  @override
+  final PermisosDeVideo permisos;
+
+  /// Para las pruebas; sin él, Android e iOS.
+  final bool? _disponible;
 
   VideollamadaEnLaApp(
     this._servicio, {
-    required this._sala,
-    AbrirEnNavegador? abrirEnNavegador,
-  }) : _abrirEnNavegador = abrirEnNavegador ?? _abrirEnElNavegadorIntegrado;
+    required this.sala,
+    required this.permisos,
+    this._disponible,
+  });
 
   @override
-  bool get disponible => true;
+  bool get disponible =>
+      _disponible ??
+      (!kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.android ||
+              defaultTargetPlatform == TargetPlatform.iOS));
 
-  /// Pide la sala y entra. Si algo falla lanza [ErrorDeVideollamada] con lo
-  /// que hay que decirle a la persona.
   @override
-  Future<SalaAbierta> unirse(
-    String citaId, {
-    String nombreVisible = '',
-    String asunto = '',
-  }) async {
+  Future<DatosDeSala> pedirSala(String citaId) async {
     final Videollamada sala;
 
     try {
@@ -248,49 +287,14 @@ class VideollamadaEnLaApp implements ServicioVideollamada {
       throw ErrorDeVideollamada(mensajeDeVideollamada(error));
     }
 
-    final datos = DatosDeSala.de(
-      sala,
-      nombreVisible: nombreVisible,
-      asunto: asunto,
-    );
-
-    if (datos != null && _sala.disponible && await _entrarConElSdk(datos)) {
-      return SalaAbierta.enLaAplicacion;
-    }
-
-    return _respaldo(sala);
-  }
-
-  Future<bool> _entrarConElSdk(DatosDeSala datos) async {
-    try {
-      return await _sala.entrar(datos);
-    } catch (_) {
-      return false;
-    }
-  }
-
-  /// El navegador integrado, con la dirección firmada de la sala.
-  Future<SalaAbierta> _respaldo(Videollamada sala) async {
-    final direccion = Uri.tryParse(sala.url);
-    if (direccion == null || direccion.scheme != 'https') {
+    final datos = DatosDeSala.de(sala);
+    if (datos == null) {
       throw const ErrorDeVideollamada(
-        'La sala no tiene una dirección válida. Comunícate con la clínica.',
+        'La sala no llegó completa del servidor. Intenta de nuevo o '
+        'comunícate con la clínica.',
       );
     }
 
-    var abierta = false;
-    try {
-      abierta = await _abrirEnNavegador(direccion);
-    } catch (_) {
-      abierta = false;
-    }
-
-    if (!abierta) {
-      throw const ErrorDeVideollamada(
-        'No pudimos abrir la videoconsulta. Intenta de nuevo en un momento.',
-      );
-    }
-
-    return SalaAbierta.enElNavegador;
+    return datos;
   }
 }

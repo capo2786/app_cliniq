@@ -6,18 +6,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/configuracion/config_publica_cubit.dart';
 import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/fechas/fecha_local.dart';
-import '../../../../core/integraciones/costuras.dart';
-import '../../../../core/presentacion/proveedores.dart';
 import '../../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../../core/presentacion/widgets/botones.dart';
 import '../../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
-import '../../../auth/providers/auth_bloc.dart';
 import '../../data/models/cita.dart';
 import '../../data/videollamada_service.dart';
 import '../../dominio/videoconsulta.dart';
+import 'sala_de_videoconsulta.dart';
 
 /// «Entrar a la videoconsulta», para una cita de telemedicina.
 ///
@@ -33,6 +31,11 @@ class BotonVideoconsulta extends StatefulWidget {
   /// Más compacto, para la tarjeta de la próxima cita.
   final bool compacto;
 
+  /// Entrar sin tocar el botón, si la sala ya está abierta al llegar (la
+  /// pantalla de `/portal/videoconsulta/:citaId`). Si la sala abre después,
+  /// con la pantalla ya a la vista, se espera a que la persona toque.
+  final EntradaAutomatica? entradaAutomatica;
+
   final ServicioVideollamada? servicio;
   final RelojClinica? reloj;
 
@@ -40,6 +43,7 @@ class BotonVideoconsulta extends StatefulWidget {
     super.key,
     required this.cita,
     this.compacto = false,
+    this.entradaAutomatica,
     this.servicio,
     this.reloj,
   });
@@ -54,6 +58,9 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
   late final RelojClinica _reloj = widget.reloj ?? Servicios.reloj;
 
   Timer? _vigilancia;
+
+  /// Si todavía vale entrar solo: deja de valer si se vio la sala por abrir.
+  bool _sinEsperar = true;
 
   @override
   void initState() {
@@ -89,10 +96,14 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
     if (estado == EstadoSala.abierta) {
       return EntrarASala(
         citaId: widget.cita.id,
+        cita: widget.cita,
         compacto: widget.compacto,
+        entradaAutomatica: _sinEsperar ? widget.entradaAutomatica : null,
         servicio: _servicio,
       );
     }
+
+    _sinEsperar = false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -117,23 +128,46 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
   }
 }
 
+/// Entrar solo, una vez: la pantalla de `/portal/videoconsulta/:citaId`
+/// abre la sala al llegar, sin que haya que tocar el botón. Se gasta la
+/// primera vez, aunque la pantalla se vuelva a dibujar.
+class EntradaAutomatica {
+  bool _gastada = false;
+
+  /// `true` solo la primera vez.
+  bool gastar() {
+    if (_gastada) return false;
+    _gastada = true;
+    return true;
+  }
+}
+
 /// El botón que entra a la sala de una cita, con lo que hace falta saber:
-/// los permisos, si no hay red, si se abrió en el navegador integrado (el
-/// respaldo) y, si el servidor dijo que no, su explicación con el contacto
-/// de la clínica.
+/// los permisos, si no hay red y, si el servidor dijo que no, su
+/// explicación con el contacto de la clínica.
 ///
 /// La sala se pide al servidor al tocarlo: él decide si la cita es de quien
-/// entra y si la sala está abierta (409) o configurada (503). Entra con el
-/// nombre de quien tiene la sesión y el asunto con el nombre de la clínica.
+/// entra y si la sala está abierta (409) o configurada (503). Con la sala,
+/// se abre la ventana de la videoconsulta encima de esta pantalla
+/// ([abrirVideoconsulta]), con el médico y la hora de fin de [cita] y el
+/// asunto con el nombre de la clínica; al colgar, se vuelve aquí.
 class EntrarASala extends StatefulWidget {
   final String citaId;
+
+  /// La cita, si se tiene: pone el médico y la hora de fin en la cabecera.
+  final Cita? cita;
   final bool compacto;
+
+  /// Ver [BotonVideoconsulta.entradaAutomatica].
+  final EntradaAutomatica? entradaAutomatica;
   final ServicioVideollamada? servicio;
 
   const EntrarASala({
     super.key,
     required this.citaId,
+    this.cita,
     this.compacto = false,
+    this.entradaAutomatica,
     this.servicio,
   });
 
@@ -146,30 +180,33 @@ class _EntrarASalaState extends State<EntrarASala> {
       widget.servicio ?? Servicios.videollamada;
 
   bool _entrando = false;
-  bool _enElNavegador = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.entradaAutomatica?.gastar() ?? false) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _entrar();
+      });
+    }
+  }
 
   Future<void> _entrar() async {
     if (_entrando) return;
 
-    final nombre = context.leerSiHay<AuthBloc>()?.usuario?.nombre ?? '';
-    final clinica = context.read<ConfigPublicaCubit>().config.clinica.nombre;
+    final config = context.read<ConfigPublicaCubit>().config;
+    final asunto = asuntoDeLaSala(config.clinica.nombre);
+    final ventana = VentanaDeSala.de(config.telemedicina);
 
     setState(() {
       _entrando = true;
-      _enElNavegador = false;
       _error = null;
     });
 
+    DatosDeSala? datos;
     try {
-      final donde = await _servicio.unirse(
-        widget.citaId,
-        nombreVisible: nombre,
-        asunto: asuntoDeLaSala(clinica),
-      );
-      if (mounted) {
-        setState(() => _enElNavegador = donde == SalaAbierta.enElNavegador);
-      }
+      datos = await _servicio.pedirSala(widget.citaId);
     } on ErrorDeVideollamada catch (error) {
       if (mounted) setState(() => _error = error.mensaje);
     } catch (error) {
@@ -177,6 +214,21 @@ class _EntrarASalaState extends State<EntrarASala> {
     } finally {
       if (mounted) setState(() => _entrando = false);
     }
+
+    if (datos == null || !mounted) return;
+
+    await abrirVideoconsulta(
+      context,
+      datos: datos,
+      servicio: _servicio,
+      asunto: asunto,
+      medico: widget.cita?.medico,
+      termina: finDeLaVideoconsulta(
+        cita: widget.cita,
+        cierraEn: datos.cierraEn,
+        ventana: ventana,
+      ),
+    );
   }
 
   @override
@@ -205,13 +257,6 @@ class _EntrarASalaState extends State<EntrarASala> {
                 : 'Sin conexión: para entrar a la videoconsulta necesitas '
                       'Internet.',
           ),
-          if (_enElNavegador) ...[
-            const SizedBox(height: 10),
-            const RecuadroAviso.alerta(
-              avisoVideoEnElNavegador,
-              icono: Icons.open_in_browser_rounded,
-            ),
-          ],
           if (error != null) ...[
             const SizedBox(height: 10),
             RecuadroAviso.error(error),
