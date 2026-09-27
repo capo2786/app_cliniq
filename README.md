@@ -463,11 +463,15 @@ las rutas del paciente de `/portal/consultas`
 
 Las citas de telemedicina ofrecen «Entrar a la videoconsulta» en el detalle
 (desde Mis citas y desde la próxima cita) y, el día de la cita, en la propia
-tarjeta del inicio; en la lista, la cita con la sala abierta lo dice. El
-botón se enciende **15 minutos antes del inicio** y se apaga **60 minutos
-después del fin**, calculado con la hora congelada de la cita contra la hora
-de la clínica, y se vuelve a mirar cada 30 segundos
-(`lib/features/citas/dominio/videoconsulta.dart`).
+tarjeta del inicio; en la lista, la cita con la sala abierta lo dice. La
+clínica elige cuánto antes y después abre la sala (`minutosAntes` de 0 a
+120, `minutosDespues` de 0 a 240; por defecto 15 y 60) y la aplicación no
+lo sabe: el botón (y la pastilla «Sala abierta») se enciende **120 minutos
+antes del inicio** y se apaga **240 minutos después del fin**, la ventana
+más amplia posible, calculada con la hora congelada de la cita contra la
+hora de la clínica y vuelta a mirar cada 30 segundos
+(`lib/features/citas/dominio/videoconsulta.dart`). La regla exacta la dice
+el servidor con su 409.
 
 Al tocarlo se pide `GET /portal/citas/:id/videollamada` y se abre la `url`
 firmada de la sala en el **navegador del teléfono** (`url_launcher`, modo
@@ -562,7 +566,7 @@ fvm flutter test
 | `detalle_consulta_bloc_test.dart` | Cargar, el sondeo con latidos inyectados (la lista primero, el detalle solo si cambió), escribir con archivo y cancelar |
 | `cancelar_consulta_test.dart` | La hoja para cancelar: motivo obligatorio, contador y tope de 500 caracteres |
 | `campo_dinamico_test.dart` | Cada tipo de pregunta y el visor de imágenes |
-| `videoconsulta_test.dart` | La ventana de la sala, pedirla, abrirla fuera y los 409/503 |
+| `videoconsulta_test.dart` | La ventana de la sala (y la pastilla «Sala abierta»), pedirla, abrirla fuera y los 409/503 |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |
 | `recorrido_consultas_test.dart` | Videoconsulta, consultas en línea de punta a punta y retomar un borrador, también con el texto agrandado |
 

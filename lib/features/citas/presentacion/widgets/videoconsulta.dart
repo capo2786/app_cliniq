@@ -15,12 +15,15 @@ import '../../dominio/videoconsulta.dart';
 
 /// «Entrar a la videoconsulta», para una cita de telemedicina.
 ///
-/// Se enciende 15 minutos antes del inicio y se apaga 60 minutos después del
-/// fin. Antes se ve apagado y dice cuándo abre; después ya no se ve. Se
-/// vuelve a mirar el reloj cada 30 segundos, así el botón se enciende solo
-/// con la pantalla abierta. Al tocarlo se pide la sala al servidor y se abre
-/// en el navegador; si el servidor dice que no (409, 503), se enseña su
-/// explicación.
+/// Se enciende 120 minutos antes del inicio y se apaga 240 minutos después
+/// del fin: la ventana más amplia que la clínica puede configurar (ver
+/// `maximoMinutosAntesDeLaSala`). Antes se ve apagado y dice desde cuándo se
+/// podrá entrar; después ya no se ve. Se vuelve a mirar el reloj cada 30
+/// segundos, así el botón se enciende solo con la pantalla abierta. Al
+/// tocarlo se pide la sala al servidor y se abre en el navegador; si el
+/// servidor dice que no —la sala todavía no abre o ya cerró con la
+/// configuración de la clínica (409), o no está configurada (503)—, se
+/// enseña su explicación.
 class BotonVideoconsulta extends StatefulWidget {
   final Cita cita;
 

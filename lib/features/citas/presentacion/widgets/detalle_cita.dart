@@ -186,8 +186,9 @@ class DetalleCita extends StatelessWidget {
             const SizedBox(height: 16),
             ConsejosDePreparacion(consejos: consejosPara(cita.tipo)),
           ],
-          // La sala sigue abierta una hora después del fin, así que también
-          // se ofrece desde el historial mientras tanto.
+          // La sala puede seguir abierta un rato después del fin (hasta
+          // cuatro horas, según la clínica), así que también se ofrece desde
+          // el historial mientras tanto.
           if (estadoDeSala(cita, ahora)
               case EstadoSala.porAbrir || EstadoSala.abierta) ...[
             const SizedBox(height: 16),

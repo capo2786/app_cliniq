@@ -82,9 +82,10 @@ class ErrorDeVideollamada implements Exception {
 /// `GET /portal/citas/:id/videollamada`: la sala de una cita de
 /// telemedicina, para el paciente o el titular.
 ///
-/// El servidor decide todo: si la cita es suya, si la sala ya abrió (15
-/// minutos antes) o ya cerró (60 minutos después del fin) —409 con la
-/// explicación— y si la videoconsulta está configurada —503—.
+/// El servidor decide todo: si la cita es suya, si la sala ya abrió o ya
+/// cerró según la configuración de la clínica (`minutosAntes` del inicio,
+/// `minutosDespues` del fin; por defecto 15 y 60) —409 con la explicación— y
+/// si la videoconsulta está configurada —503—.
 class VideollamadaService {
   final Dio _dio;
 
@@ -119,7 +120,8 @@ String mensajeDeVideollamada(Object error) {
 
   if (estado == 409) {
     return delServidor ??
-        'La sala no está abierta ahora. Se abre 15 minutos antes de la cita.';
+        'La sala no está abierta ahora. Se abre poco antes de la cita y se '
+            'cierra un rato después de que termina.';
   }
 
   if (estado == 503) {

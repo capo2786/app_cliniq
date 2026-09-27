@@ -14,7 +14,8 @@ class TarjetaCita extends StatelessWidget {
   final Cita cita;
   final VoidCallback? onTap;
 
-  /// La hora de la clínica, para saber si la sala de video está abierta.
+  /// La hora de la clínica, para saber si la sala de video está abierta
+  /// (con la misma ventana que el botón para entrar, ver `estadoDeSala`).
   /// Sin ella se usa la de ahora.
   final DateTime? ahora;
 
