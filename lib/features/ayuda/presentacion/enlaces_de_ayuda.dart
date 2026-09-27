@@ -1,9 +1,9 @@
 // lib/features/ayuda/presentacion/enlaces_de_ayuda.dart
 
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/presentacion/avisos.dart';
+import '../../../core/presentacion/enlaces.dart';
 import '../../mi_salud/presentacion/mi_salud_page.dart';
 import '../../soporte/presentacion/soporte_page.dart';
 import '../../soporte/presentacion/ticket_page.dart';
@@ -34,8 +34,9 @@ Widget? pantallaDeLaRuta(String ruta, {AbrirRutaInterna? abrirRuta}) {
 /// - una ruta interna (`/soporte`, `/portal/agendar`), con su pantalla
 ///   nativa; si la aplicación no la sabe abrir, se dice y no se va al
 ///   navegador;
-/// - una dirección `http(s)`, en el navegador integrado;
-/// - un `mailto:`, con la aplicación de correo, como siempre.
+/// - una dirección `http(s)`, en la pantalla de páginas web de la
+///   aplicación, con la cabecera de Cliniq (`abrirPaginaWeb`);
+/// - un `mailto:` o un `tel:`, con el correo o el marcador del teléfono.
 Future<void> abrirEnlaceDeAyuda(
   BuildContext context,
   String url, {
@@ -46,26 +47,7 @@ Future<void> abrirEnlaceDeAyuda(
     return;
   }
 
-  final direccion = Uri.tryParse(url);
-  final correo = direccion?.scheme.toLowerCase() == 'mailto';
-
-  var abierto = false;
-  if (direccion != null) {
-    try {
-      abierto = await launchUrl(
-        direccion,
-        mode: correo
-            ? LaunchMode.externalApplication
-            : LaunchMode.inAppBrowserView,
-      );
-    } catch (_) {
-      abierto = false;
-    }
-  }
-
-  if (!abierto && context.mounted) {
-    mostrarAviso(context, 'No pudimos abrir el enlace: $url', error: true);
-  }
+  await abrirPaginaWeb(context, url);
 }
 
 void _abrirRuta(

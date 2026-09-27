@@ -586,7 +586,7 @@ class _AccesoConsultas extends StatelessWidget {
 /// Los enlaces del menú que no caben en la barra: consultas en línea a lo
 /// ancho (con sus respuestas por leer) y los demás en una rejilla. Los
 /// externos (una página que puso el administrador) llevan su marca: se abren
-/// en el navegador integrado, sin salir de la aplicación.
+/// en la pantalla de páginas web de la aplicación, sin salir de ella.
 class _AccesosRapidos extends StatelessWidget {
   final List<EnlaceMenu> enlaces;
   final bool puedeConsultas;
@@ -681,9 +681,9 @@ class _Acceso extends StatelessWidget {
               const Spacer(),
               if (externo)
                 const Tooltip(
-                  message: 'Página externa',
+                  message: 'Página web',
                   child: Icon(
-                    Icons.open_in_new_rounded,
+                    Icons.public_rounded,
                     size: 16,
                     color: AppColors.textoSecundario,
                   ),

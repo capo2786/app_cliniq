@@ -1,5 +1,6 @@
 // test/menu_test.dart
 
+import 'package:app_cliniq/core/presentacion/pagina_web_page.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/consultas/presentacion/consultas_page.dart';
@@ -16,6 +17,7 @@ import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/navegador_falso.dart';
 import 'dobles/tablero.dart';
+import 'dobles/vista_web.dart';
 
 /// La navegación sale del menú del servidor: la barra, los accesos rápidos,
 /// qué abre cada enlace y el enrutador de las rutas del sistema.
@@ -357,8 +359,9 @@ void main() {
       expect(navegador.abiertas, isEmpty);
     });
 
-    testWidgets('un enlace externo se abre en el navegador integrado; una '
-        'ruta que no se sabe abrir no se enseña', (tester) async {
+    testWidgets('un enlace externo se abre en la pantalla web de la '
+        'aplicación, con el nombre del enlace; una ruta que no se sabe abrir '
+        'no se enseña', (tester) async {
       menu = [
         ...menuJson(),
         {
@@ -385,6 +388,8 @@ void main() {
         },
       ];
       final navegador = NavegadorFalso()..instalar();
+      final vista = VistaWebFalsa(tituloDeLaPagina: 'Blog · Andina')
+        ..instalar();
       await montar(tester);
       await tester.pumpAndSettle();
 
@@ -395,8 +400,16 @@ void main() {
       await tester.tap(find.byKey(const Key('acceso-blog')));
       await tester.pumpAndSettle();
 
-      expect(navegador.abiertas, ['https://blog.andina.ec']);
-      expect(navegador.ultimaFuera, isFalse);
+      // Ni Custom Tabs ni Safari ni el navegador: la pantalla de la
+      // aplicación, con el nombre que puso el administrador.
+      expect(find.byType(PaginaWebPage), findsOneWidget);
+      expect(vista.cargadas, [Uri.parse('https://blog.andina.ec')]);
+      expect(find.text('Blog de salud'), findsWidgets);
+      expect(navegador.abiertas, isEmpty);
+
+      await tester.tap(find.byKey(const Key('cerrar-pagina-web')));
+      await tester.pumpAndSettle();
+      expect(find.byType(PaginaWebPage), findsNothing);
     });
 
     testWidgets('un acceso conocido que no está en la barra se abre encima', (

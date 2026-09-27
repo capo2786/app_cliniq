@@ -87,8 +87,9 @@ bool abrirRuta(BuildContext context, String ruta, {String? titulo}) {
 ///
 /// - una ruta interna (`/legal/privacidad`), con su pantalla; si la
 ///   aplicación no la sabe abrir, se dice;
-/// - `mailto:`, con el correo del teléfono;
-/// - una dirección web, en el navegador integrado.
+/// - `mailto:` y `tel:`, con el correo o el marcador del teléfono;
+/// - una dirección web, en la pantalla de páginas web de la aplicación
+///   (`abrirPaginaWeb`).
 void abrirEnlaceDeTexto(BuildContext context, String direccion) {
   final enlace = direccion.trim();
 
@@ -111,6 +112,6 @@ void abrirEnlaceDeTexto(BuildContext context, String direccion) {
   }
 
   if (uri.scheme == 'http' || uri.scheme == 'https') {
-    unawaited(abrirEnlace(context, enlace, queEs: 'el enlace'));
+    unawaited(abrirPaginaWeb(context, enlace));
   }
 }

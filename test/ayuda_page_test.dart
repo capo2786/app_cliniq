@@ -1,6 +1,7 @@
 // test/ayuda_page_test.dart
 
 import 'package:app_cliniq/core/network/api_client.dart';
+import 'package:app_cliniq/core/presentacion/pagina_web_page.dart';
 import 'package:app_cliniq/core/servicios.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/ayuda/data/ayuda_service.dart';
@@ -24,6 +25,7 @@ import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/navegador_falso.dart';
 import 'dobles/pantalla.dart';
+import 'dobles/vista_web.dart';
 
 /// El centro de ayuda en pantalla: categorías, búsqueda, el artículo con
 /// su Markdown nativo, sus enlaces (sin salir de la aplicación) y el acceso
@@ -244,12 +246,18 @@ void main() {
       tester,
     ) async {
       final navegador = NavegadorFalso()..instalar();
+      final vista = VistaWebFalsa(tituloDeLaPagina: 'Clínica Andina · Inicio')
+        ..instalar();
       await abrir(tester);
 
       await tocarEnlace(tester, 'Clínica Andina');
 
-      expect(navegador.abiertas, ['https://andina.ec']);
-      expect(navegador.ultimaFuera, isFalse);
+      // La pantalla web de la aplicación, con el título de la página: no
+      // Custom Tabs, no Safari, no el navegador del teléfono.
+      expect(find.byType(PaginaWebPage), findsOneWidget);
+      expect(vista.cargadas, [Uri.parse('https://andina.ec')]);
+      expect(find.text('Clínica Andina · Inicio'), findsOneWidget);
+      expect(navegador.abiertas, isEmpty);
     });
 
     testWidgets('una ruta de otro módulo va al enrutador; si no la sabe '
