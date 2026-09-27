@@ -530,11 +530,14 @@ void main() {
           'actualizar:b1',
           'enviar:b1',
         ]);
+        // Las vacías van como null: el servidor combina con lo guardado.
         expect(servicio.actualizadas.single.respuestas, {
           'desde': '2026-09-21',
           'zona': 'Cara',
           'pica': true,
           'tamano': 2.5,
+          'forma': null,
+          'notas': null,
         });
       },
     );

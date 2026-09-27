@@ -173,17 +173,23 @@ Map<String, String> erroresDelFormulario({
   return errores;
 }
 
-/// Las respuestas como las espera la API: solo las del formulario, sin las
-/// vacías y cada una con su tipo (texto, número, sí/no o `AAAA-MM-DD`).
+/// Las respuestas como las espera la API: solo las del formulario y cada una
+/// con su tipo (texto, número, sí/no o `AAAA-MM-DD`). Al crear se omiten las
+/// vacías; al guardar un borrador (`conVacias`) van como `null`, porque el
+/// servidor combina con lo guardado y solo así borra una que se vació.
 Map<String, Object?> respuestasParaApi(
   List<CampoFormulario> campos,
-  Map<String, Object?> respuestas,
-) {
+  Map<String, Object?> respuestas, {
+  bool conVacias = false,
+}) {
   final resultado = <String, Object?>{};
 
   for (final campo in campos) {
     final valor = respuestas[campo.clave];
-    if (valorVacio(valor)) continue;
+    if (valorVacio(valor)) {
+      if (conVacias) resultado[campo.clave] = null;
+      continue;
+    }
 
     final convertido = switch (campo.tipo) {
       TipoCampo.texto || TipoCampo.textoLargo => valor.toString().trim(),

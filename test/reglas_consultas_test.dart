@@ -182,6 +182,18 @@ void main() {
       expect(errores[claveDescripcion], contains('$maximoDescripcion'));
     });
 
+    test('al guardar un borrador, lo que se vació viaja como null', () {
+      final api = respuestasParaApi(campos, const {
+        'zona': 'Brazos',
+        'notas': '   ',
+      }, conVacias: true);
+
+      expect(api['zona'], 'Brazos');
+      expect(api['notas'], isNull);
+      expect(api.containsKey('notas'), isTrue);
+      expect(api.keys.toSet(), campos.map((c) => c.clave).toSet());
+    });
+
     test('las respuestas viajan con su tipo, sin las vacías', () {
       final api = respuestasParaApi(campos, const {
         'desde': '2026-09-21',

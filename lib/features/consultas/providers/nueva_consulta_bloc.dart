@@ -512,7 +512,11 @@ class NuevaConsultaBloc extends Bloc<NuevaConsultaEvent, NuevaConsultaState> {
             )
           : await _consultas.actualizar(
               previo.id,
-              respuestas: respuestas,
+              respuestas: respuestasParaApi(
+                state.campos,
+                state.respuestas,
+                conVacias: true,
+              ),
               descripcion: state.descripcionLimpia,
             );
 
