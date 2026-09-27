@@ -148,6 +148,7 @@ class _VistaPerfil extends StatelessWidget {
                       const SizedBox(height: 26),
                       const EtiquetaSeccion('Documentos aceptados'),
                       const _DocumentosAceptados(),
+                      _DocumentosDeLaClinica(usuario: usuario),
                       const SizedBox(height: 28),
                       BotonSecundario(
                         texto: 'Cerrar sesión',
@@ -517,14 +518,87 @@ class _DocumentosAceptados extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
-                  trailing: TextButton(
-                    onPressed: () => abrirEnlace(context, a.url),
-                    style: TextButton.styleFrom(
-                      foregroundColor: AppColors.acentoSuave,
-                    ),
-                    child: const Text('Leer'),
-                  ),
+                  trailing: a.url == null
+                      ? null
+                      : TextButton(
+                          onPressed: () => abrirEnlace(context, a.url!),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.acentoSuave,
+                          ),
+                          child: const Text('Leer'),
+                        ),
                 ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Los documentos legales vigentes de la clínica que le aplican a esta
+/// cuenta, para leerlos cuando se quiera. Títulos y direcciones salen de
+/// `GET /legal/documentos`.
+class _DocumentosDeLaClinica extends StatelessWidget {
+  final Usuario usuario;
+
+  const _DocumentosDeLaClinica({required this.usuario});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<LegalBloc, LegalState>(
+      builder: (context, state) {
+        final documentos = [
+          for (final d in state.documentos)
+            if (d.aplicaA(usuario.tipo)) d,
+        ];
+
+        if (documentos.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 26),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const EtiquetaSeccion('Documentos legales'),
+              TarjetaTranslucida(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  children: [
+                    for (final d in documentos)
+                      ListTile(
+                        key: Key('documento-${d.slug}'),
+                        leading: const Icon(
+                          Icons.description_outlined,
+                          color: AppColors.primarioClaro,
+                        ),
+                        title: Text(
+                          d.titulo,
+                          style: const TextStyle(
+                            color: AppColors.texto,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: d.version.isEmpty
+                            ? null
+                            : Text(
+                                'Versión ${d.version}',
+                                style: const TextStyle(
+                                  color: AppColors.textoSecundario,
+                                  fontSize: 12,
+                                ),
+                              ),
+                        trailing: const Icon(
+                          Icons.open_in_new_rounded,
+                          size: 18,
+                          color: AppColors.acentoSuave,
+                        ),
+                        onTap: () => abrirEnlace(context, d.url),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
         );

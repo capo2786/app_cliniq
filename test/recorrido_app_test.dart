@@ -340,7 +340,10 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await esperar(tester);
-    expect(find.text('Términos y condiciones de uso'), findsOneWidget);
+    // Aceptado, y también en la lista de documentos de la clínica
+    // (`GET /legal/documentos`), con su enlace.
+    expect(find.text('Términos y condiciones de uso'), findsNWidgets(2));
+    expect(find.byKey(const Key('documento-terminos')), findsOneWidget);
 
     // 7. Agendar, paso a paso hasta los horarios.
     await tocar(tester, find.text('Agendar').last);

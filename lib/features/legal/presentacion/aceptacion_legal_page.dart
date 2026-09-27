@@ -203,14 +203,15 @@ class _TarjetaDocumento extends StatelessWidget {
                   ],
                 ),
               ),
-              TextButton.icon(
-                onPressed: () => abrirEnlace(context, documento.url),
-                icon: const Icon(Icons.open_in_new_rounded, size: 17),
-                label: const Text('Leer'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.acentoSuave,
+              if (documento.url case final url?)
+                TextButton.icon(
+                  onPressed: () => abrirEnlace(context, url),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                  label: const Text('Leer'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.acentoSuave,
+                  ),
                 ),
-              ),
             ],
           ),
           CheckboxListTile(

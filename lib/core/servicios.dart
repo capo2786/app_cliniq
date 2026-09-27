@@ -81,7 +81,7 @@ class Servicios {
   // ── Módulos ────────────────────────────────────────────────────────
   static final AuthService auth = AuthService(ApiClient().dio);
 
-  static final LegalService legal = LegalService(ApiClient().dio);
+  static final LegalService legal = LegalService(ApiClient().dio, cache);
 
   /// La configuración pública de la clínica (`/configuracion/publica`).
   static final ConfigPublicaService configuracion = ConfigPublicaService(

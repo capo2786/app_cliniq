@@ -39,6 +39,9 @@ class LegalState extends Equatable {
   final List<DocumentoPendiente> pendientes;
   final List<AceptacionLegal> aceptaciones;
 
+  /// Los documentos vigentes de la clínica (`GET /legal/documentos`).
+  final List<DocumentoLegal> documentos;
+
   /// Las claves que la persona ya marcó en pantalla.
   final Set<String> marcados;
 
@@ -52,6 +55,7 @@ class LegalState extends Equatable {
     this.error,
     this.pendientes = const [],
     this.aceptaciones = const [],
+    this.documentos = const [],
     this.marcados = const {},
     this.enviando = false,
     this.completo = false,
@@ -68,6 +72,7 @@ class LegalState extends Equatable {
     bool limpiarError = false,
     List<DocumentoPendiente>? pendientes,
     List<AceptacionLegal>? aceptaciones,
+    List<DocumentoLegal>? documentos,
     Set<String>? marcados,
     bool? enviando,
     bool? completo,
@@ -77,6 +82,7 @@ class LegalState extends Equatable {
       error: limpiarError ? null : (error ?? this.error),
       pendientes: pendientes ?? this.pendientes,
       aceptaciones: aceptaciones ?? this.aceptaciones,
+      documentos: documentos ?? this.documentos,
       marcados: marcados ?? this.marcados,
       enviando: enviando ?? this.enviando,
       completo: completo ?? this.completo,
@@ -89,6 +95,7 @@ class LegalState extends Equatable {
     error,
     pendientes,
     aceptaciones,
+    documentos,
     marcados,
     enviando,
     completo,
@@ -118,14 +125,24 @@ class LegalBloc extends Bloc<LegalEvent, LegalState> {
   ) async {
     emit(state.copiarCon(cargando: true, limpiarError: true));
 
+    // La lista de documentos da títulos y nombres cortos a lo que no los
+    // traiga; sin ella se sigue igual con lo que manda mis-aceptaciones.
+    List<DocumentoLegal> documentos;
     try {
-      final datos = await _servicio.misAceptaciones();
+      documentos = await _servicio.documentos();
+    } catch (_) {
+      documentos = state.documentos;
+    }
+
+    try {
+      final datos = await _servicio.misAceptaciones(documentos: documentos);
 
       emit(
         state.copiarCon(
           cargando: false,
           pendientes: datos.pendientes,
           aceptaciones: datos.aceptaciones,
+          documentos: documentos,
           completo: datos.pendientes.isEmpty,
         ),
       );
@@ -152,7 +169,10 @@ class LegalBloc extends Bloc<LegalEvent, LegalState> {
     emit(state.copiarCon(enviando: true, limpiarError: true));
 
     try {
-      final datos = await _servicio.aceptar(state.pendientes);
+      final datos = await _servicio.aceptar(
+        state.pendientes,
+        documentos: state.documentos,
+      );
 
       emit(
         state.copiarCon(

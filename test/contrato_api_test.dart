@@ -281,31 +281,31 @@ void main() {
       expect(lote[Catalogos.parentescoDependiente]!.single.codigo, 'MADRE');
     });
 
-    test('cada documento se abre por su nombre corto', () {
-      expect(slugDe('TERMINOS'), 'terminos');
-      expect(slugDe('AVISO_LEGAL'), 'aviso-legal');
-      expect(
-        slugDe('CONSENTIMIENTO_TELEMEDICINA'),
-        'consentimiento-telemedicina',
-      );
-      expect(slugDe('CONTRATO_MEDICO'), 'contrato-medico');
-      expect(slugDe('NUEVO_DOC'), 'nuevo-doc');
+    test('cada documento se abre por el nombre corto que manda la API', () {
       expect(
         const DocumentoPendiente(
           clave: 'USO_ACEPTABLE',
           version: '1.0',
           titulo: 'x',
+          slug: 'uso-aceptable',
         ).url,
         'https://cliniq.gcaicedo-proyectos.com/legal/uso-aceptable',
       );
+      expect(
+        const DocumentoPendiente(clave: 'NUEVO', version: '1', titulo: 'x').url,
+        isNull,
+        reason: 'sin slug no se arma ninguna dirección',
+      );
     });
 
-    test('mis aceptaciones: aceptadas y pendientes', () {
+    test('mis aceptaciones: aceptadas y pendientes, con título y slug', () {
       final datos = interpretarAceptaciones({
         'aceptaciones': [
           {
             'clave': 'TERMINOS',
             'version': '1.0',
+            'titulo': 'Términos de uso',
+            'slug': 'terminos',
             'aceptadoEn': '2026-09-20T14:00:00.000Z',
           },
         ],
@@ -314,12 +314,15 @@ void main() {
             'clave': 'PRIVACIDAD',
             'version': '1.0',
             'titulo': 'Política de privacidad',
+            'slug': 'privacidad',
           },
         ],
       });
 
-      expect(datos.aceptaciones.single.titulo, 'Términos y condiciones de uso');
+      expect(datos.aceptaciones.single.titulo, 'Términos de uso');
+      expect(datos.aceptaciones.single.slug, 'terminos');
       expect(datos.pendientes.single.clave, 'PRIVACIDAD');
+      expect(datos.pendientes.single.slug, 'privacidad');
     });
   });
 }
