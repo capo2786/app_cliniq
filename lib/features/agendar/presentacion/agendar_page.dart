@@ -7,6 +7,7 @@ import '../../../core/catalogos/catalogos_cubit.dart';
 import '../../../core/configuracion/config_publica_cubit.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
+import '../../../core/presentacion/widgets/barra_de_accion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../core/presentacion/widgets/estados.dart';
@@ -185,6 +186,8 @@ class _VistaAgendar extends StatelessWidget {
             child: KeyedSubtree(
               key: ValueKey(state.paso),
               child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: context.margenDeScroll(superior: 12, inferior: 24),
                 children: [
                   if (state.paso != PasoAgendar.listo) const AvisoSinConexion(),
@@ -299,21 +302,7 @@ class _BarraDeAccion extends StatelessWidget {
     final bloc = context.read<AgendarBloc>();
     final resumen = state.paso == PasoAgendar.resumen;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        12 + context.margenInferiorDelSistema,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.superficie,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.primarioClaro.withValues(alpha: 0.14),
-          ),
-        ),
-      ),
+    return BarraDeAccion(
       child: ConRed(
         builder: (context, hayRed) => BotonPrincipal(
           texto: resumen
@@ -326,11 +315,14 @@ class _BarraDeAccion extends StatelessWidget {
           textoCargando: state.reprogramando ? 'Reprogramando…' : 'Agendando…',
           onPressed: (resumen && !hayRed) || !AgendarBloc.pasoCompleto(state)
               ? null
-              : () => bloc.add(
-                  resumen
-                      ? const AgendarConfirmado()
-                      : const AgendarContinuado(),
-                ),
+              : () {
+                  cerrarTeclado();
+                  bloc.add(
+                    resumen
+                        ? const AgendarConfirmado()
+                        : const AgendarContinuado(),
+                  );
+                },
         ),
       ),
     );
