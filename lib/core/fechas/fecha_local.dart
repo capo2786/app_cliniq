@@ -164,4 +164,11 @@ class RelojClinica {
 
   /// La medianoche de hoy en la clínica.
   DateTime hoy() => inicioDelDia(ahora());
+
+  /// El instante real de ahora, en UTC.
+  ///
+  /// Es lo que se compara con los instantes de la API (el vencimiento de una
+  /// consulta en línea, por ejemplo), que no son hora congelada. Ver
+  /// `instante.dart`.
+  DateTime instante() => _fuente().toUtc();
 }

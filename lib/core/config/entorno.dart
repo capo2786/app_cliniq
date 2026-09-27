@@ -30,6 +30,10 @@ class Entorno {
   /// Dirección pública de un documento legal por su nombre corto.
   static String urlLegal(String slug) => '$webUrl/legal/$slug';
 
+  /// El autorregistro de pacientes, en el panel web: la aplicación no copia
+  /// ese formulario (cédula, términos, confirmación por correo), lo abre.
+  static String get urlRegistro => '$webUrl/registro';
+
   /// La zona de la clínica. Ecuador continental no aplica horario de verano.
   static const String zonaHoraria = 'America/Guayaquil';
 
