@@ -309,7 +309,7 @@ void main() {
     expect(find.textContaining('Llega 10 minutos antes'), findsOneWidget);
 
     // 4. Citas: próximas e historial, con el detalle.
-    await tocar(tester, find.text('Citas').last);
+    await tocar(tester, find.byKey(const Key('pestana-mis-citas')));
     expect(find.text('Tus citas'), findsOneWidget);
     await tocar(tester, find.text('Luis Mora').last);
     await bajarEnLaHoja(tester, find.text('Cancelar cita'));
@@ -322,11 +322,11 @@ void main() {
     expect(find.text('Para Tomás Pérez'), findsOneWidget);
 
     // 5. Dependientes.
-    await tocar(tester, find.text('Dependientes').last);
+    await tocar(tester, find.byKey(const Key('pestana-mis-dependientes')));
     expect(find.text('Tomás Pérez'), findsOneWidget);
 
     // 6. Perfil.
-    await tocar(tester, find.text('Perfil').last);
+    await tocar(tester, find.byKey(const Key('pestana-perfil')));
     expect(find.text('Mi perfil'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('Penicilina'),
@@ -346,7 +346,7 @@ void main() {
     expect(find.byKey(const Key('documento-terminos')), findsOneWidget);
 
     // 7. Agendar, paso a paso hasta los horarios.
-    await tocar(tester, find.text('Agendar').last);
+    await tocar(tester, find.byKey(const Key('pestana-agendar-cita')));
     await esperar(tester, 8);
     expect(find.byType(AgendarPage), findsOneWidget);
     expect(find.text('¿Para quién?'), findsOneWidget);
@@ -396,7 +396,7 @@ void main() {
     expect(find.byType(AgendarPage), findsNothing);
 
     // Cancelar: la hoja pide un motivo del catálogo.
-    await tocar(tester, find.text('Citas').last);
+    await tocar(tester, find.byKey(const Key('pestana-mis-citas')));
     await tocar(tester, find.text('Próximas'));
     await tocar(tester, find.text('Luis Mora').last);
     await bajarEnLaHoja(tester, find.text('Cancelar cita'));

@@ -299,6 +299,98 @@ Widget conDatosDeLaClinica(
   );
 }
 
+/// `GET /menus/mi-menu?plataforma=APP` como lo arma la semilla del
+/// servidor: grupos con sus enlaces, cada uno con su orden.
+List<Map<String, dynamic>> menuJson() => [
+  {
+    'key': 'general',
+    'label': 'General',
+    'tipo': 'GRUPO',
+    'orden': 0,
+    'children': [
+      {
+        'key': 'inicio',
+        'label': 'Inicio',
+        'route': '/inicio',
+        'icon': 'home',
+        'color': '#5fb4d1',
+        'tipo': 'LINK',
+        'orden': 0,
+      },
+    ],
+  },
+  {
+    'key': 'atencion',
+    'label': 'Atención',
+    'tipo': 'GRUPO',
+    'orden': 1,
+    'children': [
+      {
+        'key': 'mi-salud',
+        'label': 'Mi salud',
+        'route': '/mi-salud',
+        'icon': 'corazon',
+        'color': '#ff6b86',
+        'tipo': 'LINK',
+        'orden': 5,
+      },
+      {
+        'key': 'mis-citas',
+        'label': 'Mis citas',
+        'route': '/mis-citas',
+        'icon': 'calendario',
+        'color': '#5ab8ea',
+        'tipo': 'LINK',
+        'orden': 2,
+      },
+      {
+        'key': 'agendar-cita',
+        'label': 'Agendar cita',
+        'route': '/portal/agendar',
+        'icon': 'calendario-mas',
+        'color': '#3ad5a0',
+        'tipo': 'LINK',
+        'orden': 3,
+      },
+      {
+        'key': 'mis-dependientes',
+        'label': 'Mis dependientes',
+        'route': '/portal/dependientes',
+        'icon': 'users',
+        'color': '#f28a64',
+        'tipo': 'LINK',
+        'orden': 4,
+      },
+      {
+        'key': 'consultas-en-linea',
+        'label': 'Consultas en línea',
+        'route': '/portal/consultas',
+        'icon': 'estetoscopio',
+        'color': '#5fb4d1',
+        'tipo': 'LINK',
+        'orden': 6,
+      },
+    ],
+  },
+  {
+    'key': 'ayuda',
+    'label': 'Ayuda',
+    'tipo': 'GRUPO',
+    'orden': 2,
+    'children': [
+      {
+        'key': 'centro-ayuda',
+        'label': 'Centro de ayuda',
+        'route': '/ayuda',
+        'icon': 'info',
+        'color': '',
+        'tipo': 'LINK',
+        'orden': 0,
+      },
+    ],
+  },
+];
+
 /// Un sondeo de red que contesta enseguida que hay conexión, para las
 /// pantallas sueltas que lo consultan (sin él, el sondeo de verdad dejaría
 /// un plazo pendiente al terminar la prueba).
@@ -315,8 +407,9 @@ void sondeoConRed() {
   SondeoDeRed(dio);
 }
 
-/// Las rutas públicas de la clínica para [AdaptadorHttpFalso]: la
-/// configuración, los catálogos y los documentos legales.
+/// Las rutas de la clínica para [AdaptadorHttpFalso]: la configuración, los
+/// catálogos y los documentos legales (públicas) y el menú de la
+/// aplicación.
 Map<String, Respuesta Function(RequestOptions)> rutasDeLaClinica({
   Map<String, dynamic>? config,
   Map<String, List<Map<String, dynamic>>>? catalogos,
@@ -326,6 +419,7 @@ Map<String, Respuesta Function(RequestOptions)> rutasDeLaClinica({
       (estado: 200, cuerpo: config ?? configJson()),
   'GET /catalogos/lote': (_) =>
       (estado: 200, cuerpo: catalogos ?? catalogosJson()),
+  'GET /menus/mi-menu': (_) => (estado: 200, cuerpo: menuJson()),
   'GET /legal/documentos': (_) => (
     estado: 200,
     cuerpo:

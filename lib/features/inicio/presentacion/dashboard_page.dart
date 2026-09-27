@@ -5,7 +5,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/catalogos/catalogos_cubit.dart';
+import '../../../core/presentacion/enlaces.dart';
+import '../../../core/presentacion/margenes.dart';
+import '../../../core/presentacion/visual_del_servidor.dart';
+import '../../../core/presentacion/widgets/cerrar_sesion.dart';
+import '../../../core/presentacion/widgets/estados.dart';
+import '../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
 import '../../agendar/presentacion/agendar_page.dart';
@@ -20,41 +25,33 @@ import '../../consultas/providers/consultas_bloc.dart';
 import '../../consultas/providers/consultas_event.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
 import '../../dependientes/providers/dependientes_bloc.dart';
+import '../../navegacion/data/menu_service.dart';
+import '../../navegacion/dominio/destinos.dart';
+import '../../navegacion/providers/menu_cubit.dart';
 import '../../perfil/presentacion/perfil_page.dart';
 import 'inicio_page.dart';
 
-/*
- * Una pestaña de abajo. Hay de dos clases y por eso el índice de la barra no
- * puede ser el índice de la pila de páginas:
- *
- *   - Las que cambian de vista llevan [pagina], la posición en la pila.
- *   - «Agendar» no cambia de vista: abre el agendamiento encima y al volver
- *     se sigue donde se estaba, así que lleva [abre] y no ocupa sitio.
- */
-class _Pestana {
-  final IconData icono;
-  final IconData iconoActivo;
-  final String etiqueta;
-  final int? pagina;
-  final VoidCallback? abre;
-
-  const _Pestana({
-    required this.icono,
-    required this.iconoActivo,
-    required this.etiqueta,
-    this.pagina,
-    this.abre,
-  });
-
-  bool get destacada => abre != null;
-}
+/// Las pantallas que viven como pestaña (las demás se abren encima).
+const Set<PantallaNativa> pantallasDePestana = {
+  PantallaNativa.inicio,
+  PantallaNativa.citas,
+  PantallaNativa.dependientes,
+  PantallaNativa.consultas,
+  PantallaNativa.perfil,
+};
 
 /// La estructura de la aplicación con sesión: las pestañas de abajo.
 ///
-/// Aquí nacen las cargas de todo lo que comparten las pestañas —citas,
-/// consultas en línea, dependientes y catálogos— y los recordatorios, y se
-/// vuelven a pedir al regresar a la aplicación: quien la abre por la mañana
-/// tiene que ver las citas de hoy, no las de anoche.
+/// La barra la arma el menú del servidor (`GET /menus/mi-menu?plataforma=
+/// APP`): los cuatro primeros enlaces, por su orden, más «Perfil», que
+/// siempre está; el resto va a «Accesos rápidos» del inicio. Cada enlace
+/// lleva el nombre, el icono y el color que eligió el administrador. Una
+/// ruta que la aplicación conoce abre su pantalla; una que no conoce se abre
+/// en el navegador, en el panel web.
+///
+/// Aquí nacen también las cargas de todo lo que comparten las pestañas
+/// —citas, consultas en línea, dependientes y el menú— y los recordatorios,
+/// y se vuelven a pedir al regresar a la aplicación.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -64,12 +61,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage>
     with WidgetsBindingObserver {
-  static const int _paginaInicio = 0;
-  static const int _paginaCitas = 1;
-  static const int _paginaDependientes = 2;
-  static const int _paginaPerfil = 3;
-
-  int _pagina = _paginaInicio;
+  PantallaNativa _actual = PantallaNativa.inicio;
 
   @override
   void initState() {
@@ -108,6 +100,8 @@ class _DashboardPageState extends State<DashboardPage>
     final usuario = context.read<AuthBloc>().usuario;
     if (usuario == null) return;
 
+    unawaited(context.read<MenuCubit>().cargar(usuario.uid));
+
     if (usuario.puede(Permisos.misCitas)) {
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));
     }
@@ -121,110 +115,196 @@ class _DashboardPageState extends State<DashboardPage>
         DependientesSolicitados(usuario.uid),
       );
     }
-
-    unawaited(context.read<CatalogosCubit>().cargar());
   }
 
-  void _abrirAgendar() {
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => const AgendarPage()));
+  /// Las pestañas que hay: el inicio siempre (es la portada, con los accesos
+  /// rápidos), las pantallas de la barra en su orden y el perfil al final.
+  List<PantallaNativa> _pestanas(NavegacionDeLaApp navegacion) {
+    final pestanas = <PantallaNativa>[PantallaNativa.inicio];
+
+    for (final enlace in navegacion.barra) {
+      if (destinoDe(enlace) case DestinoNativo(:final pantalla)
+          when pantallasDePestana.contains(pantalla) &&
+              !pestanas.contains(pantalla)) {
+        pestanas.add(pantalla);
+      }
+    }
+
+    return pestanas..add(PantallaNativa.perfil);
   }
 
-  void _abrirConsultas() {
-    Navigator.of(context)
-        .push(MaterialPageRoute<void>(builder: (_) => const ConsultasPage()));
+  /// Abre una pantalla de la aplicación: su pestaña si la tiene; si no,
+  /// encima (agendar siempre va encima, es un recorrido).
+  void _abrir(PantallaNativa pantalla, List<PantallaNativa> pestanas) {
+    if (pantalla != PantallaNativa.agendar && pestanas.contains(pantalla)) {
+      setState(() => _actual = pantalla);
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => _pagina(pantalla, pestanas)),
+    );
   }
 
-  void _irA(DestinoRapido destino) {
-    switch (destino) {
-      case DestinoRapido.agendar:
-        _abrirAgendar();
-      case DestinoRapido.consultas:
-        _abrirConsultas();
-      case DestinoRapido.citas:
-        setState(() => _pagina = _paginaCitas);
-      case DestinoRapido.dependientes:
-        setState(() => _pagina = _paginaDependientes);
-      case DestinoRapido.perfil:
-        setState(() => _pagina = _paginaPerfil);
+  void _abrirEnlace(EnlaceMenu enlace, List<PantallaNativa> pestanas) {
+    switch (destinoDe(enlace)) {
+      case DestinoNativo(:final pantalla):
+        _abrir(pantalla, pestanas);
+      case DestinoWeb(:final url):
+        unawaited(abrirEnlace(context, url, queEs: '«${enlace.label}»'));
     }
   }
 
-  List<_Pestana> get _pestanas => [
-    const _Pestana(
-      icono: Icons.home_outlined,
-      iconoActivo: Icons.home_rounded,
-      etiqueta: 'Inicio',
-      pagina: _paginaInicio,
-    ),
-    const _Pestana(
-      icono: Icons.event_note_outlined,
-      iconoActivo: Icons.event_note_rounded,
-      etiqueta: 'Citas',
-      pagina: _paginaCitas,
-    ),
-    _Pestana(
-      icono: Icons.add_rounded,
-      iconoActivo: Icons.add_rounded,
-      etiqueta: 'Agendar',
-      abre: _abrirAgendar,
-    ),
-    const _Pestana(
-      icono: Icons.family_restroom_outlined,
-      iconoActivo: Icons.family_restroom_rounded,
-      etiqueta: 'Dependientes',
-      pagina: _paginaDependientes,
-    ),
-    const _Pestana(
-      icono: Icons.person_outline_rounded,
-      iconoActivo: Icons.person_rounded,
-      etiqueta: 'Perfil',
-      pagina: _paginaPerfil,
-    ),
-  ];
+  Widget _pagina(PantallaNativa pantalla, List<PantallaNativa> pestanas) {
+    return switch (pantalla) {
+      PantallaNativa.inicio => const SizedBox.shrink(),
+      PantallaNativa.citas => CitasPage(
+        alAgendar: () => _abrir(PantallaNativa.agendar, pestanas),
+      ),
+      PantallaNativa.agendar => const AgendarPage(),
+      PantallaNativa.dependientes => const DependientesPage(),
+      PantallaNativa.consultas => const ConsultasPage(),
+      PantallaNativa.perfil => const PerfilPage(),
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
+    final menu = context.watch<MenuCubit>().state;
+    final enlaces = menu.enlaces;
+
+    if (enlaces == null) {
+      final error = menu.error;
+
+      return _SinMenu(
+        error: menu.cargando ? null : error,
+        alReintentar: _sincronizar,
+      );
+    }
+
+    final navegacion = NavegacionDeLaApp.desde(enlaces);
+    final pestanas = _pestanas(navegacion);
+    final actual = pestanas.contains(_actual) ? _actual : pestanas.first;
+
     return Scaffold(
       body: IndexedStack(
-        index: _pagina,
+        index: pestanas.indexOf(actual),
         children: [
-          InicioPage(alIr: _irA),
-          CitasPage(alAgendar: _abrirAgendar),
-          const DependientesPage(),
-          const PerfilPage(),
+          // Con su clave: si el administrador reordena el menú, cada
+          // pantalla conserva su estado y no el de la que estaba antes ahí.
+          for (final pantalla in pestanas)
+            KeyedSubtree(
+              key: ValueKey(pantalla),
+              child: pantalla == PantallaNativa.inicio
+                  ? InicioPage(
+                      accesos: navegacion.accesos,
+                      alAbrirEnlace: (e) => _abrirEnlace(e, pestanas),
+                      alAbrir: (p) => _abrir(p, pestanas),
+                    )
+                  : _pagina(pantalla, pestanas),
+            ),
         ],
       ),
       bottomNavigationBar: _BarraInferior(
-        pestanas: _pestanas,
-        pagina: _pagina,
-        alElegir: (pestana) {
-          if (pestana.abre != null) {
-            pestana.abre!();
-          } else {
-            setState(() => _pagina = pestana.pagina!);
-          }
-        },
+        pestanas: [
+          for (final enlace in navegacion.barra)
+            _Pestana.deEnlace(
+              enlace,
+              activa: destinoDe(enlace) == DestinoNativo(actual),
+              alTocar: () => _abrirEnlace(enlace, pestanas),
+            ),
+          _Pestana(
+            clave: const Key('pestana-perfil'),
+            etiqueta: 'Perfil',
+            icono: Icons.person_outline_rounded,
+            activa: actual == PantallaNativa.perfil,
+            alTocar: () => _abrir(PantallaNativa.perfil, pestanas),
+          ),
+        ],
       ),
     );
   }
 }
 
-/// La barra de abajo, con «Agendar» destacado en el centro.
-///
-/// Agendar es la razón de ser de la aplicación: va en el centro, más grande
-/// y con el color de la acción, al alcance del pulgar desde cualquier
-/// pestaña.
+/// Mientras llega el menú, o si no se pudo traer y no hay copia.
+class _SinMenu extends StatelessWidget {
+  final String? error;
+  final VoidCallback alReintentar;
+
+  const _SinMenu({required this.error, required this.alReintentar});
+
+  @override
+  Widget build(BuildContext context) {
+    final error = this.error;
+
+    return Scaffold(
+      backgroundColor: AppColors.fondo,
+      appBar: AppBar(actions: const [BotonCerrarSesion(), SizedBox(width: 6)]),
+      body: FondoDegradado(
+        child: ListView(
+          padding: context.margenDeScroll(superior: 40),
+          children: [
+            if (error == null)
+              const CargandoCentro(mensaje: 'Preparando tu menú…')
+            else
+              EstadoError(
+                key: const Key('sin-menu'),
+                mensaje: error,
+                alReintentar: alReintentar,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Una pestaña de la barra.
+class _Pestana {
+  final String etiqueta;
+  final IconData icono;
+
+  /// El color del administrador, o `null` para el del tema.
+  final Color? color;
+  final bool activa;
+
+  /// Agendar va destacado en la barra: es la razón de ser de la aplicación.
+  final bool destacada;
+  final VoidCallback alTocar;
+
+  /// Para encontrarla en las pruebas: `pestana-<key del enlace>`.
+  final Key clave;
+
+  const _Pestana({
+    required this.clave,
+    required this.etiqueta,
+    required this.icono,
+    required this.activa,
+    required this.alTocar,
+    this.color,
+    this.destacada = false,
+  });
+
+  factory _Pestana.deEnlace(
+    EnlaceMenu enlace, {
+    required bool activa,
+    required VoidCallback alTocar,
+  }) => _Pestana(
+    clave: Key('pestana-${enlace.key}'),
+    etiqueta: enlace.label,
+    icono: iconoDelServidor(enlace.icon),
+    color: colorDelServidor(enlace.color),
+    activa: activa,
+    destacada: destinoDe(enlace) == const DestinoNativo(PantallaNativa.agendar),
+    alTocar: alTocar,
+  );
+}
+
+/// La barra de abajo, con «Agendar» destacado si el menú lo trae.
 class _BarraInferior extends StatelessWidget {
   final List<_Pestana> pestanas;
-  final int pagina;
-  final ValueChanged<_Pestana> alElegir;
 
-  const _BarraInferior({
-    required this.pestanas,
-    required this.pagina,
-    required this.alElegir,
-  });
+  const _BarraInferior({required this.pestanas});
 
   @override
   Widget build(BuildContext context) {
@@ -257,15 +337,8 @@ class _BarraInferior extends StatelessWidget {
                 for (final pestana in pestanas)
                   Expanded(
                     child: pestana.destacada
-                        ? _BotonDestacado(
-                            pestana: pestana,
-                            onTap: () => alElegir(pestana),
-                          )
-                        : _BotonPestana(
-                            pestana: pestana,
-                            activa: pestana.pagina == pagina,
-                            onTap: () => alElegir(pestana),
-                          ),
+                        ? _BotonDestacado(key: pestana.clave, pestana: pestana)
+                        : _BotonPestana(key: pestana.clave, pestana: pestana),
                   ),
               ],
             ),
@@ -278,25 +351,21 @@ class _BarraInferior extends StatelessWidget {
 
 class _BotonPestana extends StatelessWidget {
   final _Pestana pestana;
-  final bool activa;
-  final VoidCallback onTap;
 
-  const _BotonPestana({
-    required this.pestana,
-    required this.activa,
-    required this.onTap,
-  });
+  const _BotonPestana({super.key, required this.pestana});
 
   @override
   Widget build(BuildContext context) {
-    final color = activa ? AppColors.acentoClaro : AppColors.textoSecundario;
+    final activa = pestana.activa;
+    final propio = pestana.color ?? AppColors.acentoClaro;
+    final color = activa ? propio : AppColors.textoSecundario;
 
     return Semantics(
       button: true,
       selected: activa,
       label: pestana.etiqueta,
       child: InkResponse(
-        onTap: onTap,
+        onTap: pestana.alTocar,
         radius: 36,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -306,15 +375,11 @@ class _BotonPestana extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
               decoration: BoxDecoration(
                 color: activa
-                    ? AppColors.acento.withValues(alpha: 0.14)
+                    ? propio.withValues(alpha: 0.14)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(999),
               ),
-              child: Icon(
-                activa ? pestana.iconoActivo : pestana.icono,
-                color: color,
-                size: 23,
-              ),
+              child: Icon(pestana.icono, color: color, size: 23),
             ),
             const SizedBox(height: 3),
             FittedBox(
@@ -338,17 +403,18 @@ class _BotonPestana extends StatelessWidget {
 
 class _BotonDestacado extends StatelessWidget {
   final _Pestana pestana;
-  final VoidCallback onTap;
 
-  const _BotonDestacado({required this.pestana, required this.onTap});
+  const _BotonDestacado({super.key, required this.pestana});
 
   @override
   Widget build(BuildContext context) {
+    final propio = pestana.color;
+
     return Semantics(
       button: true,
       label: pestana.etiqueta,
       child: GestureDetector(
-        onTap: onTap,
+        onTap: pestana.alTocar,
         behavior: HitTestBehavior.opaque,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -357,17 +423,18 @@ class _BotonDestacado extends StatelessWidget {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                gradient: AppGradientes.accion,
+                gradient: propio == null ? AppGradientes.accion : null,
+                color: propio,
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.acento.withValues(alpha: 0.45),
+                    color: (propio ?? AppColors.acento).withValues(alpha: 0.45),
                     blurRadius: 14,
                     offset: const Offset(0, 5),
                   ),
                 ],
               ),
-              child: Icon(pestana.icono, color: Colors.white, size: 28),
+              child: Icon(pestana.icono, color: Colors.white, size: 26),
             ),
             const SizedBox(height: 2),
             FittedBox(
@@ -375,8 +442,8 @@ class _BotonDestacado extends StatelessWidget {
               child: Text(
                 pestana.etiqueta,
                 maxLines: 1,
-                style: const TextStyle(
-                  color: AppColors.acentoClaro,
+                style: TextStyle(
+                  color: propio ?? AppColors.acentoClaro,
                   fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                 ),

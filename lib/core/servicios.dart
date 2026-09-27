@@ -21,6 +21,7 @@ import 'service/biometria_service.dart';
 import 'storage/almacen_claves.dart';
 import 'storage/cache_local.dart';
 import 'storage/credenciales_service.dart';
+import '../features/navegacion/data/menu_service.dart';
 
 /// Raíz de composición: el único lugar donde nacen los servicios.
 ///
@@ -95,6 +96,9 @@ class Servicios {
   );
 
   static final CitasService citas = CitasService(ApiClient().dio, cache);
+
+  /// El menú de la aplicación de quien entró (`/menus/mi-menu`).
+  static final MenuService menu = MenuService(ApiClient().dio, cache);
 
   static final PortalService portal = PortalService(ApiClient().dio);
 

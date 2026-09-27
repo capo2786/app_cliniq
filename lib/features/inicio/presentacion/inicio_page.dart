@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/margenes.dart';
+import '../../../core/presentacion/visual_del_servidor.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/cerrar_sesion.dart';
 import '../../../core/presentacion/widgets/estados.dart';
@@ -24,17 +25,28 @@ import '../../citas/providers/citas_event.dart';
 import '../../citas/providers/citas_state.dart';
 import '../../consultas/dominio/reglas_consultas.dart';
 import '../../consultas/providers/consultas_bloc.dart';
+import '../../navegacion/data/menu_service.dart';
+import '../../navegacion/dominio/destinos.dart';
 import 'widgets/proxima_cita.dart';
 import '../../../core/configuracion/en_contexto.dart';
 
-/// Las pestañas a las que se puede saltar desde los accesos rápidos.
-enum DestinoRapido { agendar, consultas, citas, dependientes, perfil }
-
 /// La portada: quién eres, cuál es tu próxima cita y los accesos rápidos.
+///
+/// Los accesos rápidos son los enlaces del menú del servidor que no caben en
+/// la barra de abajo, con el nombre, el icono y el color del administrador.
 class InicioPage extends StatefulWidget {
-  final ValueChanged<DestinoRapido> alIr;
+  final List<EnlaceMenu> accesos;
+  final ValueChanged<EnlaceMenu> alAbrirEnlace;
 
-  const InicioPage({super.key, required this.alIr});
+  /// Abre una pantalla de la aplicación (agendar, desde la próxima cita).
+  final ValueChanged<PantallaNativa> alAbrir;
+
+  const InicioPage({
+    super.key,
+    required this.accesos,
+    required this.alAbrirEnlace,
+    required this.alAbrir,
+  });
 
   @override
   State<InicioPage> createState() => _InicioPageState();
@@ -167,22 +179,24 @@ class _InicioPageState extends State<InicioPage> {
                                 : 'Agenda con el médico que necesites, para '
                                       'ti o para alguien a tu cargo.',
                             accion: 'Agendar una cita',
-                            alPulsar: () => widget.alIr(DestinoRapido.agendar),
+                            alPulsar: () =>
+                                widget.alAbrir(PantallaNativa.agendar),
                           )
                         else
                           TarjetaProximaCita(
                             cita: proximas.first,
                             ahora: _ahora,
                           ),
-                        const SizedBox(height: 26),
-                        const EtiquetaSeccion('Accesos rápidos'),
-                        if (usuario?.puede(Permisos.consultas) ?? false) ...[
-                          _AccesoConsultas(
-                            alAbrir: () => widget.alIr(DestinoRapido.consultas),
+                        if (widget.accesos.isNotEmpty) ...[
+                          const SizedBox(height: 26),
+                          const EtiquetaSeccion('Accesos rápidos'),
+                          _AccesosRapidos(
+                            enlaces: widget.accesos,
+                            puedeConsultas:
+                                usuario?.puede(Permisos.consultas) ?? false,
+                            alAbrir: widget.alAbrirEnlace,
                           ),
-                          const SizedBox(height: 12),
                         ],
-                        _AccesosRapidos(alIr: widget.alIr),
                         const SizedBox(height: 30),
                         const Center(
                           child: Row(
@@ -456,10 +470,12 @@ class _Dato extends StatelessWidget {
 
 /// Consultas en línea, a lo ancho y antes que los demás accesos: es la forma
 /// de hablar con un médico sin cita, y avisa cuando hay respuestas por leer.
+/// El nombre, el icono y el color son los del enlace del menú.
 class _AccesoConsultas extends StatelessWidget {
+  final EnlaceMenu enlace;
   final VoidCallback alAbrir;
 
-  const _AccesoConsultas({required this.alAbrir});
+  const _AccesoConsultas({required this.enlace, required this.alAbrir});
 
   @override
   Widget build(BuildContext context) {
@@ -478,9 +494,11 @@ class _AccesoConsultas extends StatelessWidget {
         ? (enCurso == 1 ? '1 consulta en curso' : '$enCurso consultas en curso')
         : 'Escríbele a un médico sin ir a la clínica';
 
+    final color = colorDelServidor(enlace.color) ?? AppColors.primarioClaro;
+
     return TarjetaTranslucida(
       key: const Key('acceso-consultas'),
-      tinte: AppColors.ambar,
+      tinte: color,
       onTap: alAbrir,
       padding: const EdgeInsets.all(15),
       child: Row(
@@ -489,23 +507,19 @@ class _AccesoConsultas extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.ambar.withValues(alpha: 0.14),
+              color: color.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
-              Icons.forum_outlined,
-              color: AppColors.ambar,
-              size: 23,
-            ),
+            child: Icon(iconoDelServidor(enlace.icon), color: color, size: 23),
           ),
           const SizedBox(width: 13),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Consultas en línea',
-                  style: TextStyle(
+                Text(
+                  enlace.label,
+                  style: const TextStyle(
                     color: AppColors.texto,
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
@@ -552,98 +566,125 @@ class _AccesoConsultas extends StatelessWidget {
   }
 }
 
+/// Los enlaces del menú que no caben en la barra: consultas en línea a lo
+/// ancho (con sus respuestas por leer) y los demás en una rejilla. Los que
+/// se abren en el navegador llevan su marca.
 class _AccesosRapidos extends StatelessWidget {
-  final ValueChanged<DestinoRapido> alIr;
+  final List<EnlaceMenu> enlaces;
+  final bool puedeConsultas;
+  final ValueChanged<EnlaceMenu> alAbrir;
 
-  const _AccesosRapidos({required this.alIr});
+  const _AccesosRapidos({
+    required this.enlaces,
+    required this.puedeConsultas,
+    required this.alAbrir,
+  });
+
+  static bool _esConsultas(EnlaceMenu e) =>
+      destinoDe(e) == const DestinoNativo(PantallaNativa.consultas);
 
   @override
   Widget build(BuildContext context) {
-    final accesos = [
-      (
-        DestinoRapido.agendar,
-        'Agendar',
-        'Una cita nueva',
-        Icons.add_circle_outline_rounded,
-        AppColors.acentoClaro,
-      ),
-      (
-        DestinoRapido.citas,
-        'Mis citas',
-        'Próximas e historial',
-        Icons.event_note_rounded,
-        AppColors.celeste,
-      ),
-      (
-        DestinoRapido.dependientes,
-        'Dependientes',
-        'Quienes están a tu cargo',
-        Icons.family_restroom_rounded,
-        AppColors.menta,
-      ),
-      (
-        DestinoRapido.perfil,
-        'Mi perfil',
-        'Datos y seguridad',
-        Icons.person_outline_rounded,
-        AppColors.violeta,
-      ),
+    final consultas = puedeConsultas
+        ? enlaces.where(_esConsultas).firstOrNull
+        : null;
+    final resto = [
+      for (final e in enlaces)
+        if (e != consultas) e,
     ];
 
-    return LayoutBuilder(
-      builder: (context, limites) {
-        final ancho = (limites.maxWidth - 12) / 2;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (consultas != null) ...[
+          _AccesoConsultas(
+            enlace: consultas,
+            alAbrir: () => alAbrir(consultas),
+          ),
+          const SizedBox(height: 12),
+        ],
+        LayoutBuilder(
+          builder: (context, limites) {
+            final ancho = (limites.maxWidth - 12) / 2;
 
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final (destino, titulo, descripcion, icono, color) in accesos)
-              SizedBox(
-                width: ancho,
-                child: TarjetaTranslucida(
-                  tinte: color,
-                  onTap: () => alIr(destino),
-                  padding: const EdgeInsets.all(15),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Icon(icono, color: color, size: 23),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        titulo,
-                        style: const TextStyle(
-                          color: AppColors.texto,
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        descripcion,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textoSecundario,
-                          fontSize: 11.5,
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final enlace in resto)
+                  SizedBox(
+                    width: ancho,
+                    child: _Acceso(enlace: enlace, alAbrir: alAbrir),
                   ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _Acceso extends StatelessWidget {
+  final EnlaceMenu enlace;
+  final ValueChanged<EnlaceMenu> alAbrir;
+
+  const _Acceso({required this.enlace, required this.alAbrir});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = colorDelServidor(enlace.color) ?? AppColors.primarioClaro;
+    final enElNavegador = destinoDe(enlace) is DestinoWeb;
+
+    return TarjetaTranslucida(
+      key: Key('acceso-${enlace.key}'),
+      tinte: color,
+      onTap: () => alAbrir(enlace),
+      padding: const EdgeInsets.all(15),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  iconoDelServidor(enlace.icon),
+                  color: color,
+                  size: 23,
                 ),
               ),
-          ],
-        );
-      },
+              const Spacer(),
+              if (enElNavegador)
+                const Tooltip(
+                  message: 'Se abre en el navegador',
+                  child: Icon(
+                    Icons.open_in_new_rounded,
+                    size: 16,
+                    color: AppColors.textoSecundario,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            enlace.label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.texto,
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
