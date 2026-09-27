@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../agendar/presentacion/agendar_page.dart';
 import '../../avisos/presentacion/avisos_page.dart';
 import '../../citas/presentacion/citas_page.dart';
+import '../../citas/presentacion/videoconsulta_page.dart';
 import '../../consultas/presentacion/consultas_page.dart';
 import '../../consultas/presentacion/detalle_consulta_page.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
@@ -43,8 +44,8 @@ Widget pantallaNativa(
       consultaId: destino.parametro('id'),
     ),
     PantallaNativa.perfil => const PerfilPage(),
-    PantallaNativa.videoconsulta => MuyProntoPage(
-      titulo: titulo ?? 'Videoconsulta',
+    PantallaNativa.videoconsulta => VideoconsultaPage(
+      citaId: destino.parametro('citaId'),
     ),
     PantallaNativa.avisos => AvisosPage(titulo: titulo),
     PantallaNativa.privacidad => const PrivacidadPage(),

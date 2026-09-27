@@ -1,16 +1,20 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/configuracion/config_publica_cubit.dart';
 import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/fechas/fecha_local.dart';
 import '../../../../core/integraciones/costuras.dart';
+import '../../../../core/presentacion/proveedores.dart';
 import '../../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../../core/presentacion/widgets/botones.dart';
 import '../../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
+import '../../../auth/providers/auth_bloc.dart';
 import '../../data/models/cita.dart';
 import '../../data/videollamada_service.dart';
 import '../../dominio/videoconsulta.dart';
@@ -22,10 +26,7 @@ import '../../dominio/videoconsulta.dart';
 /// (`telemedicina.minutosAntes` y `minutosDespues`). Antes se ve apagado y
 /// dice a qué hora abre la sala; después ya no se ve. Se vuelve a mirar el
 /// reloj cada 30 segundos, así el botón se enciende solo con la pantalla
-/// abierta. Al tocarlo se pide la sala al servidor y se abre en el
-/// navegador; si el servidor dice que no (409, o 503 si la videoconsulta no
-/// está configurada), se enseña su explicación con el contacto de la
-/// clínica.
+/// abierta. Con la sala abierta, entrar es [EntrarASala].
 class BotonVideoconsulta extends StatefulWidget {
   final Cita cita;
 
@@ -53,8 +54,6 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
   late final RelojClinica _reloj = widget.reloj ?? Servicios.reloj;
 
   Timer? _vigilancia;
-  bool _entrando = false;
-  String? _error;
 
   @override
   void initState() {
@@ -68,25 +67,6 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
   void dispose() {
     _vigilancia?.cancel();
     super.dispose();
-  }
-
-  Future<void> _entrar() async {
-    if (_entrando) return;
-
-    setState(() {
-      _entrando = true;
-      _error = null;
-    });
-
-    try {
-      await _servicio.unirse(widget.cita.id);
-    } on ErrorDeVideollamada catch (error) {
-      if (mounted) setState(() => _error = error.mensaje);
-    } catch (error) {
-      if (mounted) setState(() => _error = mensajeDeVideollamada(error));
-    } finally {
-      if (mounted) setState(() => _entrando = false);
-    }
   }
 
   @override
@@ -106,45 +86,135 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
       );
     }
 
-    final abierta = estado == EstadoSala.abierta;
+    if (estado == EstadoSala.abierta) {
+      return EntrarASala(
+        citaId: widget.cita.id,
+        compacto: widget.compacto,
+        servicio: _servicio,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        BotonSecundario(
+          key: const Key('boton-videoconsulta'),
+          texto: 'Entrar a la videoconsulta',
+          icono: Icons.videocam_outlined,
+          color: AppColors.violeta,
+          onPressed: null,
+        ),
+        const SizedBox(height: 8),
+        NotaDeVideo(
+          icono: Icons.lock_clock_outlined,
+          texto:
+              '${cuandoAbreLaSala(widget.cita, ahora, ventana)} '
+              '$avisoPermisosDeVideo',
+        ),
+      ],
+    );
+  }
+}
+
+/// El botón que entra a la sala de una cita, con lo que hace falta saber:
+/// los permisos, si no hay red, si se abrió en el navegador integrado (el
+/// respaldo) y, si el servidor dijo que no, su explicación con el contacto
+/// de la clínica.
+///
+/// La sala se pide al servidor al tocarlo: él decide si la cita es de quien
+/// entra y si la sala está abierta (409) o configurada (503). Entra con el
+/// nombre de quien tiene la sesión y el asunto con el nombre de la clínica.
+class EntrarASala extends StatefulWidget {
+  final String citaId;
+  final bool compacto;
+  final ServicioVideollamada? servicio;
+
+  const EntrarASala({
+    super.key,
+    required this.citaId,
+    this.compacto = false,
+    this.servicio,
+  });
+
+  @override
+  State<EntrarASala> createState() => _EntrarASalaState();
+}
+
+class _EntrarASalaState extends State<EntrarASala> {
+  late final ServicioVideollamada _servicio =
+      widget.servicio ?? Servicios.videollamada;
+
+  bool _entrando = false;
+  bool _enElNavegador = false;
+  String? _error;
+
+  Future<void> _entrar() async {
+    if (_entrando) return;
+
+    final nombre = context.leerSiHay<AuthBloc>()?.usuario?.nombre ?? '';
+    final clinica = context.read<ConfigPublicaCubit>().config.clinica.nombre;
+
+    setState(() {
+      _entrando = true;
+      _enElNavegador = false;
+      _error = null;
+    });
+
+    try {
+      final donde = await _servicio.unirse(
+        widget.citaId,
+        nombreVisible: nombre,
+        asunto: asuntoDeLaSala(clinica),
+      );
+      if (mounted) {
+        setState(() => _enElNavegador = donde == SalaAbierta.enElNavegador);
+      }
+    } on ErrorDeVideollamada catch (error) {
+      if (mounted) setState(() => _error = error.mensaje);
+    } catch (error) {
+      if (mounted) setState(() => _error = mensajeDeVideollamada(error));
+    } finally {
+      if (mounted) setState(() => _entrando = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final error = _error;
 
     return ConRed(
       builder: (context, hayRed) => Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (abierta)
-            BotonPrincipal(
-              key: const Key('boton-videoconsulta'),
-              texto: 'Entrar a la videoconsulta',
-              icono: Icons.videocam_rounded,
-              cargando: _entrando,
-              textoCargando: 'Abriendo la sala…',
-              alto: widget.compacto ? 50 : 56,
-              onPressed: hayRed ? _entrar : null,
-            )
-          else
-            BotonSecundario(
-              key: const Key('boton-videoconsulta'),
-              texto: 'Entrar a la videoconsulta',
-              icono: Icons.videocam_outlined,
-              color: AppColors.violeta,
-              onPressed: null,
-            ),
-          const SizedBox(height: 8),
-          _Nota(
-            icono: abierta ? Icons.mic_none_rounded : Icons.lock_clock_outlined,
-            texto: !hayRed && abierta
-                ? 'Sin conexión: para entrar a la videoconsulta necesitas '
-                      'Internet.'
-                : abierta
-                ? avisoPermisosDeVideo
-                : '${cuandoAbreLaSala(widget.cita, ahora, ventana)} '
-                      '$avisoPermisosDeVideo',
+          BotonPrincipal(
+            key: const Key('boton-videoconsulta'),
+            texto: 'Entrar a la videoconsulta',
+            icono: Icons.videocam_rounded,
+            cargando: _entrando,
+            textoCargando: 'Abriendo la sala…',
+            alto: widget.compacto ? 50 : 56,
+            onPressed: hayRed ? _entrar : null,
           ),
-          if (_error != null) ...[
+          const SizedBox(height: 8),
+          NotaDeVideo(
+            icono: Icons.mic_none_rounded,
+            texto: hayRed
+                ? avisoPermisosDeVideo
+                : 'Sin conexión: para entrar a la videoconsulta necesitas '
+                      'Internet.',
+          ),
+          if (_enElNavegador) ...[
             const SizedBox(height: 10),
-            RecuadroAviso.error(_error!),
+            const RecuadroAviso.alerta(
+              avisoVideoEnElNavegador,
+              icono: Icons.open_in_browser_rounded,
+            ),
+          ],
+          if (error != null) ...[
+            const SizedBox(height: 10),
+            RecuadroAviso.error(error),
             const SizedBox(height: 4),
             const ContactoClinica(),
           ],
@@ -154,11 +224,12 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
   }
 }
 
-class _Nota extends StatelessWidget {
+/// Una nota pequeña bajo el botón, con su icono.
+class NotaDeVideo extends StatelessWidget {
   final IconData icono;
   final String texto;
 
-  const _Nota({required this.icono, required this.texto});
+  const NotaDeVideo({super.key, required this.icono, required this.texto});
 
   @override
   Widget build(BuildContext context) {

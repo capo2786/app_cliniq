@@ -5,6 +5,7 @@ import '../features/avisos/data/avisos_service.dart';
 import '../features/auth/data/almacen_de_sesion.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/citas/data/citas_service.dart';
+import '../features/citas/data/sala_jitsi.dart';
 import '../features/citas/data/videollamada_service.dart';
 import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
@@ -69,15 +70,18 @@ class Servicios {
 
   // ── Costuras de terceros ───────────────────────────────────────────
   /*
-   * Lo que depende de un tercero. La videollamada ya está enchufada: abre
-   * la sala de Jitsi de la clínica en el navegador. Los avisos push y los
-   * pagos siguen apagados; enchufar el de verdad es cambiar la línea
-   * correspondiente: todo lo demás se escribió contra la interfaz.
+   * Lo que depende de un tercero. La videollamada ya está enchufada: entra
+   * a la sala de Jitsi de la clínica dentro de la aplicación, con el SDK
+   * oficial (y, si el SDK no está o falla, en el navegador integrado). Los
+   * avisos push y los pagos siguen apagados; enchufar el de verdad es
+   * cambiar la línea correspondiente: todo lo demás se escribió contra la
+   * interfaz.
    */
   static const ServicioPush push = PushApagado();
 
-  static final ServicioVideollamada videollamada = VideollamadaEnNavegador(
+  static final ServicioVideollamada videollamada = VideollamadaEnLaApp(
     VideollamadaService(ApiClient().dio),
+    sala: SalaJitsi(),
   );
 
   static const ServicioPagos pagos = PagosNoDisponibles();

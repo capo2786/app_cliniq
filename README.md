@@ -26,6 +26,8 @@ la aplicación salen del mismo cálculo, portado línea a línea.
 | Dart SDK | ^3.13.4 |
 | Java | 17 (compilación de Android) |
 | Xcode | Solo para compilar iOS |
+| Android | 7.0 (API 24) o posterior: lo pide el SDK de video |
+| iOS | 15.1 o posterior: lo pide el SDK de video |
 
 Con [FVM](https://fvm.app) instalado, `fvm use` deja la versión correcta.
 
@@ -165,6 +167,12 @@ antes de tocarla.
 | `open_filex` | Abrir un PDF recibido con el visor del teléfono |
 | `path_provider` | La carpeta temporal privada donde se guarda ese PDF (se borra al cerrar sesión) |
 
+### Videoconsulta
+
+| Paquete | Para qué |
+| --- | --- |
+| `jitsi_meet_flutter_sdk` ^13.2.0 | El SDK oficial de Jitsi: la sala de la videoconsulta dentro de la aplicación, con el token del servidor. Solo Android (API 24+) e iOS (15.1+); en la web, el navegador |
+
 ### Fechas y recordatorios
 
 | Paquete | Para qué |
@@ -185,12 +193,20 @@ incompatible y `pub get` no resuelve.
 
 **Android** (`android/app/src/main/AndroidManifest.xml`): `INTERNET`,
 `USE_BIOMETRIC`, `POST_NOTIFICATIONS` y `RECEIVE_BOOT_COMPLETED`, más el
-receptor que reprograma los recordatorios tras reiniciar el teléfono. El
-identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
+receptor que reprograma los recordatorios tras reiniciar el teléfono, y
+`CAMERA` y `RECORD_AUDIO` para la videoconsulta. El identificador es
+`ec.cliniq.sage.app` y el nombre visible, «Cliniq».
 
-- **Adjuntos sin permisos nuevos.** La cámara se abre con la aplicación de
-  cámara del teléfono (intento `IMAGE_CAPTURE`), así que **no** se declara
-  `CAMERA`: si se declarara, Android exigiría concederlo antes. La galería
+- **Videoconsulta (SDK de Jitsi).** Lo que pide el README de
+  `jitsi_meet_flutter_sdk`: `minSdk` 24 (`maxOf(flutter.minSdkVersion, 24)`
+  en `android/app/build.gradle.kts`), `tools:replace="android:label"` en
+  `<application>` (el SDK trae su propio `android:label`) y las reglas de R8
+  del SDK en `android/app/proguard-rules.pro`, que Flutter agrega solo a la
+  versión publicada (sin ellas la sala se cierra en release). El SDK baja sus
+  bibliotecas nativas del repositorio Maven de Jitsi, que agrega él mismo.
+- **Adjuntos.** La cámara se abre con la aplicación de cámara del teléfono
+  (intento `IMAGE_CAPTURE`); como la videoconsulta declara `CAMERA`, Android
+  exige concederlo antes, e `image_picker` lo pide la primera vez. La galería
   usa el selector de fotos del sistema y los PDF el de documentos, que solo
   entregan lo elegido.
 - `open_filex` trae en su manifiesto `READ_EXTERNAL_STORAGE` y
@@ -217,9 +233,16 @@ identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   ese archivo se firma con la clave de depuración.
 
 **iOS** (`ios/Runner/Info.plist`): descripciones de uso de Face ID
-(`NSFaceIDUsageDescription`), de la cámara (`NSCameraUsageDescription`) y de
-la fototeca (`NSPhotoLibraryUsageDescription`), en español, y solo
-orientación vertical en teléfono. El
+(`NSFaceIDUsageDescription`), de la cámara (`NSCameraUsageDescription`: la
+videoconsulta y las fotos de los adjuntos), del micrófono
+(`NSMicrophoneUsageDescription`: la videoconsulta) y de la fototeca
+(`NSPhotoLibraryUsageDescription`), en español, y solo orientación vertical
+en teléfono. La plataforma mínima es **iOS 15.1** (`platform :ios, '15.1'` en
+`ios/Podfile` e `IPHONEOS_DEPLOYMENT_TARGET` del proyecto): lo pide el SDK de
+Jitsi. Tras cambiar dependencias, `cd ios && pod install --repo-update`.
+Compartir pantalla desde la sala necesitaría una extensión de difusión
+(Broadcast Upload Extension) que no está configurada: una videoconsulta no la
+necesita. El
 identificador es `ec.cliniq.sage.app`. El `AppDelegate` se registra como delegado
 del centro de notificaciones para que los recordatorios se vean también con
 la aplicación abierta.
@@ -685,12 +708,25 @@ congelada de la cita contra la hora de la clínica y vuelto a mirar cada 30
 segundos (`lib/features/citas/dominio/videoconsulta.dart`). El servidor
 vuelve a decidir con su 409.
 
-Al tocarlo se pide `GET /portal/citas/:id/videollamada` y se abre la `url`
-firmada de la sala en el **navegador del teléfono** (`url_launcher`, modo
-externo): el navegador ya sabe pedir la cámara y el micrófono, y una nota lo
-avisa. Un 409 (la sala todavía no abre o ya cerró) o un 503 (la
-videoconsulta no está configurada) enseñan el mensaje del servidor, con el
-teléfono y el correo de la clínica.
+Al tocarlo se pide `GET /portal/citas/:id/videollamada` (dominio, sala y
+token firmado) y se entra **dentro de la aplicación** con el SDK oficial de
+Jitsi (`jitsi_meet_flutter_sdk`): servidor `https://<dominio>`, la sala, el
+token, el nombre de quien tiene la sesión y el asunto «Videoconsulta ·
+<clínica>». El SDK pide la cámara y el micrófono, y una nota lo avisa. Un
+409 (la sala todavía no abre o ya cerró) o un 503 (la videoconsulta no está
+configurada) enseñan el mensaje del servidor, con el teléfono y el correo de
+la clínica.
+
+**Respaldo.** Si el SDK no está (la web) o falla, recién ahí se abre la `url`
+firmada de la sala en el navegador integrado (`LaunchMode.inAppBrowserView`),
+y la pantalla lo avisa. El SDK va detrás de una interfaz (`SalaDeVideo`, en
+`videollamada_service.dart`; la de verdad es `SalaJitsi`, en
+`sala_jitsi.dart`, el único archivo que lo conoce), así que las pruebas
+entran a una sala de mentira, sin plataforma.
+
+Los avisos y enlaces a `/portal/videoconsulta/:citaId` abren la pantalla de
+la videoconsulta: la tarjeta de la cita y el botón de siempre; si la cita no
+está entre las de la persona, se ofrece entrar igual y el servidor decide.
 
 ## Sin conexión
 
@@ -731,11 +767,11 @@ Los avisos push (Firebase), la videollamada y los pagos dependen de un
 tercero. Cada uno tiene su interfaz en `lib/core/integraciones/costuras.dart`
 y una versión apagada (`PushApagado`, `VideollamadaNoDisponible`,
 `PagosNoDisponibles`); `Servicios` decide cuál se usa. La videollamada ya
-está enchufada: `VideollamadaEnNavegador`
+está enchufada: `VideollamadaEnLaApp`
 (`lib/features/citas/data/videollamada_service.dart`) pide la sala de Jitsi de
-la clínica y la abre en el navegador. Los avisos push y los pagos siguen
-apagados; enchufarlos es cambiar esa línea: el cierre de sesión ya llama a
-`olvidarEsteTelefono`.
+la clínica y entra con el SDK dentro de la aplicación (ver «Videoconsulta»).
+Los avisos push y los pagos siguen apagados; enchufarlos es cambiar esa
+línea: el cierre de sesión ya llama a `olvidarEsteTelefono`.
 
 ## Icono y arranque
 
@@ -799,7 +835,7 @@ fvm flutter test
 | `detalle_consulta_bloc_test.dart` | Cargar, el sondeo con latidos inyectados (la lista primero, el detalle solo si cambió), escribir con archivo y cancelar |
 | `cancelar_consulta_test.dart` | La hoja para cancelar: motivo obligatorio, contador y tope de 500 caracteres |
 | `campo_dinamico_test.dart` | Cada tipo de pregunta y el visor de imágenes |
-| `videoconsulta_test.dart` | La ventana de la sala de la configuración (y la pastilla «Sala abierta»), pedirla, abrirla fuera y los 409/503 |
+| `videoconsulta_test.dart` | La ventana de la sala de la configuración (y la pastilla «Sala abierta»), pedirla, entrar con el SDK (servidor, sala, token, nombre y asunto), el respaldo en el navegador integrado si el SDK no está o falla, los 409/503, el botón y la pantalla de `/portal/videoconsulta/:citaId` |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |
 | `recorrido_consultas_test.dart` | Videoconsulta, consultas en línea de punta a punta y retomar un borrador, también con el texto agrandado |
 
@@ -816,8 +852,10 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
 ## Pendientes
 
 - **Probar en teléfonos de verdad**: huella, recordatorios, arranque, icono,
-  la cámara, la galería, abrir un PDF y la videoconsulta en el navegador.
-  Ninguna compilación de Android o iOS se ha hecho todavía.
+  la cámara (ahora pide permiso la primera vez), la galería, abrir un PDF, el
+  navegador integrado y la videoconsulta con el SDK de Jitsi (Android e iOS,
+  en debug y en release). Ninguna compilación de Android o iOS se ha hecho
+  todavía.
 - **Avisos push y pagos**: enchufar las costuras. Sin push, la respuesta del
   médico a una consulta llega por correo y se ve al abrir la aplicación.
 - **Mi salud**: los adjuntos de las atenciones cerradas

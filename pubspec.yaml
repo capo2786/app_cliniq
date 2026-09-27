@@ -44,6 +44,11 @@ dependencies:
   open_filex: ^4.7.0
   path_provider: ^2.1.6
 
+  # La videoconsulta dentro de la aplicación: el SDK oficial de Jitsi, con
+  # la sala y el token que da el servidor. Pide Android 24+ e iOS 15.1+
+  # (ver «Configuración nativa» en el README).
+  jitsi_meet_flutter_sdk: ^13.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -84,8 +84,21 @@ String cuandoAbreLaSala(Cita cita, DateTime ahora, VentanaDeSala ventana) {
   return 'La sala abre $cuando, $margen.';
 }
 
-/// El aviso de siempre antes de entrar: el navegador va a pedir permisos.
+/// El aviso de siempre antes de entrar: la sala se abre dentro de la
+/// aplicación, que va a pedir los permisos.
 const String avisoPermisosDeVideo =
-    'Se abrirá en el navegador del teléfono, que te pedirá permiso para usar '
-    'la cámara y el micrófono: acéptalo para que el médico te vea y te '
-    'escuche.';
+    'La videoconsulta se abre aquí mismo, en la aplicación, que te pedirá '
+    'permiso para usar la cámara y el micrófono: acéptalo para que el médico '
+    'te vea y te escuche.';
+
+/// Cuando el SDK de video no está o falló y la sala se abrió en el navegador
+/// integrado (el respaldo).
+const String avisoVideoEnElNavegador =
+    'No pudimos abrir la videoconsulta dentro de la aplicación, así que la '
+    'abrimos en el navegador integrado. Acepta ahí los permisos de la cámara '
+    'y el micrófono.';
+
+/// El asunto de la sala: lleva el nombre de la clínica.
+String asuntoDeLaSala(String clinica) => clinica.trim().isEmpty
+    ? 'Videoconsulta'
+    : 'Videoconsulta · ${clinica.trim()}';
