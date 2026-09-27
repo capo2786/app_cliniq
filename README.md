@@ -79,7 +79,7 @@ arranca con valores inventados.**
 
 | Qué | De dónde | Dónde se usa |
 | --- | --- | --- |
-| Nombre, eslogan y logotipo de la clínica | `GET /configuracion/publica` → `clinica.nombre`, `eslogan`, `logo` (data URL; sin él, el logotipo de marca) | Acceso, arranque, inicio, perfil, legales, cerrar sesión, título |
+| Nombre, eslogan y logotipo de la clínica | `GET /configuracion/publica` → `clinica.nombre`, `eslogan`, `logo` (la dirección absoluta de `GET /configuracion/logo?v=…`, que sale de MinIO; se baja una vez y queda guardada en el teléfono; de un servidor anterior, un data URL; sin él, el logotipo de marca) | Acceso, arranque, inicio, perfil, legales, cerrar sesión, título |
 | Colores de la marca | `clinica.colorPrimario`, `colorAcento` (sin ellos, los tokens de siempre) | El tema entero (`PaletaMarca`) |
 | Teléfono y correo | `clinica.telefono`, `correoContacto` | Cada «comunícate con la clínica», para tocar (`tel:`, `mailto:`) |
 | Número de emergencias | `clinica.telefonoEmergencia` | Consulta nueva |
@@ -122,6 +122,17 @@ campo que falta o no tiene la forma esperada descarta la respuesta entera
 (se sigue con la copia buena). Los colores de la marca son los únicos
 opcionales, porque el contrato dice que sin ellos van los tokens actuales.
 
+**El logotipo** (`LogoClinicaService`, `LogoDeLaClinica`) se pide sin la
+sesión a la dirección de `clinica.logo` y se guarda en la caché cifrada como
+dato de la clínica (`configuracion:logo`, sobrevive al cierre de sesión). La
+dirección lleva la huella corta del archivo (`?v=`): mientras no cambie, no
+se vuelve a bajar. Sin red, el último guardado, aunque sea el anterior; sin
+ninguno, el de marca. Mientras se baja por primera vez se ve el hueco, no el
+de marca un instante. Una dirección que no es absoluta (`https://…`) o un
+texto que no es un data URL de imagen se toman como «sin logotipo». El
+servidor arma la dirección con `API_URL_PUBLICA`: si queda en `localhost`,
+el teléfono no la alcanza y se ve el de marca.
+
 **Lo que sigue en el código, a propósito** (§8 del contrato): los códigos del
 sistema y su lógica (estados, modalidades, tipos de documento), las rutas de
 la API y las rutas del panel que la aplicación sabe abrir, los límites de
@@ -160,7 +171,16 @@ antes de tocarla.
 | `local_auth` | Entrar con huella o rostro |
 | `package_info_plus` | Versión instalada, en el pie del acceso y del perfil |
 | `url_launcher` | Abrir en el navegador integrado (`LaunchMode.inAppBrowserView`: Chrome Custom Tabs o Safari encima de la aplicación) el registro, el panel web y los enlaces externos del menú; llamar o escribir a la clínica (`tel:`, `mailto:`) |
-| `flutter_svg` | Pintar el logotipo de la clínica cuando llega en SVG (`clinica.logo`) |
+| `flutter_svg` | Pintar el logotipo de la clínica cuando es un SVG (`clinica.logo`) |
+
+### Recetas y certificados firmados en PDF
+
+| Paquete | Para qué |
+| --- | --- |
+| `pdfx` ^2.11.0 | Ver el PDF firmado **dentro de la aplicación** (`PdfViewPinch`: páginas una bajo otra, se amplían con los dedos). Usa el lector de PDF del propio sistema (`PdfRenderer` en Android, PDFKit en iOS): nada se abre en otra aplicación ni en el navegador |
+| `flutter_file_dialog` ^3.3.3 | «Guardar en el teléfono»: el diálogo del sistema para elegir dónde (en Android, el de documentos; en iOS, el de Archivos). Sin permisos de almacenamiento |
+| `share_plus` ^13.3.0 | «Compartir»: la hoja de compartir del sistema, solo si la persona la pide |
+| `crypto` | La huella sha256 del PDF: con ella se nombra la copia del teléfono y se comprueba que es el documento firmado |
 
 ### Adjuntos de las consultas en línea
 
@@ -168,7 +188,7 @@ antes de tocarla.
 | --- | --- |
 | `image_picker` | Tomar una foto o elegirla de la galería. La reduce en el propio teléfono (2560 px de lado, calidad 85): de 5–8 MB a menos de uno y medio, sin librerías de imagen en Dart |
 | `file_selector` | Elegir un PDF o una imagen guardada (paquete oficial de Flutter, sin permisos) |
-| `open_filex` | Abrir un PDF recibido con el visor del teléfono |
+| `open_filex` | Abrir un PDF recibido en una consulta o un ticket con el visor del teléfono (los PDF firmados de Mi salud no: esos se ven dentro de la aplicación) |
 | `path_provider` | La carpeta temporal privada donde se guarda ese PDF (se borra al cerrar sesión) |
 
 ### Videoconsulta
@@ -220,6 +240,11 @@ El identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   `http`/`https` (el navegador integrado), `tel:` y `mailto:` (llamar o
   escribir a la clínica), `IMAGE_CAPTURE` (cámara) y `application/pdf`
   (visor).
+- **PDF firmados.** No piden nada nuevo: `pdfx` usa el `PdfRenderer` del
+  sistema, «Guardar en el teléfono» el diálogo de documentos
+  (`ACTION_CREATE_DOCUMENT`, sin permiso de almacenamiento) y «Compartir»
+  el `FileProvider` que trae `share_plus` en su manifiesto.
+  `flutter_file_dialog` pide `minSdk` 24, que es el de Flutter.
 
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
@@ -247,7 +272,11 @@ micrófono a la página sin que esta vuelva a preguntar. El `post_install` del
 `Podfile` enciende en `permission_handler` solo `PERMISSION_CAMERA` y
 `PERMISSION_MICROPHONE` (sin ellas, iOS los da por negados sin preguntar).
 Tras cambiar dependencias, `cd ios && pod install --repo-update` (el
-`Podfile.lock` del repositorio está atrasado). El
+`Podfile.lock` del repositorio está atrasado); `pdfx`, `share_plus` y
+`flutter_file_dialog` piden iOS 13 o menos, por debajo del 15.1 del
+proyecto, y ninguno necesita una clave nueva en `Info.plist` (la carpeta de
+documentos de la aplicación no se comparte con Archivos: no hay
+`UIFileSharingEnabled`). El
 identificador es `ec.cliniq.sage.app`. El `AppDelegate` se registra como delegado
 del centro de notificaciones para que los recordatorios se vean también con
 la aplicación abierta.
@@ -371,7 +400,8 @@ lib/
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
     dependientes/             personas a cargo, con la validación de cédula
     perfil/                   datos personales y clínicos, seguridad, documentos
-    mi_salud/                 la historia clínica que ve el paciente, recetas y órdenes
+    mi_salud/                 la historia clínica que ve el paciente: recetas, órdenes,
+                              certificados de reposo, la firma electrónica y el visor de PDF
     ayuda/                    centro de ayuda: búsqueda, categorías y artículos en Markdown nativo
     soporte/                  mis tickets, ticket nuevo y la conversación con soporte
 test/                         pruebas (ver abajo)
@@ -455,7 +485,8 @@ de la campana y los enlaces de los textos (`abrirRuta`, en
 | `/portal/arco`, `/privacidad/solicitudes` | Mis derechos sobre mis datos |
 | `/portal/encuesta/:citaId` | La encuesta de la cita |
 | `/legal/:slug` | El documento legal |
-| `/mi-salud`, `/ayuda`, `/soporte`, `/soporte/tickets/:id` | «Muy pronto», hasta que lleguen sus pantallas |
+| `/mi-salud` | Mi salud (también desde los avisos «Tu receta está lista» y «Tu certificado de reposo está listo») |
+| `/ayuda`, `/soporte`, `/soporte/tickets/:id` | El centro de ayuda, soporte y el ticket |
 
 La consulta y el fragmento de la ruta se ignoran. Una ruta del menú que la
 aplicación no sabe abrir no se enseña (ni en la barra ni en los accesos); un
@@ -490,7 +521,9 @@ de cada pestaña.
 - **Al tocar un aviso** queda leído (`PATCH /notificaciones/:id/leida`) y su
   `enlace` se abre con el enrutador: una pestaña cierra la lista y la
   enseña; lo demás se abre encima. Si el enlace no es del paciente
-  (`/admin/...`), se queda en la lista y lo dice.
+  (`/admin/...`), se queda en la lista y lo dice. Los de una receta o un
+  certificado firmados («Tu receta está lista», «Tu certificado de reposo
+  está listo») llevan a `/mi-salud` y abren Mi salud.
 
 ## Mis derechos sobre mis datos (ARCO)
 
@@ -726,10 +759,11 @@ red se enseña esa copia; sin copia, el error con «Reintentar».
 
 - **Mi salud** (`GET /portal/mi-salud`, `?pacienteId=` para un dependiente):
   la ficha con las alergias, el embarazo en curso, las últimas mediciones y,
-  por consulta, diagnósticos, indicaciones, recetas, órdenes y adjuntos.
-  Cada receta y orden se abre en su pantalla (`/portal/recetas/:id`,
-  `/portal/ordenes/:id`) con su código de verificación. Las fechas clínicas
-  son hora congelada.
+  por consulta, diagnósticos, indicaciones, recetas, órdenes, certificados
+  de reposo y adjuntos. Cada receta, orden y certificado se abre en su
+  pantalla (`/portal/recetas/:id`, `/portal/ordenes/:id`,
+  `/portal/certificados/:id`) con su código de verificación. Las fechas
+  clínicas son hora congelada. Ver «Recetas y certificados firmados».
 - **Centro de ayuda** (`GET /ayuda?q=`): el servidor busca; sin red se busca
   con la misma regla sobre la copia. El Markdown del artículo se pinta con
   widgets (párrafos, títulos, negrita, listas y enlaces). Un enlace nunca
@@ -743,6 +777,61 @@ red se enseña esa copia; sin copia, el error con «Reintentar».
   panel. Los mensajes solo traen el id del adjunto: el nombre y el tipo
   salen de las cabeceras de la misma descarga; una imagen se ve en el visor
   de la aplicación y un PDF, con el visor del teléfono.
+
+## Recetas y certificados firmados
+
+El médico firma la receta o el certificado de reposo en su equipo, con su
+certificado `.p12` (que nunca sale de ahí), y el servidor guarda el PDF
+firmado en MinIO con su sha256. La aplicación lee de cada documento
+`firmado`, `pdfDisponible` y `firma` (quién firmó —el nombre del
+certificado—, cuándo, el emisor y la huella del PDF).
+
+- **Certificado de reposo** (`CertificadoPage`): los días en número y en
+  letras, desde y hasta (días sueltos; sin `fechaHasta`, desde + días − 1),
+  reposo absoluto o relativo, la contingencia, la modalidad de la atención
+  (con el nombre de su catálogo), a quién va dirigido, las recomendaciones,
+  quién lo emitió y el código de verificación. **El diagnóstico aparece solo
+  si el servidor lo manda y el certificado no lo reserva**
+  (`mostrarDiagnostico`); si lo reserva, «Diagnóstico reservado», como en el
+  PDF. Los códigos (`tipoReposo`, `contingencia`, `destinatario`) son del
+  sistema y se nombran en `dominio/reglas_mi_salud.dart`.
+- **Entrega al firmar:** si la clínica entrega los documentos al firmar
+  (`clinico.entregarDocumentosAlFirmar`), Mi salud trae también la consulta
+  todavía abierta (`enCurso`) con lo ya firmado y sin contenido clínico: se
+  marca «En curso» y lo explica.
+- **La firma:** en la lista, la pastilla «Firmada electrónicamente» /
+  «Firmado electrónicamente»; en el documento, el sello «Firmado
+  electrónicamente por <nombre> el <día> a las <hora>» (el instante real,
+  en la hora de la clínica) con el emisor del certificado. Una reserva en
+  curso (`EN_CURSO`) no es una firma y no se enseña.
+- **«Ver PDF»**, solo con `pdfDisponible` y si el documento no está anulado:
+  abajo en la receta y el certificado (en la `BarraDeAccion`) y en su fila
+  de Mi salud. Abre `VisorPdfPage`, que baja
+  `GET /portal/{recetas|certificados}/:id/pdf` con la sesión y lo pinta
+  **dentro de la aplicación** con `pdfx`. Nunca otra aplicación ni el
+  navegador. Abajo, «Guardar en el teléfono» (el diálogo del sistema) y
+  «Compartir» (la hoja del sistema), con un nombre legible («Receta
+  UC7F6DB5UU.pdf»).
+- **La copia en el teléfono** (`DocumentosPdfService`): cada PDF bajado se
+  guarda en la carpeta de documentos de la aplicación,
+  `cliniq_documentos/<tipo>_<id>_<sha256>.pdf`. El servidor nunca regenera
+  un PDF firmado, así que la copia sirve siempre: con la huella del
+  documento se abre la copia sin pedir nada; sin red, la última copia de
+  ese documento, y la pantalla lo dice. Lo que se baja tiene que empezar
+  como un PDF y, si se conoce la huella, coincidir con ella; si no, no se
+  guarda ni se enseña. Cada copia se comprueba al abrirla contra la huella
+  de su nombre, y una dañada se borra.
+- **Se borran al cerrar sesión (y al vencer la sesión).** Es una decisión:
+  son datos de salud y el teléfono puede ser compartido, igual que las
+  citas y los adjuntos descargados. Con ellos se borra lo que ver, guardar
+  o compartir deja en la carpeta temporal (la copia con nombre legible, la
+  que `share_plus` hace en Android y las páginas que `pdfx` pinta en
+  Android). Lo que la persona guardó en el teléfono con «Guardar en el
+  teléfono», o compartió, ya es suyo y no se toca. Al volver a entrar, el
+  PDF se baja de nuevo la primera vez. En iOS la carpeta de documentos
+  entra en la copia de seguridad del teléfono (iCloud) mientras la sesión
+  sigue abierta; si la clínica no lo quiere, la alternativa es la carpeta
+  de soporte de la aplicación marcada fuera de la copia.
 
 ## Videoconsulta
 
@@ -843,10 +932,14 @@ cita no está entre las de la persona, se entra igual y el servidor decide.
 - Durante quince segundos después de una caída, `CorteRapidoSinRed` corta las
   peticiones sin esperar el plazo: la pantalla cae a lo guardado al
   instante.
+- Los PDF firmados de recetas y certificados quedan en la carpeta de
+  documentos de la aplicación y se abren sin red (ver «Recetas y
+  certificados firmados»). El logotipo de la clínica, en la caché cifrada
+  con el prefijo `configuracion`.
 - Al cerrar sesión se borra lo de la persona (citas, consultas,
-  dependientes, el menú, archivos descargados, recordatorios) y se conservan
-  la configuración, los catálogos y los documentos legales, que son de la
-  clínica.
+  dependientes, el menú, archivos descargados, los PDF firmados,
+  recordatorios) y se conservan la configuración, el logotipo, los
+  catálogos y los documentos legales, que son de la clínica.
 
 ## Recordatorios
 
@@ -900,12 +993,16 @@ fvm flutter test
 | Archivo | Qué fija |
 | --- | --- |
 | `configuracion_test.dart` | `GET /configuracion/publica`: pública, copia sin red, sin copia no hay valores, lectura estricta, la zona horaria |
+| `logo_clinica_test.dart` | `clinica.logo` como dirección absoluta (y el data URL de antes; lo demás, el de marca), bajarlo sin la sesión, la copia de la clínica que sobrevive al cierre de sesión, la dirección nueva, sin red, lo que no es imagen, y cómo se pinta |
+| `documentos_pdf_test.dart` | El PDF firmado: la descarga con la sesión, la copia por tipo, id y huella, abrirla sin pedir nada, sin red, la huella que no coincide, lo que no es PDF, la copia dañada, la versión nueva, el borrado al cerrar sesión (también lo temporal), el error del servidor en bytes; el visor con dobles: pintar dentro de la aplicación, guardar, compartir, sin conexión y «Reintentar» |
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
 | `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
 | `privacidad_test.dart` | ARCO: el servicio y su copia, el detalle y sus límites, vencida, el orden, el plazo en palabras, los derechos activos del catálogo, el plazo de la configuración, la lista, el vacío, el error y la solicitud nueva (y su rechazo) |
 | `encuestas_test.dart` | Las pendientes como citas, su copia, responder (comentario, 409), el aviso del inicio y su texto, la encuesta (formulario, no disponible, sin lista, lo que falta, gracias, la siguiente, ya respondida, el error del servidor), la pantalla y el aviso en el tablero |
-| `avisos_test.dart` | La campana: el servicio y su copia, el contador (encendido, latidos, en segundo plano, sin red, apagado), la lista (leer, leer todos, borrar y deshacer, ver más), la fecha relativa, la pantalla y la campana en el tablero según el menú |
+| `avisos_test.dart` | La campana: el servicio y su copia, el contador (encendido, latidos, en segundo plano, sin red, apagado), la lista (leer, leer todos, borrar y deshacer, ver más), la fecha relativa, la pantalla, «Tu receta está lista» que abre Mi salud y la campana en el tablero según el menú |
+| `mi_salud_test.dart` | Mi salud: la lectura (también los certificados de reposo y la firma, en sus dos formas), el embarazo, los nombres de los códigos, la copia sin red por persona, el cubit y el documento |
+| `mi_salud_page_test.dart` | La pantalla y el detalle de la receta, la orden y el certificado: la firma, «Ver PDF» (desde el documento y desde su fila), el diagnóstico reservado o autorizado, anulado, sin firma o sin PDF |
 | `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
 | `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |
@@ -956,6 +1053,28 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
   la cámara (ahora pide permiso la primera vez), la galería, abrir un PDF, el
   navegador integrado y la videoconsulta (Android e iOS, en debug y en
   release). Ninguna compilación de Android o iOS se ha hecho todavía.
+- **Recetas y certificados firmados, en el teléfono** (Android e iOS, con
+  una receta y un certificado firmados desde el panel):
+  - «Ver PDF» abre el PDF dentro de la aplicación, bajo la cabecera de
+    Cliniq: ninguna otra aplicación, ni el navegador, ni una tarea nueva en
+    las recientes de Android; se amplía con los dedos, se pasa de página y
+    con más de una se ve «Página 1 de 2»;
+  - en modo avión, el que ya se abrió una vez se vuelve a abrir (con el
+    aviso de la copia) y uno que nunca se abrió dice «Sin conexión…» con
+    «Reintentar»;
+  - «Guardar en el teléfono» abre el diálogo del sistema (Descargas o
+    Drive en Android; Archivos en iOS) con el nombre «Receta <código>.pdf»,
+    el archivo guardado se abre con el lector del teléfono y conserva la
+    firma (Adobe Reader la muestra en el sello);
+  - «Compartir» abre la hoja del sistema (WhatsApp, correo) con el mismo
+    nombre; en iPad, la hoja sale junto al botón;
+  - al cerrar sesión desaparecen `cliniq_documentos/` y, en Android,
+    `cache/share_plus`, `cache/pdf_renderer_cache` y
+    `cache/cliniq_compartir` (con `adb shell run-as ec.cliniq.sage.app ls`);
+  - el aviso «Tu receta está lista» abre Mi salud;
+  - el logotipo de la clínica llega por su dirección, sigue después de
+    cerrar sesión y en modo avión, y al cambiarlo en el panel se ve el nuevo
+    al volver a abrir la aplicación.
 - **Videoconsulta, en el teléfono** (Android e iOS, debug y release, con el
   médico entrando desde el panel web):
   - al tocar «Entrar», la ventana se abre encima de la cita y el sistema
