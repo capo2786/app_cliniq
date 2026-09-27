@@ -121,8 +121,8 @@ class DestinoNativo extends DestinoDeEnlace {
 }
 
 /// Una página de fuera (un enlace `EXTERNO` del menú, que puso el
-/// administrador). Se abre en el navegador integrado, sin salir de la
-/// aplicación.
+/// administrador). Se abre en la pantalla de páginas web de la aplicación
+/// (un WebView bajo la cabecera de Cliniq), sin salir de ella.
 class DestinoWeb extends DestinoDeEnlace {
   final String url;
 
@@ -224,8 +224,9 @@ final RegExp _contacto = RegExp(r'^(tel|mailto):', caseSensitive: false);
 ///
 /// - `LINK`: una ruta del sistema abre su pantalla; una que el enrutador no
 ///   conoce no se muestra.
-/// - `EXTERNO`: la dirección que puso el administrador, en el navegador
-///   integrado; `tel:` y `mailto:`, con el marcador o el correo.
+/// - `EXTERNO`: la dirección que puso el administrador, en la pantalla de
+///   páginas web de la aplicación; `tel:` y `mailto:`, con el marcador o el
+///   correo.
 DestinoDeEnlace? destinoDe(EnlaceMenu enlace) {
   final ruta = enlace.route.trim();
 

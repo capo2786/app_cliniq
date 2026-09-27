@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/config/entorno.dart';
 import '../../../core/network/errores.dart';
 import '../../../core/storage/credenciales_service.dart';
 import '../data/almacen_de_sesion.dart';
@@ -16,10 +15,11 @@ import 'auth_state.dart';
 const String avisoSesionVencida =
     'Tu sesión venció. Vuelve a iniciar sesión para continuar.';
 
-/// Lo que se dice cuando entra alguien del personal de la clínica.
+/// Lo que se dice cuando entra alguien del personal de la clínica. Debajo
+/// va la dirección del panel, para copiarla (no se abre desde aquí).
 const String avisoSoloPacientes =
     'Esta aplicación es para pacientes. El personal de la clínica usa el '
-    'panel web: ${Entorno.webUrl}';
+    'panel web desde una computadora, en esta dirección:';
 
 /// La sesión: entrar, el segundo factor, restaurar, vencer y salir.
 ///

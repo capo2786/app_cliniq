@@ -18,14 +18,14 @@ class Entorno {
     defaultValue: 'https://api-cliniq.gcaicedo-proyectos.com/api',
   );
 
-  /// Dónde vive el panel web. La aplicación solo lo abre (en el navegador
-  /// integrado) para el autorregistro y para el personal que entra por error.
+  /// Dónde vive el panel web. La aplicación no lo abre: su dirección se
+  /// enseña, para copiarla, al personal que entra por error, y es el dominio
+  /// de los enlaces de los correos que abren la aplicación
+  /// (`/confirmar-correo`, `/restablecer`). Si cambia, cambian también el
+  /// dominio de los App Links (AndroidManifest.xml) y de los Universal Links
+  /// (Runner.entitlements).
   static const String webUrl = String.fromEnvironment(
     'WEB_URL',
     defaultValue: 'https://cliniq.gcaicedo-proyectos.com',
   );
-
-  /// El autorregistro de pacientes, en el panel web: la aplicación no copia
-  /// ese formulario (cédula, términos, confirmación por correo), lo abre.
-  static String get urlRegistro => '$webUrl/registro';
 }

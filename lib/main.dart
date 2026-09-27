@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -30,6 +31,7 @@ import 'features/dependientes/providers/dependientes_bloc.dart';
 import 'features/encuestas/providers/encuestas_cubit.dart';
 import 'features/inicio/presentacion/dashboard_page.dart';
 import 'features/legal/presentacion/aceptacion_legal_page.dart';
+import 'features/navegacion/presentacion/receptor_de_enlaces.dart';
 import 'features/navegacion/providers/menu_cubit.dart';
 
 /*
@@ -74,7 +76,10 @@ void main() {
     // de sin conexión se va solo cuando vuelve.
     Servicios.red.vigilar();
 
-    runApp(const CliniqApp());
+    // Los enlaces de los correos (confirmar el correo, crear la contraseña
+    // nueva) abren la aplicación: App Links y Universal Links. El primero
+    // —el que abrió la aplicación— llega al empezar a escuchar.
+    runApp(CliniqApp(enlacesEntrantes: AppLinks().uriLinkStream));
   }, (error, pila) => registrarFallo('el arranque', error, pila));
 }
 
@@ -119,7 +124,11 @@ void repintarTodo() {
 /// (agendar, una consulta nueva) crea el suyo para cargar datos frescos en
 /// cada visita.
 class CliniqApp extends StatelessWidget {
-  const CliniqApp({super.key});
+  /// Los enlaces de los correos que abren la aplicación (`app_links`). Sin
+  /// ellos —en las pruebas—, no se escucha ninguno.
+  final Stream<Uri>? enlacesEntrantes;
+
+  const CliniqApp({super.key, this.enlacesEntrantes});
 
   @override
   Widget build(BuildContext context) {
@@ -200,7 +209,12 @@ class CliniqApp extends StatelessWidget {
                 navigatorObservers: [observadorDeRutas],
                 builder: (context, hijo) =>
                     CerrarTecladoAlTocarFuera(child: hijo ?? const SizedBox()),
-                home: const EsperaDatosDeLaClinica(child: PuertaDeEntrada()),
+                home: EsperaDatosDeLaClinica(
+                  child: ReceptorDeEnlaces(
+                    enlaces: enlacesEntrantes,
+                    child: const PuertaDeEntrada(),
+                  ),
+                ),
               ),
             ),
       ),

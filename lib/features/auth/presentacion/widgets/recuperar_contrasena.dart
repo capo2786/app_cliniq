@@ -30,10 +30,11 @@ Future<void> mostrarRecuperarContrasena(
 /// Pedir un enlace para crear una contraseña nueva.
 ///
 /// La API responde siempre lo mismo, exista o no el correo, para no revelar
-/// quién tiene cuenta. El enlace llega al correo y abre la página web de la
-/// clínica, donde se escribe la contraseña nueva; la aplicación no necesita
-/// hacer nada más. Vence en los minutos que diga la configuración
-/// (`seguridad.resetMinutos`).
+/// quién tiene cuenta. El enlace llega al correo: abierto en el teléfono,
+/// abre la aplicación en la pantalla de la contraseña nueva
+/// (`RestablecerPage`, por App Links o Universal Links); en una
+/// computadora, la página del panel. Vence en los minutos que diga la
+/// configuración (`seguridad.resetMinutos`).
 class _RecuperarContrasena extends StatefulWidget {
   final String correoInicial;
   final AuthService servicio;

@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/network/api_interceptor.dart';
+import 'models/datos_registro.dart';
 import 'models/usuario.dart';
 
 /// Lo que puede pasar al enviar correo y contraseña (o el código).
@@ -114,6 +116,48 @@ class AuthService {
         : mensajeReenvioNeutral;
   }
 
+  /// `POST /auth/registro` (pública): crea la cuenta de un paciente, que
+  /// queda sin confirmar hasta que abra el enlace que le llega al correo.
+  ///
+  /// El API valida lo mismo que la pantalla y responde 400 con el motivo, 409
+  /// si el correo o el documento ya tienen cuenta y 429 si desde la misma
+  /// conexión se crearon demasiadas en una hora: esos mensajes se enseñan
+  /// tal cual.
+  Future<void> registrar(DatosRegistro datos) async {
+    await _dio.post<dynamic>(
+      '/auth/registro',
+      data: datos.aJson(),
+      options: Options(extra: const {rutaPublica: true}),
+    );
+  }
+
+  /// `POST /auth/registro/confirmar` (pública): el enlace del correo de
+  /// registro. Devuelve el mensaje del servidor. Un enlace vencido o ya
+  /// usado es un 400.
+  Future<String> confirmarCorreo(String token) async {
+    final respuesta = await _dio.post<dynamic>(
+      '/auth/registro/confirmar',
+      data: {'token': token},
+      options: Options(extra: const {rutaPublica: true}),
+    );
+
+    return _mensajeDe(respuesta.data) ?? mensajeCorreoConfirmado;
+  }
+
+  /// `POST /auth/password/restablecer` (pública): la contraseña nueva con el
+  /// enlace que llegó al correo. El API revisa el mínimo de la clínica antes
+  /// de gastar el enlace; uno vencido o ya usado es un 400.
+  Future<void> restablecerContrasena({
+    required String token,
+    required String nueva,
+  }) async {
+    await _dio.post<dynamic>(
+      '/auth/password/restablecer',
+      data: {'token': token, 'newPassword': nueva},
+      options: Options(extra: const {rutaPublica: true}),
+    );
+  }
+
   /// `GET /auth/me`: el perfil vigente, con permisos y legales pendientes.
   Future<Usuario> yo() async {
     final respuesta = await _dio.get<dynamic>('/auth/me');
@@ -168,6 +212,16 @@ class AuthService {
     return yo();
   }
 }
+
+/// El `message` de una respuesta, si trae uno legible.
+String? _mensajeDe(Object? datos) {
+  final mensaje = datos is Map ? datos['message']?.toString().trim() : null;
+  return mensaje == null || mensaje.isEmpty ? null : mensaje;
+}
+
+/// Si el servidor confirma el correo sin decir nada.
+const String mensajeCorreoConfirmado =
+    'Confirmamos tu correo. Ya puedes ingresar con tu correo y tu contraseña.';
 
 /// Lo que se dice tras pedir otro enlace de confirmación, llegue o no.
 const String mensajeReenvioNeutral =

@@ -47,8 +47,9 @@ const Set<PantallaNativa> pantallasDePestana = {
 /// lleva el nombre, el icono y el color que eligió el administrador. Una
 /// ruta del sistema abre su pantalla (ver el enrutador en
 /// `navegacion/dominio/destinos.dart`); una que la aplicación no sabe abrir
-/// no se enseña, y un enlace externo se abre en el navegador integrado:
-/// nada saca a la persona de la aplicación.
+/// no se enseña, y un enlace externo se abre en la pantalla de páginas web
+/// de la aplicación (un WebView bajo la cabecera de Cliniq): nada saca a la
+/// persona de la aplicación.
 ///
 /// Aquí nacen también las cargas de todo lo que comparten las pestañas
 /// —citas, consultas en línea, dependientes, el menú y la campana de
@@ -193,7 +194,7 @@ class _DashboardPageState extends State<DashboardPage>
       case final DestinoNativo destino:
         _abrir(destino, titulo: enlace.label);
       case DestinoWeb(:final url):
-        unawaited(abrirEnlace(context, url, queEs: '«${enlace.label}»'));
+        unawaited(abrirPaginaWeb(context, url, titulo: enlace.label));
       case DestinoContacto(:final direccion):
         unawaited(abrirContacto(context, direccion));
       case null:
