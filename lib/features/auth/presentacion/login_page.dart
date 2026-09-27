@@ -10,7 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/app/version_instalada.dart';
 import '../../../core/config/entorno.dart';
 import '../../../core/network/errores.dart';
-import '../../../core/presentacion/enlaces.dart';
+import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/widgets/barra_de_accion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/campos.dart';
@@ -845,6 +845,9 @@ class _SinCuenta extends StatelessWidget {
 }
 
 /// Entró alguien del personal: esta aplicación no es para su cuenta.
+///
+/// Se dice dónde está el panel web, como texto para copiar: la aplicación
+/// no lo abre (el panel es para una computadora, no para esta pantalla).
 class _SoloPacientes extends StatelessWidget {
   const _SoloPacientes();
 
@@ -885,18 +888,51 @@ class _SoloPacientes extends StatelessWidget {
               ),
             ],
           ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              key: const Key('boton-panel-web'),
-              onPressed: () =>
-                  abrirEnlace(context, Entorno.webUrl, queEs: 'el panel web'),
-              icon: const Icon(Icons.open_in_new_rounded, size: 17),
-              label: const Text('Abrir el panel web'),
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.acentoSuave,
+          const SizedBox(height: 10),
+          const _DireccionDelPanel(),
+        ],
+      ),
+    );
+  }
+}
+
+/// La dirección del panel web, para leerla o copiarla. No es un enlace.
+class _DireccionDelPanel extends StatelessWidget {
+  const _DireccionDelPanel();
+
+  Future<void> _copiar(BuildContext context) async {
+    await Clipboard.setData(const ClipboardData(text: Entorno.webUrl));
+    if (context.mounted) mostrarAviso(context, 'Dirección copiada.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+      decoration: BoxDecoration(
+        color: AppColors.campo,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.bordeCampo),
+      ),
+      child: Row(
+        children: [
+          const Expanded(
+            child: SelectableText(
+              Entorno.webUrl,
+              key: Key('direccion-panel-web'),
+              style: TextStyle(
+                color: AppColors.texto,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
+          ),
+          IconButton(
+            key: const Key('copiar-panel-web'),
+            tooltip: 'Copiar la dirección',
+            icon: const Icon(Icons.copy_rounded, size: 19),
+            color: AppColors.textoSecundario,
+            onPressed: () => _copiar(context),
           ),
         ],
       ),

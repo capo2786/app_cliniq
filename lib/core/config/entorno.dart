@@ -18,9 +18,8 @@ class Entorno {
     defaultValue: 'https://api-cliniq.gcaicedo-proyectos.com/api',
   );
 
-  /// Dónde vive el panel web. La aplicación solo lo abre (en el navegador
-  /// integrado) para el personal que entra por error: el registro de
-  /// pacientes es una pantalla propia (`RegistroPage`).
+  /// Dónde vive el panel web. La aplicación no lo abre: su dirección se
+  /// enseña, para copiarla, al personal que entra por error.
   static const String webUrl = String.fromEnvironment(
     'WEB_URL',
     defaultValue: 'https://cliniq.gcaicedo-proyectos.com',

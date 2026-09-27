@@ -16,6 +16,7 @@ import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
 import 'package:app_cliniq/features/legal/data/legal_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -185,16 +186,39 @@ void main() {
     await tocar(tester, find.byKey(const Key('boton-entrar')));
 
     expect(bloc.state, isA<AuthCuentaDelPersonal>());
+    expect(find.text(avisoSoloPacientes), findsOneWidget);
+
+    // La dirección del panel es texto para copiar, no un enlace.
+    final direccion = find.byKey(const Key('direccion-panel-web'));
+    expect(direccion, findsOneWidget);
     expect(
-      find.text(
-        'Esta aplicación es para pacientes. El personal de la clínica usa el '
-        'panel web: https://cliniq.gcaicedo-proyectos.com',
+      tester.widget<SelectableText>(direccion).data,
+      'https://cliniq.gcaicedo-proyectos.com',
+    );
+    expect(find.byKey(const Key('boton-panel-web')), findsNothing);
+
+    final copiado = <String>[];
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (llamada) async {
+        if (llamada.method == 'Clipboard.setData') {
+          copiado.add((llamada.arguments as Map)['text'] as String);
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
       ),
-      findsOneWidget,
     );
 
-    await tocar(tester, find.byKey(const Key('boton-panel-web')));
-    expect(navegador.abiertas, ['https://cliniq.gcaicedo-proyectos.com']);
+    await tocar(tester, find.byKey(const Key('copiar-panel-web')));
+
+    expect(copiado, ['https://cliniq.gcaicedo-proyectos.com']);
+    expect(find.text('Dirección copiada.'), findsOneWidget);
+    expect(navegador.abiertas, isEmpty);
   });
 
   testWidgets('correo sin confirmar: reenviar el enlace y esperar un minuto '
