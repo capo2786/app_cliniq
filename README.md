@@ -2,11 +2,17 @@
 
 Aplicación móvil de Cliniq para pacientes. Quien tiene cuenta en la clínica
 agenda sus citas —y las de las personas a su cargo— sin llamar, las cancela o
-reprograma con tiempo, recibe recordatorios un día y una hora antes, y ve sus
-citas guardadas aunque se quede sin cobertura en la sala de espera. Además,
-le escribe a un médico sin cita (**consultas en línea**, con fotos y PDF, y
-respuesta en menos de 48 horas) y entra desde el teléfono a la
-**videoconsulta** de sus citas de telemedicina.
+reprograma con tiempo, recibe los recordatorios que la clínica tenga
+encendidos, y ve sus citas guardadas aunque se quede sin cobertura en la sala
+de espera. Además, le escribe a un médico sin cita (**consultas en línea**,
+con fotos y documentos, y respuesta en el plazo que fije la clínica) y entra
+desde el teléfono a la **videoconsulta** de sus citas de telemedicina.
+
+**Todo lo de negocio lo administra la clínica** desde el panel web: el
+nombre, el logotipo y los colores, las reglas de las citas, los plazos, los
+textos de los recordatorios, las listas de los formularios, los documentos
+legales y el menú. La aplicación no trae ninguno escrito ni listas de
+respaldo (ver «Lo que administra la clínica»).
 
 Consume la API `api-cliniq` (gateway NestJS con prefijo `/api` y JWT) y sigue
 las mismas reglas que el panel web `dashboard-cliniq`: los horarios que ofrece
@@ -59,6 +65,64 @@ La configuración vive en `lib/core/config/entorno.dart`.
 lleva excepciones de tráfico en claro. Para probar contra un backend local por
 HTTP (en el emulador), hay que agregar una excepción temporal y no subirla.
 
+## Lo que administra la clínica
+
+La regla es del dueño del producto: nada de negocio escrito en la aplicación.
+Todo sale de la API, que lo toma de lo que se configura en el panel
+(Administración › Configuración, Catálogos, Documentos legales y Menú). Sin
+red se usa la última copia descargada; **sin copia, la aplicación lo dice
+(«No pudimos cargar los datos de la clínica…») y ofrece «Reintentar»: nunca
+arranca con valores inventados.**
+
+| Qué | De dónde | Dónde se usa |
+| --- | --- | --- |
+| Nombre, eslogan y logotipo de la clínica | `GET /configuracion/publica` → `clinica.nombre`, `eslogan`, `logo` (data URL; sin él, el logotipo de marca) | Acceso, arranque, inicio, perfil, legales, cerrar sesión, título |
+| Colores de la marca | `clinica.colorPrimario`, `colorAcento` (sin ellos, los tokens de siempre) | El tema entero (`PaletaMarca`) |
+| Teléfono y correo | `clinica.telefono`, `correoContacto` | Cada «comunícate con la clínica», para tocar (`tel:`, `mailto:`) |
+| Número de emergencias | `clinica.telefonoEmergencia` | Consulta nueva |
+| Zona horaria | `clinica.zonaHoraria` | El reloj de la clínica, los instantes y los recordatorios |
+| Horas para cancelar o reprogramar | `agenda.horasMinimasCambio` | Detalle de la cita, resumen del agendamiento |
+| Recordatorios | `agenda.recordatoriosActivos`, `recordatorio24h`, `recordatorio1h`, `recordatorioInicio` | Se programan solo los encendidos; apagados, se cancelan |
+| Rejilla de horarios | `agenda.pasoMinutos`, `minutosAnticipacionReserva`, `diasHorizonteReserva`, `horaInicioTarde`, `horaInicioNoche`, `duracionPresencial/Telemedicina/Asincrona` | Agendar |
+| Ventana de la sala de video | `telemedicina.minutosAntes`, `minutosDespues` | Botón de la videoconsulta, «Sala abierta» |
+| Consultas en línea | `telemedicina.horasRespuesta`, `diasSeguimiento`, `maxArchivosConsulta` | Textos y tope de archivos |
+| Archivos | `archivos.tamanoMaximoMb`, `archivos.tipos` | Selectores y validación antes de subir |
+| Seguridad | `seguridad.passwordMinimo`, `bloqueoMinutos`, `otpMinutos`, `resetMinutos`, `reenvioSegundos` | Acceso, código, recuperación, cambiar contraseña |
+| Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes |
+| Modalidades (nombre, descripción, color, icono) | `GET /catalogos/lote` → `MODALIDAD_CITA` | Citas, agendar |
+| Cómo prepararse | `PREPARACION_CITA` (`<MODALIDAD>_<n>`) | Detalle, próxima cita, agendar, recordatorios |
+| Estados de citas y consultas | `ESTADO_CITA`, `ESTADO_CONSULTA` | Pastillas y explicaciones |
+| Motivos para cancelar | `MOTIVO_CANCELACION_PACIENTE` | Cancelar una cita |
+| Parentescos | `PARENTESCO_DEPENDIENTE` (dependientes), `PARENTESCO` (contacto de emergencia) | Formularios |
+| Especialidades y ciudades | `ESPECIALIDAD`, `CIUDAD` | Orden de los filtros de agendar |
+| Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios y perfil |
+| Documentos legales | `GET /legal/documentos` (clave, slug, versión, título) y `mis-aceptaciones` | Aceptación y perfil; se abren en `https://<web>/legal/<slug>` |
+| Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil») y los accesos rápidos |
+
+La configuración, los catálogos y los documentos legales son públicos (se
+piden sin token, antes de entrar) y se guardan como datos de la clínica: se
+conservan al cerrar sesión. El menú depende de los permisos de quien entró y
+se guarda por persona. La configuración y los catálogos se piden al abrir la
+aplicación y cada vez que vuelve al frente; si cambian los colores de la
+marca, la aplicación se vuelve a pintar, y si cambian las reglas de los
+recordatorios, se reprograman.
+
+La lectura de la configuración es estricta con lo que la aplicación usa: un
+campo que falta o no tiene la forma esperada descarta la respuesta entera
+(se sigue con la copia buena). Los colores de la marca son los únicos
+opcionales, porque el contrato dice que sin ellos van los tokens actuales.
+
+**Lo que sigue en el código, a propósito** (§8 del contrato): los códigos del
+sistema y su lógica (estados, modalidades, tipos de documento), las rutas de
+la API y las rutas del panel que la aplicación sabe abrir, los límites de
+longitud que espejan validadores (500 caracteres del motivo, 4000 de un
+mensaje, 6 dígitos del código), la verificación de tipos de archivo por su
+contenido, el cálculo de la cédula (módulo 10), los colores que no son de la
+marca (fondos, estados, textos) y las URL de despliegue (`API_URL`,
+`WEB_URL`). También el rótulo «Portal del paciente», el nombre y el icono
+instalados de la aplicación («Cliniq», que el sistema lee del paquete) y el
+arranque nativo, que se generan al compilar.
+
 ## Dependencias
 
 Todas se resuelven con `pub get`. Se listan aquí para saber qué aporta cada una
@@ -77,7 +141,7 @@ antes de tocarla.
 | Paquete | Para qué |
 | --- | --- |
 | `flutter_secure_storage` | Llavero: sesión, perfil guardado, credenciales de la huella y la clave de la caché |
-| `hive_ce_flutter` | Caché cifrada: citas, dependientes y catálogos para abrir sin conexión |
+| `hive_ce_flutter` | Caché cifrada: la configuración, los catálogos, los documentos legales, el menú, las citas y los dependientes para abrir sin conexión |
 
 ### Dispositivo y seguridad
 
@@ -85,7 +149,8 @@ antes de tocarla.
 | --- | --- |
 | `local_auth` | Entrar con huella o rostro |
 | `package_info_plus` | Versión instalada, en el pie del acceso y del perfil |
-| `url_launcher` | Abrir en el navegador los documentos legales, el registro, el panel web y la sala de la videoconsulta |
+| `url_launcher` | Abrir en el navegador los documentos legales, el registro, el panel web, los enlaces del menú sin pantalla propia y la sala de la videoconsulta; llamar o escribir a la clínica (`tel:`, `mailto:`) |
+| `flutter_svg` | Pintar el logotipo de la clínica cuando llega en SVG (`clinica.logo`) |
 
 ### Adjuntos de las consultas en línea
 
@@ -101,8 +166,8 @@ antes de tocarla.
 | Paquete | Para qué |
 | --- | --- |
 | `intl`, `flutter_localizations` | Español en los selectores de fecha del sistema |
-| `flutter_local_notifications` ^22.3.0 | Recordatorios 24 h y 1 h antes de cada cita |
-| `timezone` | Programa cada aviso en la hora de Ecuador (`America/Guayaquil`) |
+| `flutter_local_notifications` ^22.3.0 | Los recordatorios de cada cita que la clínica tenga encendidos |
+| `timezone` | La zona de la clínica (`clinica.zonaHoraria`): la hora de la clínica y la de cada aviso |
 
 Son las mismas versiones que usa UCEBell: por debajo de la 22,
 `flutter_local_notifications` arrastra un plugin de Windows con un `xml`
@@ -129,7 +194,8 @@ identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   su carpeta privada) y que Google Play restringe: se quitan con
   `tools:node="remove"`.
 - `<queries>` declara lo que se abre fuera: `http`/`https` (navegador,
-  videoconsulta), `IMAGE_CAPTURE` (cámara) y `application/pdf` (visor).
+  videoconsulta), `tel:` y `mailto:` (llamar o escribir a la clínica),
+  `IMAGE_CAPTURE` (cámara) y `application/pdf` (visor).
 
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
@@ -193,9 +259,15 @@ Son las de UCEBell, con los colores de Cliniq:
 - **Las fechas de la API** pasan siempre por `lib/core/fechas/fecha_local.dart`
   (ver abajo). Un `DateTime.parse` suelto sobre una fecha de la API es un
   error.
+- **Nada de negocio escrito.** Una regla, un número, una lista o un texto
+  que la clínica pueda querer cambiar se lee de la configuración o de un
+  catálogo: en una pantalla, `context.config` y `context.catalogos`
+  (`lib/core/configuracion/en_contexto.dart`); en un bloc, por su
+  constructor; en una regla pura, por parámetro. Sin datos no se inventan:
+  se dice y se ofrece «Reintentar».
 - **El estado vive en blocs**; las páginas pintan y despachan eventos. Los
-  blocs que comparten las pestañas (sesión, citas, dependientes, catálogos)
-  se crean en `main.dart`; una pantalla que se abre por navegación
+  blocs que comparten las pestañas (configuración, catálogos, sesión, citas,
+  consultas, dependientes y menú) se crean en `main.dart`; una pantalla que se abre por navegación
   (agendar, perfil) crea el suyo para cargar datos frescos en cada visita.
 - **El relleno inferior de una lista** sale de `context.margenDeScroll(...)`
   (`lib/core/presentacion/margenes.dart`), que descuenta la barra de
@@ -204,6 +276,11 @@ Son las de UCEBell, con los colores de Cliniq:
   y las reglas puras de un módulo van en `dominio/`.
 
 ### Los colores
+
+Los de la marca (primario, acento y sus tonos) salen de la configuración de
+la clínica (`PaletaMarca`, `lib/core/tema/paleta_marca.dart`) y por eso son
+getters, no constantes; los valores de la tabla son los de siempre, los que
+se usan si la clínica no configuró los suyos. Los demás sí son constantes.
 
 | Token | Valor | Papel |
 | --- | --- | --- |
@@ -228,26 +305,30 @@ lib/
   main.dart                   arranque protegido, blocs compartidos y la puerta de entrada
   core/
     arranque/                 que un fallo al arrancar se vea
-    catalogos/                MOTIVO_CANCELACION, ESPECIALIDAD, PARENTESCO (con valores de partida)
-    config/entorno.dart       API_URL, WEB_URL, zona horaria
+    catalogos/                los catálogos de la clínica, completos y sin valores de partida
+    config/entorno.dart       API_URL, WEB_URL
+    configuracion/            la configuración pública de la clínica: modelo, servicio, cubit
     archivos/                 adjuntos: ArchivoMeta, validación antes de subir, selectores y descargas
     fechas/fecha_local.dart   la hora «congelada» de la API y el reloj de la clínica
+    fechas/zona_clinica.dart  la zona horaria de la configuración
     fechas/instante.dart      los instantes reales (consultas, mensajes, archivos) en la hora de la clínica
     formato/fechas.dart       cómo se enseñan las fechas
     integraciones/costuras.dart  push, videollamada y pagos: interfaces (la videollamada ya enchufada)
     network/                  ApiClient, interceptores, mensajeDeError
     notificaciones/           recordatorios locales de citas
-    presentacion/             márgenes, avisos, enlaces, el observador de rutas y los widgets base
+    presentacion/             márgenes, avisos, enlaces, el observador de rutas, los widgets base,
+                              el contacto y el logotipo de la clínica, iconos y colores del servidor
     red/                      el sondeo de la red y el cartel de sin conexión
     storage/                  llavero, credenciales y caché cifrada
-    tema/                     tokens y tema de Material
+    tema/                     tokens, la paleta de la marca y el tema de Material
     servicios.dart            la raíz de composición
   features/
-    arranque/                 la pantalla mientras se restaura la sesión
+    arranque/                 la espera de los datos de la clínica y de la sesión
     auth/                     acceso, segundo factor, recuperación, sesión
-    legal/                    aceptación de documentos
+    legal/                    documentos legales de la API y su aceptación
+    navegacion/               el menú del servidor y a dónde lleva cada enlace
     inicio/                   el inicio y la barra de pestañas
-    citas/                    mis citas, detalle, cancelar, la regla de las 12 horas y la videoconsulta
+    citas/                    mis citas, detalle, cancelar, las horas para cambiar y la videoconsulta
     consultas/                consultas en línea: lista, consulta nueva paso a paso y detalle con la conversación
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
     dependientes/             personas a cargo, con la validación de cédula
@@ -258,8 +339,10 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
 
 ## Pantallas
 
-1. **Arranque.** Mientras se restaura la sesión guardada se ve el logotipo
-   sobre el mismo fondo del arranque nativo. La sesión se confirma con
+1. **Arranque.** Primero, los datos de la clínica: con una copia guardada se
+   pasa enseguida; la primera vez se espera la respuesta y, sin red, se dice
+   con «Reintentar». Mientras se restaura la sesión guardada se ve el
+   logotipo sobre el mismo fondo del arranque nativo. La sesión se confirma con
    `GET /auth/me` (con plazo corto): la respuesta trae los documentos legales
    pendientes, y si la clínica publicó una versión nueva hay que pasar por la
    aceptación antes que por el inicio. Sin red se entra igual con el perfil
@@ -267,24 +350,24 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
 2. **Acceso.** Ver «Pantalla de acceso».
 3. **Aceptación legal.** Si `legalPendientes` no está vacío, bloquea todo lo
    demás. Cada documento tiene su botón «Leer», que abre
-   `https://cliniq.gcaicedo-proyectos.com/legal/<slug>`, y su casilla; «Aceptar y continuar»
+   `https://cliniq.gcaicedo-proyectos.com/legal/<slug>` con el slug de la
+   API, y su casilla; «Aceptar y continuar»
    se enciende cuando están todas marcadas, manda `POST /legal/aceptar` y
    relee `/auth/me`. La otra salida es cerrar sesión.
 4. **Inicio.** El saludo sobre el degradado de bienvenida; «Tu próxima cita»
    con la hoja de calendario, la hora, el médico, la modalidad, la cuenta
-   regresiva y cómo prepararse según la modalidad (presencial: llegar 10
-   minutos antes con la cédula y los exámenes; telemedicina: conectarse 5
-   minutos antes desde un lugar privado; asíncrona: tener los exámenes a
-   mano) —el día de una cita de telemedicina, con el botón de la
-   videoconsulta—, y los accesos rápidos: «Consultas en línea» a lo ancho,
-   con las respuestas del médico por leer, y Agendar, Mis citas,
-   Dependientes y Mi perfil.
+   regresiva y cómo prepararse según la modalidad (los consejos de
+   `PREPARACION_CITA`) —el día de una cita de telemedicina, con el botón de
+   la videoconsulta—, y los accesos rápidos: los enlaces del menú que no
+   caben en la barra; «Consultas en línea», si está entre ellos, a lo ancho y
+   con las respuestas del médico por leer.
 5. **Citas.** Próximas e Historial; las de un dependiente llevan «Para
    <nombre>». El detalle se abre en una hoja inferior con «Reprogramar» (el
    agendamiento en modo reprogramar, con el mismo médico y la misma
-   modalidad) y «Cancelar cita» (motivo del catálogo y detalle opcional).
-   Con menos de 12 horas por delante, las dos acciones desaparecen y se
-   explica por qué. Las de telemedicina traen «Entrar a la videoconsulta»
+   modalidad) y «Cancelar cita» (motivo de `MOTIVO_CANCELACION_PACIENTE` y
+   detalle opcional). Con menos de las horas de la clínica por delante, las
+   dos acciones desaparecen y se explica por qué, con su teléfono y su
+   correo. Las de telemedicina traen «Entrar a la videoconsulta»
    (ver «Videoconsulta»).
 6. **Agendar.** Un paso por pantalla: para quién (con «Agregar dependiente»),
    filtros de especialidad, ciudad y modalidad, el médico (modalidades,
@@ -296,24 +379,33 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
    hora ya no está libre, se vuelve a elegir. El botón «atrás» vuelve un paso,
    no tira lo elegido.
 7. **Dependientes.** Lista, alta y edición con validación: nombre, parentesco
-   (catálogo), fecha de nacimiento (no futura), documento (cédula con módulo
-   10, o pasaporte), sexo, tipo de sangre y datos clínicos. Quitar pregunta
+   (`PARENTESCO_DEPENDIENTE`), fecha de nacimiento (no futura), documento
+   (cédula —con módulo 10 si la clínica lo pide— o pasaporte), sexo, tipo de
+   sangre (con las etiquetas de sus catálogos) y datos clínicos. Quitar pregunta
    antes; con citas pendientes el servidor lo impide y la aplicación lo dice.
 8. **Perfil.** Datos personales y clínicos, con edición de lo que la API deja
    cambiar a uno mismo (el correo y la cédula se cambian en la clínica);
    cambiar contraseña, verificación en dos pasos, acceso con huella,
-   documentos aceptados con su enlace, cerrar sesión y la versión.
+   documentos aceptados con su enlace, los documentos legales vigentes de la
+   clínica, cerrar sesión y la versión.
 9. **Consultas en línea.** Ver «Consultas en línea».
 10. **Recordatorios.** Ver «Recordatorios».
 11. **Sin conexión.** Ver «Sin conexión».
 
-La barra de abajo tiene Inicio, Citas, **Agendar** (en el centro, destacado),
-Dependientes y Perfil. Agendar no cambia de pestaña: abre el agendamiento
-encima y al volver se sigue donde se estaba.
+La barra de abajo la arma el menú del servidor (`GET
+/menus/mi-menu?plataforma=APP`): los cuatro primeros enlaces por su orden,
+con el nombre, el icono y el color del administrador, más **Perfil**, que
+siempre está; el resto va a los accesos rápidos del inicio. Una ruta que la
+aplicación conoce (`/inicio`, `/mis-citas`, `/portal/agendar`,
+`/portal/dependientes`, `/portal/consultas`) abre su pantalla; una que no,
+`https://<web><ruta>` en el navegador. Agendar va destacado y no cambia de
+pestaña: abre el agendamiento encima. El menú se guarda para abrir sin red;
+sin copia, un aviso con «Reintentar».
 
 ## Pantalla de acceso
 
-Replica la de UCEBell: el logotipo de verdad —el mismo del icono—, la tarjeta
+Replica la de UCEBell: el logotipo y el nombre de la clínica —sin logotipo
+propio, el de marca, el mismo del icono—, su eslogan, la tarjeta
 de **vidrio** que desenfoca el fondo, el contenido que **sube al abrir**, cada
 campo con su icono en una pastilla y el **anillo de foco terracota**, y un
 solo botón con el degradado de la marca. Al pie, la **versión instalada**.
@@ -324,9 +416,9 @@ solo botón con el degradado de la marca. Al pie, la **versión instalada**.
 - **Verificación en dos pasos.** Si la cuenta la tiene, la API contesta
   `{requiere2fa, desafio, destino}` y la misma tarjeta pasa al paso del
   código de seis dígitos (`POST /auth/login/2fa`).
-- **Cuenta bloqueada.** Cinco intentos fallidos en quince minutos la cierran
-  otros quince (HTTP 423). Se explica con el texto del servidor —que dice
-  cuántos minutos faltan— y se ofrece recuperar la contraseña.
+- **Cuenta bloqueada.** Varios intentos fallidos la cierran unos minutos
+  (HTTP 423; cuántos, `seguridad.bloqueoMinutos`). Se explica con el texto
+  del servidor y se ofrece recuperar la contraseña.
 - **Sesión vencida.** La API no tiene token de renovación. Un 401 con la
   sesión abierta borra la sesión y lleva al acceso con el aviso «Tu sesión
   venció». Un 401 en las rutas del acceso no es eso: son credenciales o un
@@ -338,8 +430,8 @@ solo botón con el degradado de la marca. Al pie, la **versión instalada**.
   su enlace recibe 403 con `codigo: CORREO_NO_VERIFICADO`: la tarjeta dice
   «Confirma tu correo para entrar» y ofrece «Reenviar el enlace»
   (`POST /auth/registro/reenviar { email }`), que enseña siempre la misma
-  respuesta neutral —no revela si la cuenta existe— y se apaga 60 segundos
-  entre pedidos.
+  respuesta neutral —no revela si la cuenta existe— y se apaga
+  `seguridad.reenvioSegundos` entre pedidos.
 - **Solo pacientes.** Una cuenta sin `portal.mis_citas` en sus permisos (el
   personal de la clínica, también el administrador: su comodín `*` no abre
   el portal) no entra: se descarta el token sin guardar sesión ni
@@ -372,9 +464,11 @@ verdad la movería cinco horas. `lib/core/fechas/fecha_local.dart`:
   fechas imposibles en vez de desbordarlas.
 - `aTextoLocal` escribe `YYYY-MM-DDTHH:mm:ss`, sin zona, que es lo que la API
   exige.
-- `RelojClinica` da la hora de la clínica (UTC−5, Ecuador continental no
-  tiene horario de verano) esté donde esté el teléfono: la regla de las 12
-  horas y los horarios que ya pasaron se comparan contra la clínica.
+- `RelojClinica` da la hora de la clínica esté donde esté el teléfono, en la
+  zona de su configuración (`clinica.zonaHoraria`, con la base de zonas de
+  `timezone`: una zona con horario de verano también queda bien): las horas
+  para cambiar una cita y los horarios que ya pasaron se comparan contra la
+  clínica.
 
 Está cubierto por `test/fecha_local_test.dart`.
 
@@ -383,8 +477,8 @@ Está cubierto por `test/fecha_local_test.dart`.
 Las consultas en línea, sus mensajes, los archivos y los eventos de video
 **no** son hora congelada: son instantes de verdad en UTC con `Z`. Para ellos
 es `lib/core/fechas/instante.dart`: `leerInstante` respeta la zona (y toma
-como UTC una cadena sin ella) y `enHoraDeLaClinica` los convierte a
-America/Guayaquil para enseñarlos. El plazo de una consulta se compara con
+como UTC una cadena sin ella) y `enHoraDeLaClinica` los convierte a la zona
+de la clínica para enseñarlos. El plazo de una consulta se compara con
 `RelojClinica.instante()`, no con `ahora()`. Pasar uno de estos por
 `leerFechaLocal` los dejaría cinco horas corridos, y al revés con las citas.
 Cubierto por `test/instante_test.dart`.
@@ -394,12 +488,14 @@ Cubierto por `test/instante_test.dart`.
 `lib/features/agendar/dominio/` es el puerto 1:1 de
 `agenda.utils.ts` y `horarios.model.ts` del panel web, con los mismos
 nombres: `normalizarHorarios`, `rangosDelDia`, `bloqueoEn`, `duracionDe`,
-`margenDe`, `calcularHuecos` (paso de 15 minutos, la cita tiene que caber
-entera en el turno, margen a ambos lados de cada cita ocupada),
-`limiteAlcanzado`, `siguienteDiaConAtencion`, y la división en mañana, tarde
-y noche a las 12:00 y a las 19:00. De `agendar.ts` vienen el primer día con
-atención (hoy solo si todavía cabe una cita con 15 minutos de anticipación) y
-la etiqueta de «próxima fecha».
+`margenDe`, `calcularHuecos` (la cita tiene que caber entera en el turno,
+margen a ambos lados de cada cita ocupada), `limiteAlcanzado`,
+`siguienteDiaConAtencion` y la división en mañana, tarde y noche. De
+`agendar.ts` vienen el primer día con atención (hoy solo si todavía cabe una
+cita con la anticipación mínima) y la etiqueta de «próxima fecha». El paso de
+la rejilla, la anticipación, el horizonte de días, los cortes de la tarde y
+la noche y las duraciones por defecto son los de la configuración
+(`ReglasAgendamiento`, desde `agenda.*`).
 
 El portal solo recibe lo ocupado del médico (`GET /portal/disponibilidad`,
 inicio y fin, nunca datos de otros pacientes). Al reprogramar, el horario de
@@ -412,7 +508,8 @@ elegir una especialidad sin médicos es un callejón sin salida.
 ## Consultas en línea
 
 El paciente le escribe a un médico sin cita (`portal.consultas`), para sí o
-para un dependiente, y el médico responde en menos de 48 horas. Todo va por
+para un dependiente, y el médico responde en el plazo de la clínica
+(`telemedicina.horasRespuesta`). Todo va por
 las rutas del paciente de `/portal/consultas`
 (`lib/features/consultas/data/consultas_service.dart`).
 
@@ -426,9 +523,11 @@ las rutas del paciente de `/portal/consultas`
   → el formulario del motivo (`texto`, `textoLargo`, `numero` con su unidad,
   `seleccion`, `siNo`, `fecha`), la descripción y los archivos → resumen →
   enviar. Los errores se marcan al intentar seguir.
-- **Archivos**: cámara, galería o archivos del teléfono; PDF, JPG o PNG de
-  hasta 20 MB, validados **antes** de subir con las mismas reglas del
-  servidor (el tipo por la firma del contenido, la extensión corregida si no
+- **Archivos**: cámara, galería o archivos del teléfono; los tipos y el
+  tamaño de la configuración (`archivos.tipos` —PDF, JPG, PNG, WEBP o HEIC—
+  y `archivos.tamanoMaximoMb`), hasta `telemedicina.maxArchivosConsulta` por
+  consulta, validados **antes** de subir con las mismas reglas del servidor
+  (el tipo por la firma del contenido, la extensión corregida si no
   coincide). Las fotos se reducen al elegirlas.
 - **Enviar** son tres pasos: crear el borrador (`POST`), subir los archivos
   uno por uno (`POST …/adjuntos`, multipart, campo `archivo`) y enviar
@@ -463,26 +562,26 @@ las rutas del paciente de `/portal/consultas`
 
 Las citas de telemedicina ofrecen «Entrar a la videoconsulta» en el detalle
 (desde Mis citas y desde la próxima cita) y, el día de la cita, en la propia
-tarjeta del inicio; en la lista, la cita con la sala abierta lo dice. La
-clínica elige cuánto antes y después abre la sala (`minutosAntes` de 0 a
-120, `minutosDespues` de 0 a 240; por defecto 15 y 60) y la aplicación no
-lo sabe: el botón (y la pastilla «Sala abierta») se enciende **120 minutos
-antes del inicio** y se apaga **240 minutos después del fin**, la ventana
-más amplia posible, calculada con la hora congelada de la cita contra la
-hora de la clínica y vuelta a mirar cada 30 segundos
-(`lib/features/citas/dominio/videoconsulta.dart`). La regla exacta la dice
-el servidor con su 409.
+tarjeta del inicio; en la lista, la cita con la sala abierta lo dice. El
+botón (y la pastilla «Sala abierta») se enciende los minutos antes del
+inicio y se apaga los minutos después del fin que dice la configuración
+(`telemedicina.minutosAntes`, `minutosDespues`), calculado con la hora
+congelada de la cita contra la hora de la clínica y vuelto a mirar cada 30
+segundos (`lib/features/citas/dominio/videoconsulta.dart`). El servidor
+vuelve a decidir con su 409.
 
 Al tocarlo se pide `GET /portal/citas/:id/videollamada` y se abre la `url`
 firmada de la sala en el **navegador del teléfono** (`url_launcher`, modo
 externo): el navegador ya sabe pedir la cámara y el micrófono, y una nota lo
 avisa. Un 409 (la sala todavía no abre o ya cerró) o un 503 (la
-videoconsulta no está configurada) enseñan el mensaje del servidor.
+videoconsulta no está configurada) enseñan el mensaje del servidor, con el
+teléfono y el correo de la clínica.
 
 ## Sin conexión
 
-- La sesión y el perfil van en el **llavero**; las citas, las consultas en
-  línea (la lista y cada detalle abierto), los dependientes y los catálogos,
+- La sesión y el perfil van en el **llavero**; la configuración de la
+  clínica, sus catálogos y documentos legales, el menú, las citas, las
+  consultas en línea (la lista y cada detalle abierto) y los dependientes,
   en una **caché Hive cifrada** con clave en el llavero. Sin red, las
   pantallas abren con lo guardado y dicen desde cuándo.
 - `SondeoDeRed` sabe si hay salida: escucha cada petición y, si hace falta,
@@ -495,16 +594,20 @@ videoconsulta no está configurada) enseñan el mensaje del servidor.
   peticiones sin esperar el plazo: la pantalla cae a lo guardado al
   instante.
 - Al cerrar sesión se borra lo de la persona (citas, consultas,
-  dependientes, archivos descargados, recordatorios) y se conservan los
-  catálogos, que son de la clínica.
+  dependientes, el menú, archivos descargados, recordatorios) y se conservan
+  la configuración, los catálogos y los documentos legales, que son de la
+  clínica.
 
 ## Recordatorios
 
 `lib/core/notificaciones/recordatorios_citas.dart` programa en el propio
-teléfono un aviso **24 horas** y otro **1 hora** antes de cada cita pendiente,
-en la zona `America/Guayaquil`. Se reprograman en cada sincronización —una
-cita cancelada desde la clínica deja de sonar—, al agendar, reprogramar o
-cancelar, y se cancelan todos al cerrar sesión. El permiso se pide ya dentro
+teléfono los avisos que la clínica tenga encendidos para cada cita pendiente
+(`agenda.recordatoriosActivos` y, de ellos, `recordatorio24h`,
+`recordatorio1h`, `recordatorioInicio`), en la zona de la clínica y con el
+nombre de la modalidad y los consejos de sus catálogos. Se reprograman en
+cada sincronización —una cita cancelada desde la clínica deja de sonar—, al
+agendar, reprogramar o cancelar y cada vez que cambia la configuración (si la
+clínica los apaga, se cancelan), y se cancelan todos al cerrar sesión. El permiso se pide ya dentro
 de la aplicación, no en el acceso. En la web no hay recordatorios.
 
 ## Costuras para lo que falta
@@ -522,8 +625,10 @@ apagados; enchufarlos es cambiar esa línea: el cierre de sesión ya llama a
 ## Icono y arranque
 
 El icono y la pantalla de arranque se generan desde el mismo `CustomPainter`
-del logotipo (`PintorLogoCliniq`): un anillo `#5A6E73` con una cruz
-`#D16F4B`. Tras cambiar el logotipo:
+del logotipo de marca (`PintorLogoCliniq`): un anillo `#5A6E73` con una cruz
+`#D16F4B`. Son recursos nativos que se generan al compilar: no cambian con
+la configuración de la clínica (dentro de la aplicación, el logotipo y los
+colores sí). Tras cambiar el logotipo:
 
 ```bash
 fvm flutter test tool/generar_iconos_test.dart   # pinta los PNG en assets/images
@@ -545,33 +650,46 @@ fvm flutter test
 
 | Archivo | Qué fija |
 | --- | --- |
+| `configuracion_test.dart` | `GET /configuracion/publica`: pública, copia sin red, sin copia no hay valores, lectura estricta, la zona horaria |
+| `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
+| `menu_test.dart` | El menú: aplanado por orden, copia por persona, ruta conocida (pantalla) y desconocida (navegador), la barra y los accesos, el tablero |
+| `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
+| `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
+| `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |
+| `contacto_clinica_test.dart` | Teléfono y correo para tocar, y el número de emergencias |
+| `seguridad_test.dart` | La contraseña mínima de la clínica |
+| `formulario_dependiente_test.dart` | Parentescos, documento, sexo y sangre de los catálogos; `validarCedula` |
 | `fecha_local_test.dart` | La zona se descarta y nunca se convierte; el reloj de la clínica |
-| `huecos_test.dart` | El puerto del cálculo de horarios del web |
-| `validaciones_test.dart` | Cédula con módulo 10, pasaporte, fecha no futura |
+| `huecos_test.dart` | El puerto del cálculo de horarios del web, con la rejilla de la configuración |
+| `validaciones_test.dart` | Cédula con módulo 10 (o solo diez dígitos si la clínica lo apaga), pasaporte, fecha no futura, opciones de los catálogos |
 | `errores_test.dart` | `{status, message}` con texto o lista, 401 y 423 del acceso, la red |
-| `reglas_citas_test.dart` | La regla de las 12 horas, próximas e historial, cuenta regresiva |
-| `recordatorios_test.dart` | 24 h y 1 h antes, sin avisos vencidos |
+| `reglas_citas_test.dart` | Las horas para cambiar de la configuración, próximas e historial, cuenta regresiva, consejos del catálogo |
+| `recordatorios_test.dart` | Solo los recordatorios encendidos, sus textos de los catálogos, sin avisos vencidos |
 | `contrato_api_test.dart` | Lo que se lee y se manda a la API |
 | `auth_bloc_test.dart` | Acceso correcto, segundo factor, 401, 423, sesión guardada y vencida, solo pacientes, correo sin confirmar |
 | `acceso_pacientes_test.dart` | Quién es paciente, el 403 `CORREO_NO_VERIFICADO` y `POST /auth/registro/reenviar` |
 | `agendar_bloc_test.dart` | El agendamiento completo, el horario tomado y la reprogramación |
-| `citas_bloc_test.dart` | La copia sin conexión y cancelar |
-| `login_page_test.dart` | La pantalla de acceso, crear cuenta, el personal y reenviar el enlace con su espera |
+| `citas_bloc_test.dart` | La copia sin conexión, cancelar y los recordatorios según la configuración (y cancelados si se apagan) |
+| `login_page_test.dart` | La pantalla de acceso con el nombre, el eslogan y el logotipo de la clínica, crear cuenta, el personal, el bloqueo, el código y el reenvío con los tiempos de la configuración |
 | `instante_test.dart` | Los instantes reales y la hora de la clínica |
-| `archivos_test.dart` | La validación de adjuntos, los nombres y la descarga para abrir un PDF |
+| `archivos_test.dart` | La validación de adjuntos con el tamaño y los tipos de la configuración (WEBP y HEIC por su firma), los nombres y la descarga para abrir un PDF |
 | `consultas_servicio_test.dart` | Cada ruta de `/portal/consultas`: método, ruta, cuerpo, el multipart `archivo` y la copia sin red |
 | `reglas_consultas_test.dart` | El plazo del médico, qué novedades despiertan al sondeo, el motivo de una cancelación, el formulario dinámico y cómo se leen las respuestas |
 | `consultas_bloc_test.dart` | La lista, los borradores y lo que cambia en otras pantallas |
-| `nueva_consulta_bloc_test.dart` | Los pasos y su validación, enviar (borrador → archivos → enviar), reintentar y retomar un borrador con su copia del motivo |
+| `nueva_consulta_bloc_test.dart` | Los pasos y su validación, el tope de archivos y de tamaño de la configuración, enviar (borrador → archivos → enviar), reintentar y retomar un borrador con su copia del motivo |
 | `detalle_consulta_bloc_test.dart` | Cargar, el sondeo con latidos inyectados (la lista primero, el detalle solo si cambió), escribir con archivo y cancelar |
 | `cancelar_consulta_test.dart` | La hoja para cancelar: motivo obligatorio, contador y tope de 500 caracteres |
 | `campo_dinamico_test.dart` | Cada tipo de pregunta y el visor de imágenes |
-| `videoconsulta_test.dart` | La ventana de la sala (y la pastilla «Sala abierta»), pedirla, abrirla fuera y los 409/503 |
+| `videoconsulta_test.dart` | La ventana de la sala de la configuración (y la pastilla «Sala abierta»), pedirla, abrirla fuera y los 409/503 |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |
 | `recorrido_consultas_test.dart` | Videoconsulta, consultas en línea de punta a punta y retomar un borrador, también con el texto agrandado |
 
 Las pruebas de blocs nunca esperan un tiempo fijo: esperan el estado que
-les interesa, y el sondeo del detalle recibe los latidos de la prueba.
+les interesa, y el sondeo del detalle recibe los latidos de la prueba. La
+configuración y los catálogos de prueba están en `test/dobles/clinica.dart`
+(`configDePrueba`, `catalogosDePrueba`, `conDatosDeLaClinica`,
+`rutasDeLaClinica`), con los valores que antes estaban escritos en la
+aplicación; cada prueba de una regla cambia solo el campo que le importa.
 
 No hay SDK de Android ni Xcode en el entorno donde se construyó: además de
 las pruebas, `flutter build web` sirve de prueba de compilación.
