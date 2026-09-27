@@ -98,7 +98,7 @@ arranca con valores inventados.**
 | Especialidades y ciudades | `ESPECIALIDAD`, `CIUDAD` | Orden de los filtros de agendar |
 | Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios y perfil |
 | Documentos legales | `GET /legal/documentos` (clave, slug, versión, título), `mis-aceptaciones` y el texto de cada uno, `GET /legal/documentos/:slug` (Markdown con los datos de la clínica ya sustituidos) | Aceptación y perfil; se leen dentro de la aplicación, con copia para leerlos sin red |
-| Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil») y los accesos rápidos |
+| Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil»), los accesos rápidos y la campana de avisos (si trae `/notificaciones`) |
 
 La configuración, los catálogos y los documentos legales son públicos (se
 piden sin token, antes de entrar) y se guardan como datos de la clínica: se
@@ -332,6 +332,7 @@ lib/
     navegacion/               el menú del servidor, el enrutador de las rutas del sistema,
                               las pantallas que abre cada una y «Muy pronto»
     inicio/                   el inicio y la barra de pestañas
+    avisos/                   la campana de la cabecera y la lista de avisos
     citas/                    mis citas, detalle, cancelar, las horas para cambiar y la videoconsulta
     consultas/                consultas en línea: lista, consulta nueva paso a paso y detalle con la conversación
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
@@ -427,6 +428,33 @@ el navegador integrado; `tel:` y `mailto:`, con el marcador y el correo del
 teléfono. Las pantallas de cada destino se arman en un solo lugar,
 `navegacion/presentacion/pantallas_nativas.dart` (`pantallaNativa`): ahí se
 conectan las que falten.
+
+## Avisos (la campana)
+
+La campana de la cabecera es administrable: aparece solo si el menú de la
+aplicación de la persona trae el enlace a `/notificaciones` (el servidor lo
+siembra como «Avisos»). Ese enlace no va en la barra ni en los accesos: es la
+campana, con su nombre como título y un número con los avisos sin leer
+(`GET /notificaciones/no-leidas/contador`; hasta «99+»). Está en la cabecera
+de cada pestaña.
+
+- **Cuándo pregunta.** Al entrar, al volver a primer plano y cada minuto con
+  la aplicación abierta (el mismo intervalo de la campana del panel); en
+  segundo plano no pregunta. Si el servidor no responde, se queda el último
+  número. `CampanaCubit` (`features/avisos/providers`) nace en `main.dart` y
+  el tablero la enciende o la apaga según el menú.
+- **La lista** (`GET /notificaciones?limite=20`, «Ver avisos anteriores» con
+  `antesDe`): icono según el tipo, fecha relativa en la hora de la clínica
+  («hace 5 min», «ayer», «28 sep»), los sin leer resaltados, «Marcar todas
+  como leídas» (`PATCH /notificaciones/leer-todas`) y deslizar para borrar
+  (`DELETE /notificaciones/:id`). Los cambios se ven al instante; si el
+  servidor dice que no, se deshacen. Vacía, «Todo al día»; sin red, la última
+  copia (`avisos:<uid>`, se borra al cerrar sesión); sin copia, el error con
+  «Reintentar».
+- **Al tocar un aviso** queda leído (`PATCH /notificaciones/:id/leida`) y su
+  `enlace` se abre con el enrutador: una pestaña cierra la lista y la
+  enseña; lo demás se abre encima. Si el enlace no es del paciente
+  (`/admin/...`), se queda en la lista y lo dice.
 
 ## Documentos legales
 
@@ -697,6 +725,7 @@ fvm flutter test
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
 | `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
+| `avisos_test.dart` | La campana: el servicio y su copia, el contador (encendido, latidos, en segundo plano, sin red, apagado), la lista (leer, leer todos, borrar y deshacer, ver más), la fecha relativa, la pantalla y la campana en el tablero según el menú |
 | `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
 | `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |

@@ -9,6 +9,8 @@ import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
+import 'package:app_cliniq/features/avisos/data/avisos_service.dart';
+import 'package:app_cliniq/features/avisos/providers/campana_cubit.dart';
 import 'package:app_cliniq/features/citas/data/citas_service.dart';
 import 'package:app_cliniq/features/citas/providers/citas_bloc.dart';
 import 'package:app_cliniq/features/consultas/presentacion/consultas_page.dart';
@@ -367,6 +369,9 @@ void main() {
               BlocProvider(create: (_) => ConsultasBloc(ConsultasFalso())),
               BlocProvider(
                 create: (_) => DependientesBloc(DependientesFalso()),
+              ),
+              BlocProvider(
+                create: (_) => CampanaCubit(AvisosService(api.dio, cache)),
               ),
             ],
             child: MaterialApp(

@@ -18,6 +18,7 @@ import 'core/tema/tema_app.dart';
 import 'features/arranque/presentacion/arranque_page.dart';
 import 'features/arranque/presentacion/espera_datos_clinica.dart';
 import 'features/auth/presentacion/login_page.dart';
+import 'features/avisos/providers/campana_cubit.dart';
 import 'features/auth/providers/auth_bloc.dart';
 import 'features/auth/providers/auth_state.dart';
 import 'features/citas/providers/citas_bloc.dart';
@@ -111,7 +112,7 @@ void repintarTodo() {
 ///
 /// Los blocs que usan varias pantallas —la configuración y los catálogos de
 /// la clínica, la sesión, las citas, las consultas en línea, los
-/// dependientes y el menú— nacen aquí. Una pantalla que se abre por navegación
+/// dependientes, el menú y la campana de avisos— nacen aquí. Una pantalla que se abre por navegación
 /// (agendar, una consulta nueva) crea el suyo para cargar datos frescos en
 /// cada visita.
 class CliniqApp extends StatelessWidget {
@@ -161,6 +162,9 @@ class CliniqApp extends StatelessWidget {
           create: (_) => DependientesBloc(Servicios.dependientes),
         ),
         BlocProvider<MenuCubit>(create: (_) => MenuCubit(Servicios.menu)),
+        BlocProvider<CampanaCubit>(
+          create: (_) => CampanaCubit(Servicios.avisos),
+        ),
       ],
       child: _DatosDeLaClinicaAlDia(
         child:
@@ -287,6 +291,7 @@ class PuertaDeEntrada extends StatelessWidget {
         context.read<ConsultasBloc>().add(const ConsultasVaciadas());
         context.read<DependientesBloc>().add(const DependientesVaciados());
         context.read<MenuCubit>().vaciar();
+        context.read<CampanaCubit>().activar(false);
       },
       buildWhen: (antes, ahora) => _destino(antes) != _destino(ahora),
       builder: (context, state) {

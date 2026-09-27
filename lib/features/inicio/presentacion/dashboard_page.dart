@@ -16,6 +16,7 @@ import '../../../core/tema/tokens.dart';
 import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
+import '../../avisos/providers/campana_cubit.dart';
 import '../../citas/providers/citas_bloc.dart';
 import '../../citas/providers/citas_event.dart';
 import '../../consultas/providers/consultas_bloc.dart';
@@ -49,8 +50,9 @@ const Set<PantallaNativa> pantallasDePestana = {
 /// nada saca a la persona de la aplicación.
 ///
 /// Aquí nacen también las cargas de todo lo que comparten las pestañas
-/// —citas, consultas en línea, dependientes y el menú— y los recordatorios,
-/// y se vuelven a pedir al regresar a la aplicación.
+/// —citas, consultas en línea, dependientes, el menú y la campana de
+/// avisos— y los recordatorios, y se vuelven a pedir al regresar a la
+/// aplicación. La campana se enciende si el menú la trae.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -76,6 +78,8 @@ class _DashboardPageState extends State<DashboardPage>
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _actualizarCampana(context.read<MenuCubit>().state.enlaces);
       _sincronizar();
 
       // El permiso de notificaciones se pide aquí, ya dentro: pedirlo en el
@@ -93,12 +97,28 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      Servicios.red.olvidar();
-      unawaited(Servicios.red.estado());
-      context.read<AuthBloc>().add(const AuthPerfilRefrescado());
-      _sincronizar();
+    switch (state) {
+      case AppLifecycleState.resumed:
+        Servicios.red.olvidar();
+        unawaited(Servicios.red.estado());
+        context.read<AuthBloc>().add(const AuthPerfilRefrescado());
+        _sincronizar();
+      case AppLifecycleState.paused || AppLifecycleState.hidden:
+        // En segundo plano la campana no pregunta.
+        context.read<CampanaCubit>().pausar();
+      case _:
+        break;
     }
+  }
+
+  /// La campana existe si el menú trae `/notificaciones`. Sin menú todavía,
+  /// se decide cuando llegue.
+  void _actualizarCampana(List<EnlaceMenu>? enlaces) {
+    if (enlaces == null) return;
+
+    context.read<CampanaCubit>().activar(
+      NavegacionDeLaApp.desde(enlaces).campana != null,
+    );
   }
 
   void _sincronizar() {
@@ -108,6 +128,7 @@ class _DashboardPageState extends State<DashboardPage>
     if (usuario == null) return;
 
     unawaited(context.read<MenuCubit>().cargar(usuario.uid));
+    context.read<CampanaCubit>().reanudar();
 
     if (usuario.puede(Permisos.misCitas)) {
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));
@@ -190,6 +211,14 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   Widget build(BuildContext context) {
+    return BlocListener<MenuCubit, MenuState>(
+      listenWhen: (antes, ahora) => antes.enlaces != ahora.enlaces,
+      listener: (context, menu) => _actualizarCampana(menu.enlaces),
+      child: _tablero(context),
+    );
+  }
+
+  Widget _tablero(BuildContext context) {
     final menu = context.watch<MenuCubit>().state;
     final enlaces = menu.enlaces;
 

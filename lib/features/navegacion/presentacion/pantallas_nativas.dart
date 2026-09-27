@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 
 import '../../agendar/presentacion/agendar_page.dart';
+import '../../avisos/presentacion/avisos_page.dart';
 import '../../citas/presentacion/citas_page.dart';
 import '../../consultas/presentacion/consultas_page.dart';
 import '../../consultas/presentacion/detalle_consulta_page.dart';
@@ -43,7 +44,7 @@ Widget pantallaNativa(
     PantallaNativa.videoconsulta => MuyProntoPage(
       titulo: titulo ?? 'Videoconsulta',
     ),
-    PantallaNativa.avisos => MuyProntoPage(titulo: titulo ?? 'Avisos'),
+    PantallaNativa.avisos => AvisosPage(titulo: titulo),
     PantallaNativa.privacidad => MuyProntoPage(
       titulo: titulo ?? 'Mis derechos sobre mis datos',
     ),

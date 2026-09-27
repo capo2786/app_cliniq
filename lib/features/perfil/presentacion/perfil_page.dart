@@ -29,6 +29,7 @@ import 'widgets/seguridad.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/catalogos/catalogo_service.dart';
 import '../../../core/presentacion/widgets/contacto_clinica.dart';
+import '../../avisos/presentacion/widgets/boton_campana.dart';
 
 /// El perfil: datos personales y clínicos, seguridad de la cuenta,
 /// documentos aceptados y la salida.
@@ -96,7 +97,11 @@ class _VistaPerfil extends StatelessWidget {
         backgroundColor: AppColors.fondo,
         appBar: AppBar(
           title: const Text('Mi perfil'),
-          actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+          actions: const [
+            BotonCampana(),
+            BotonCerrarSesion(),
+            SizedBox(width: 6),
+          ],
         ),
         body: FondoDegradado(
           child: RefreshIndicator(

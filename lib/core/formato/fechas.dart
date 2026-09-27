@@ -1,5 +1,8 @@
 // lib/core/formato/fechas.dart
 
+import '../fechas/fecha_local.dart';
+import '../fechas/instante.dart';
+
 /// Cómo se enseñan las fechas en Cliniq, en español.
 ///
 /// Todo pasa por aquí y no por formatos sueltos en cada pantalla. Los nombres
@@ -87,6 +90,10 @@ class FormatoFecha {
   static String diaMedio(DateTime f) =>
       '${diaCorto(f)} ${f.day} ${_mesesCortos[f.month - 1]}';
 
+  /// «28 sep»
+  static String diaYMesCorto(DateTime f) =>
+      '${f.day} ${_mesesCortos[f.month - 1]}';
+
   /// «28 sep 2026»
   static String fechaMedia(DateTime f) =>
       '${f.day} ${_mesesCortos[f.month - 1]} ${f.year}';
@@ -112,6 +119,39 @@ class FormatoFecha {
 
     return texto[0].toUpperCase() + texto.substring(1);
   }
+}
+
+/// Cuánto hace que pasó un instante real (un aviso, una solicitud), como lo
+/// dice el panel: «hace un momento», «hace 5 min», «hace 2 h», «ayer»,
+/// «hace 3 días», y de ahí en adelante la fecha («28 sep», o «28 sep 2025»
+/// si es de otro año).
+///
+/// [ahora] es la hora de la clínica (`RelojClinica.ahora()`): el instante se
+/// pasa a esa hora y los días se cuentan en la zona de la clínica, no en la
+/// del teléfono. Un reloj del servidor un poco adelantado no produce «dentro
+/// de 2 min»: es «hace un momento».
+String tiempoRelativo(DateTime instante, DateTime ahora) {
+  final local = enHoraDeLaClinica(instante);
+  final diferencia = ahora.difference(local);
+
+  if (diferencia < const Duration(seconds: 45)) return 'hace un momento';
+
+  if (diferencia < const Duration(hours: 1)) {
+    final min = (diferencia.inSeconds / 60).round();
+    return 'hace ${min < 1 ? 1 : min} min';
+  }
+
+  final dias =
+      (inicioDelDia(ahora).difference(inicioDelDia(local)).inHours / 24)
+          .round();
+
+  if (dias <= 0) return 'hace ${diferencia.inHours} h';
+  if (dias == 1) return 'ayer';
+  if (dias < 7) return 'hace $dias días';
+
+  return local.year == ahora.year
+      ? FormatoFecha.diaYMesCorto(local)
+      : FormatoFecha.fechaMedia(local);
 }
 
 /// «1 hora», «12 horas».
