@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../core/archivos/archivo_local.dart';
 import '../../../core/archivos/archivo_meta.dart';
+import '../../../core/archivos/subida.dart';
 import '../../../core/network/errores.dart';
 import '../../../core/storage/cache_local.dart';
 import 'models/consulta.dart';
@@ -225,33 +226,7 @@ class ConsultasService {
     String id,
     ArchivoLocal archivo, {
     void Function(int enviados, int total)? progreso,
-  }) async {
-    final mime = archivo.mime;
-
-    final formulario = FormData.fromMap({
-      'archivo': MultipartFile.fromBytes(
-        archivo.bytes,
-        filename: archivo.nombreParaSubir,
-        contentType: mime == null ? null : DioMediaType.parse(mime),
-      ),
-    });
-
-    final respuesta = await _dio.post<dynamic>(
-      '$_ruta/$id/adjuntos',
-      data: formulario,
-      onSendProgress: progreso,
-      options: Options(
-        // Veinte megas con datos móviles no suben en quince segundos.
-        sendTimeout: const Duration(minutes: 3),
-        receiveTimeout: const Duration(minutes: 1),
-      ),
-    );
-
-    final meta = ArchivoMeta.desdeJson(respuesta.data);
-    if (meta == null) throw const FormatException('Adjunto sin identificador');
-
-    return meta;
-  }
+  }) => subirArchivo(_dio, '$_ruta/$id/adjuntos', archivo, progreso: progreso);
 
   /// `DELETE /portal/consultas/:id/adjuntos/:archivoId`, solo en BORRADOR.
   Future<void> quitarAdjunto(String id, String archivoId) async {

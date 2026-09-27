@@ -12,6 +12,7 @@ import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
+import '../../../core/presentacion/widgets/redactor_de_mensaje.dart';
 import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
@@ -579,166 +580,32 @@ class _Redactor extends StatelessWidget {
   Widget build(BuildContext context) {
     final adjunto = state.adjunto;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        12,
-        10,
-        12,
-        10 + (tecladoAbierto ? 0 : context.margenInferiorDelSistema),
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.superficie,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.primarioClaro.withValues(alpha: 0.14),
-          ),
-        ),
-      ),
-      child: ConRed(
-        builder: (context, hayRed) => Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (state.errorEnvio != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  state.errorEnvio!,
-                  style: const TextStyle(
-                    color: AppColors.errorTexto,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            if (!hayRed)
-              const Padding(
-                padding: EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  'Sin conexión: para escribirle al médico necesitas Internet.',
-                  style: TextStyle(color: AppColors.alertaTexto, fontSize: 12),
-                ),
-              ),
-            if (adjunto != null) ...[
-              FilaAdjunto(
-                nombre: adjunto.nombreParaSubir,
-                tamano: adjunto.tamano,
-                esImagen: adjunto.esImagen,
-                nota: state.adjuntoSubido != null
-                    ? 'Subido'
-                    : 'Va con tu mensaje',
-                alQuitar: state.enviando
-                    ? null
-                    : () => context.read<DetalleConsultaBloc>().add(
-                        const DetalleConsultaAdjuntoQuitado(),
-                      ),
-              ),
-              const SizedBox(height: 8),
-            ],
-            if (state.progreso != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-                child: Text(
-                  state.progreso!,
-                  style: const TextStyle(
-                    color: AppColors.textoSecundario,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  key: const Key('boton-adjuntar-mensaje'),
-                  tooltip: 'Adjuntar un archivo',
-                  onPressed: state.enviando ? null : alAdjuntar,
-                  icon: Icon(
-                    Icons.attach_file_rounded,
-                    color: AppColors.primarioClaro,
-                  ),
-                ),
-                Expanded(
-                  child: TextField(
-                    key: const Key('campo-mensaje'),
-                    controller: controlador,
-                    enabled: !state.enviando,
-                    minLines: 1,
-                    maxLines: 5,
-                    maxLength: maximoMensaje,
-                    textCapitalization: TextCapitalization.sentences,
-                    cursorColor: AppColors.acentoClaro,
-                    style: const TextStyle(
-                      color: AppColors.texto,
-                      fontSize: 14.5,
+    return RedactorDeMensaje(
+      controlador: controlador,
+      pista: 'Escríbele al médico',
+      maximo: maximoMensaje,
+      tecladoAbierto: tecladoAbierto,
+      enviando: state.enviando,
+      progreso: state.progreso,
+      error: state.errorEnvio,
+      sinRed: 'Sin conexión: para escribirle al médico necesitas Internet.',
+      alAdjuntar: alAdjuntar,
+      alEnviar: alEnviar,
+      adjunto: adjunto == null
+          ? null
+          : FilaAdjunto(
+              nombre: adjunto.nombreParaSubir,
+              tamano: adjunto.tamano,
+              esImagen: adjunto.esImagen,
+              nota: state.adjuntoSubido != null
+                  ? 'Subido'
+                  : 'Va con tu mensaje',
+              alQuitar: state.enviando
+                  ? null
+                  : () => context.read<DetalleConsultaBloc>().add(
+                      const DetalleConsultaAdjuntoQuitado(),
                     ),
-                    decoration: InputDecoration(
-                      hintText: 'Escríbele al médico',
-                      hintStyle: const TextStyle(color: AppColors.textoPista),
-                      counterText: '',
-                      filled: true,
-                      fillColor: AppColors.campo,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(
-                          color: AppColors.bordeCampo,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: const BorderSide(
-                          color: AppColors.bordeCampo,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(18),
-                        borderSide: BorderSide(
-                          color: AppColors.acentoClaro,
-                          width: 1.6,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                state.enviando
-                    ? Padding(
-                        padding: EdgeInsets.all(12),
-                        child: SizedBox(
-                          width: 22,
-                          height: 22,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.4,
-                            color: AppColors.acentoClaro,
-                          ),
-                        ),
-                      )
-                    : IconButton.filled(
-                        key: const Key('boton-enviar-mensaje'),
-                        tooltip: 'Enviar',
-                        onPressed: hayRed ? alEnviar : null,
-                        style: IconButton.styleFrom(
-                          backgroundColor: AppColors.acento,
-                          disabledBackgroundColor: AppColors.acento.withValues(
-                            alpha: 0.35,
-                          ),
-                        ),
-                        icon: const Icon(
-                          Icons.send_rounded,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
-              ],
             ),
-          ],
-        ),
-      ),
     );
   }
 }

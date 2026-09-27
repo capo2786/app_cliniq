@@ -65,6 +65,14 @@ void main() {
       ]);
       expect(config.seguridad.reenvioSegundos, 60);
       expect(config.general.validarCedula, isTrue);
+      expect(config.general.soporteHorasSla, {
+        'CRITICA': 4,
+        'ALTA': 24,
+        'MEDIA': 72,
+        'BAJA': 120,
+      });
+      expect(config.general.soporteHorasAviso, 2);
+      expect(config.clinico.diasGestacion, 280);
     });
 
     test('es pública: va sin el token aunque haya sesión, y un 401 ahí no '
@@ -180,6 +188,52 @@ void main() {
         () => configDePrueba(agenda: {'recordatoriosActivos': 'sí'}),
         throwsFormatException,
       );
+    });
+
+    test(
+      'las horas de soporte por severidad: un objeto de enteros desde 1',
+      () {
+        expect(
+          configDePrueba(
+            general: {
+              'soporteHorasSla': {'CRITICA': '6', 'BAJA': 200},
+            },
+          ).general.soporteHorasSla,
+          {'CRITICA': 6, 'BAJA': 200},
+        );
+        expect(
+          () => configDePrueba(general: {'soporteHorasSla': <String, int>{}}),
+          throwsFormatException,
+        );
+        expect(
+          () => configDePrueba(general: {'soporteHorasSla': 72}),
+          throwsFormatException,
+        );
+        expect(
+          () => configDePrueba(
+            general: {
+              'soporteHorasSla': {'ALTA': 0},
+            },
+          ),
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains('general.soporteHorasSla.ALTA'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test('los días de gestación salen de la sección clínica', () {
+      expect(
+        configDePrueba(clinico: {'diasGestacion': 283}).clinico.diasGestacion,
+        283,
+      );
+
+      final json = configJson()..remove('clinico');
+      expect(() => ConfigPublica.desdeJson(json), throwsFormatException);
     });
 
     test('los colores de marca son opcionales: si no son un color, no hay', () {

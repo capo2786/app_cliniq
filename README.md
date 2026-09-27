@@ -94,6 +94,8 @@ arranca con valores inventados.**
 | Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes |
 | Plazo legal de una solicitud ARCO | `general.arcoPlazoDias` | Mis derechos sobre mis datos |
 | Días para responder una encuesta | `general.encuestasDiasVentana` | La encuesta que ya no está disponible |
+| Horas de respuesta de soporte | `general.soporteHorasSla` (por severidad), `soporteHorasAviso` | Ticket nuevo |
+| Días de gestación | `clinico.diasGestacion` | Mi salud (semanas y fecha probable de parto) |
 | Modalidades (nombre, descripción, color, icono) | `GET /catalogos/lote` → `MODALIDAD_CITA` | Citas, agendar |
 | Cómo prepararse | `PREPARACION_CITA` (`<MODALIDAD>_<n>`) | Detalle, próxima cita, agendar, recordatorios |
 | Estados de citas y consultas | `ESTADO_CITA`, `ESTADO_CONSULTA` | Pastillas y explicaciones |
@@ -101,7 +103,9 @@ arranca con valores inventados.**
 | Motivos para cancelar | `MOTIVO_CANCELACION_PACIENTE` | Cancelar una cita |
 | Parentescos | `PARENTESCO_DEPENDIENTE` (dependientes), `PARENTESCO` (contacto de emergencia) | Formularios |
 | Especialidades y ciudades | `ESPECIALIDAD`, `CIUDAD` | Orden de los filtros de agendar |
-| Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios y perfil |
+| Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios, perfil y Mi salud |
+| Soporte | `CATEGORIA_TICKET` (las de la clínica), `SEVERIDAD_TICKET` (las activas, en su orden), `ESTADO_TICKET` | Ticket nuevo, mis tickets y la conversación |
+| Artículos de ayuda | `GET /ayuda` (el servidor ya reemplaza las `{{variables}}`) | Centro de ayuda |
 | Documentos legales | `GET /legal/documentos` (clave, slug, versión, título), `mis-aceptaciones` y el texto de cada uno, `GET /legal/documentos/:slug` (Markdown con los datos de la clínica ya sustituidos) | Aceptación y perfil; se leen dentro de la aplicación, con copia para leerlos sin red |
 | Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil»), los accesos rápidos y la campana de avisos (si trae `/notificaciones`) |
 
@@ -366,6 +370,9 @@ lib/
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
     dependientes/             personas a cargo, con la validación de cédula
     perfil/                   datos personales y clínicos, seguridad, documentos
+    mi_salud/                 la historia clínica que ve el paciente, recetas y órdenes
+    ayuda/                    centro de ayuda: búsqueda, categorías y artículos en Markdown nativo
+    soporte/                  mis tickets, ticket nuevo y la conversación con soporte
 test/                         pruebas (ver abajo)
 tool/generar_iconos_test.dart genera los PNG del icono y del arranque
 ```
@@ -707,6 +714,34 @@ las rutas del paciente de `/portal/consultas`
   /portal/consultas/:id` queda en la bitácora de la historia clínica, y
   pedirlo cada 30 segundos la llenaba. Al escribir o cancelar se usa la
   consulta que devuelve el servidor, sin volver a pedirla.
+
+## Mi salud, centro de ayuda y soporte
+
+Tres pantallas nativas que el enrutador abre por su ruta: `MiSaludPage()`
+(`/mi-salud`), `CentroAyudaPage()` (`/ayuda`), `SoportePage()` (`/soporte`)
+y `TicketPage(id: …)` (`/soporte/tickets/:id`). Cada respuesta se guarda en
+el teléfono tal como llegó (por persona; se borra al cerrar sesión) y sin
+red se enseña esa copia; sin copia, el error con «Reintentar».
+
+- **Mi salud** (`GET /portal/mi-salud`, `?pacienteId=` para un dependiente):
+  la ficha con las alergias, el embarazo en curso, las últimas mediciones y,
+  por consulta, diagnósticos, indicaciones, recetas, órdenes y adjuntos.
+  Cada receta y orden se abre en su pantalla (`/portal/recetas/:id`,
+  `/portal/ordenes/:id`) con su código de verificación. Las fechas clínicas
+  son hora congelada.
+- **Centro de ayuda** (`GET /ayuda?q=`): el servidor busca; sin red se busca
+  con la misma regla sobre la copia. El Markdown del artículo se pinta con
+  widgets (párrafos, títulos, negrita, listas y enlaces). Un enlace nunca
+  saca de la aplicación: las rutas de ayuda, soporte y Mi salud abren su
+  pantalla, las de otros módulos van al enrutador (`abrirRuta`), la web se
+  abre en el navegador integrado y `mailto:` sigue igual. Al final de cada
+  artículo, «¿No resolviste tu duda?» abre soporte con el ticket nuevo.
+- **Soporte** (`/soporte/tickets`): el ticket nuevo valida con los límites
+  del servidor (asunto 3–150, descripción 10–5000, mensaje hasta 5000) y
+  sube el archivo después de crearlo, en un mensaje «Adjunto: …», como el
+  panel. Los mensajes solo traen el id del adjunto: el nombre y el tipo
+  salen de las cabeceras de la misma descarga; una imagen se ve en el visor
+  de la aplicación y un PDF, con el visor del teléfono.
 
 ## Videoconsulta
 

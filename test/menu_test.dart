@@ -6,7 +6,7 @@ import 'package:app_cliniq/features/consultas/presentacion/consultas_page.dart';
 import 'package:app_cliniq/features/dependientes/presentacion/dependientes_page.dart';
 import 'package:app_cliniq/features/navegacion/data/menu_service.dart';
 import 'package:app_cliniq/features/navegacion/dominio/destinos.dart';
-import 'package:app_cliniq/features/navegacion/presentacion/muy_pronto_page.dart';
+import 'package:app_cliniq/features/mi_salud/presentacion/mi_salud_page.dart';
 import 'package:app_cliniq/features/navegacion/providers/menu_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -343,8 +343,8 @@ void main() {
       expect(find.byType(DependientesPage), findsOneWidget);
     });
 
-    testWidgets('una pantalla que todavía no llega abre «Muy pronto» con el '
-        'nombre del menú, sin salir de la aplicación', (tester) async {
+    testWidgets('Mi salud, desde los accesos, abre su pantalla sin salir de '
+        'la aplicación', (tester) async {
       final navegador = NavegadorFalso()..instalar();
       await montar(tester);
       await tester.pumpAndSettle();
@@ -353,8 +353,7 @@ void main() {
       await tester.tap(find.byKey(const Key('acceso-mi-salud')));
       await tester.pumpAndSettle();
 
-      expect(find.byType(MuyProntoPage), findsOneWidget);
-      expect(find.text('Muy pronto'), findsOneWidget);
+      expect(find.byType(MiSaludPage), findsOneWidget);
       expect(navegador.abiertas, isEmpty);
     });
 

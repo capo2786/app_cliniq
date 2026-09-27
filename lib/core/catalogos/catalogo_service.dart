@@ -32,6 +32,13 @@ class Catalogos {
   static const String tipoArco = 'TIPO_ARCO';
   static const String estadoArco = 'ESTADO_ARCO';
 
+  /// Soporte: las categorías que se eligen al abrir un ticket (códigos de la
+  /// clínica), las severidades (códigos fijos, en el orden del panel) y los
+  /// estados (códigos fijos).
+  static const String categoriaTicket = 'CATEGORIA_TICKET';
+  static const String severidadTicket = 'SEVERIDAD_TICKET';
+  static const String estadoTicket = 'ESTADO_TICKET';
+
   static const List<String> todos = [
     especialidad,
     motivoCancelacionPaciente,
@@ -47,6 +54,9 @@ class Catalogos {
     estadoConsulta,
     tipoArco,
     estadoArco,
+    categoriaTicket,
+    severidadTicket,
+    estadoTicket,
   ];
 }
 

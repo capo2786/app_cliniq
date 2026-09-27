@@ -22,6 +22,7 @@ class ConfigPublica extends Equatable {
   final ReglasArchivos archivos;
   final ReglasSeguridad seguridad;
   final ReglasGenerales general;
+  final ReglasClinicas clinico;
 
   /// La respuesta tal como llegó, para guardarla y volver a leerla igual.
   final Map<String, dynamic> datos;
@@ -33,6 +34,7 @@ class ConfigPublica extends Equatable {
     required this.archivos,
     required this.seguridad,
     required this.general,
+    required this.clinico,
     this.datos = const {},
   });
 
@@ -50,6 +52,7 @@ class ConfigPublica extends Equatable {
       archivos: ReglasArchivos._leer(lector.seccion('archivos')),
       seguridad: ReglasSeguridad._leer(lector.seccion('seguridad')),
       general: ReglasGenerales._leer(lector.seccion('general')),
+      clinico: ReglasClinicas._leer(lector.seccion('clinico')),
       datos: Map<String, dynamic>.from(json),
     );
   }
@@ -64,6 +67,7 @@ class ConfigPublica extends Equatable {
     archivos,
     seguridad,
     general,
+    clinico,
   ];
 }
 
@@ -313,16 +317,28 @@ class ReglasGenerales extends Equatable {
   /// encuesta.
   final int encuestasDiasVentana;
 
+  /// Horas de respuesta de soporte por severidad del ticket
+  /// (`{CRITICA: 4, ALTA: 24, …}`), las mismas con que el servidor calcula
+  /// el vencimiento de cada ticket.
+  final Map<String, int> soporteHorasSla;
+
+  /// A cuántas horas del vencimiento un ticket abierto «vence pronto».
+  final int soporteHorasAviso;
+
   const ReglasGenerales({
     required this.validarCedula,
     required this.arcoPlazoDias,
     required this.encuestasDiasVentana,
+    required this.soporteHorasSla,
+    required this.soporteHorasAviso,
   });
 
   factory ReglasGenerales._leer(_Lector l) => ReglasGenerales(
     validarCedula: l.booleano('validarCedula'),
     arcoPlazoDias: l.entero('arcoPlazoDias', minimo: 1),
     encuestasDiasVentana: l.entero('encuestasDiasVentana', minimo: 1),
+    soporteHorasSla: l.enterosPorClave('soporteHorasSla', minimo: 1),
+    soporteHorasAviso: l.entero('soporteHorasAviso', minimo: 1),
   );
 
   @override
@@ -330,7 +346,24 @@ class ReglasGenerales extends Equatable {
     validarCedula,
     arcoPlazoDias,
     encuestasDiasVentana,
+    soporteHorasSla,
+    soporteHorasAviso,
   ];
+}
+
+/// `clinico`: las reglas clínicas de apoyo que la aplicación usa.
+class ReglasClinicas extends Equatable {
+  /// Los días que suma la regla de Naegele a la fecha de la última
+  /// menstruación para la fecha probable de parto (Mi salud).
+  final int diasGestacion;
+
+  const ReglasClinicas({required this.diasGestacion});
+
+  factory ReglasClinicas._leer(_Lector l) =>
+      ReglasClinicas(diasGestacion: l.entero('diasGestacion', minimo: 1));
+
+  @override
+  List<Object?> get props => [diasGestacion];
 }
 
 /// Lee campos obligatorios de una sección y dice cuál falta si falta uno.
@@ -382,6 +415,20 @@ class _Lector {
       for (final x in valor)
         if ((x as String).trim().isNotEmpty) x.trim(),
     ];
+  }
+
+  /// Un objeto de enteros por clave (`{CRITICA: 4, ALTA: 24}`), con al
+  /// menos una clave y todos los valores desde [minimo].
+  Map<String, int> enterosPorClave(String campo, {int minimo = 0}) {
+    final valor = _datos[campo];
+    if (valor is! Map || valor.isEmpty) _falta(campo, valor);
+
+    final lector = seccion(campo);
+
+    return {
+      for (final clave in valor.keys)
+        clave.toString(): lector.entero(clave.toString(), minimo: minimo),
+    };
   }
 
   String? textoOpcional(String campo) {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../agendar/presentacion/agendar_page.dart';
 import '../../avisos/presentacion/avisos_page.dart';
+import '../../ayuda/presentacion/centro_ayuda_page.dart';
 import '../../citas/presentacion/citas_page.dart';
 import '../../citas/presentacion/videoconsulta_page.dart';
 import '../../consultas/presentacion/consultas_page.dart';
@@ -11,10 +12,13 @@ import '../../consultas/presentacion/detalle_consulta_page.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
 import '../../encuestas/presentacion/encuesta_page.dart';
 import '../../legal/presentacion/documento_legal_page.dart';
+import '../../mi_salud/presentacion/mi_salud_page.dart';
 import '../../perfil/presentacion/perfil_page.dart';
 import '../../privacidad/presentacion/privacidad_page.dart';
+import '../../soporte/presentacion/soporte_page.dart';
+import '../../soporte/presentacion/ticket_page.dart';
 import '../dominio/destinos.dart';
-import 'muy_pronto_page.dart';
+import 'enrutador.dart';
 
 /// La pantalla que abre cada destino del enrutador: el único lugar donde una
 /// ruta del sistema se convierte en una pantalla.
@@ -23,11 +27,8 @@ import 'muy_pronto_page.dart';
 /// pantalla que todavía no existe lo usa en su cabecera). [alAgendar] lo pone
 /// el tablero para que «Mis citas» pueda abrir el agendamiento.
 ///
-/// **Punto de registro de los módulos nuevos.** Mi salud, Centro de ayuda y
-/// Soporte abren «Muy pronto» mientras no tengan pantalla; al integrarlas se
-/// cambia su línea aquí por su página (`MiSaludPage()`, `CentroAyudaPage()`,
-/// `SoportePage()`, `TicketPage(id: destino.parametro('id'))`) y nada más:
-/// el menú, la campana y los enlaces ya llegan hasta aquí.
+/// Un módulo nuevo se registra aquí con su página y nada más: el menú, la
+/// campana y los enlaces ya llegan hasta aquí.
 Widget pantallaNativa(
   DestinoNativo destino, {
   String? titulo,
@@ -56,13 +57,13 @@ Widget pantallaNativa(
       slug: destino.parametro('slug'),
       titulo: titulo,
     ),
-
-    // ── Módulos por integrar ───────────────────────────────────────────
-    PantallaNativa.miSalud => MuyProntoPage(titulo: titulo ?? 'Mi salud'),
-    PantallaNativa.ayuda => MuyProntoPage(titulo: titulo ?? 'Centro de ayuda'),
-    PantallaNativa.soporte => MuyProntoPage(titulo: titulo ?? 'Soporte'),
-    PantallaNativa.ticket => MuyProntoPage(
-      titulo: titulo ?? 'Ticket de soporte',
-    ),
+    PantallaNativa.miSalud => const MiSaludPage(),
+    // Los enlaces internos de un artículo se abren con el mismo enrutador
+    PantallaNativa.ayuda => const CentroAyudaPage(abrirRuta: _abrirRutaInterna),
+    PantallaNativa.soporte => const SoportePage(),
+    PantallaNativa.ticket => TicketPage(id: destino.parametro('id')),
   };
 }
+
+bool _abrirRutaInterna(BuildContext context, String ruta) =>
+    abrirRuta(context, ruta);
