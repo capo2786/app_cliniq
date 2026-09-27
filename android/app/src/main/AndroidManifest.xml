@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
         Sin esto la app no tiene red en release.
@@ -15,6 +16,34 @@
     <!-- Recordatorios locales 24 h y 1 h antes de cada cita -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!--
+        Adjuntos de las consultas en línea: no hace falta pedir ningún permiso.
+
+        - La cámara se abre con la aplicación de cámara del teléfono
+          (image_picker, intento IMAGE_CAPTURE). Por eso NO se declara
+          android.permission.CAMERA: si se declarara, Android exigiría
+          concederlo antes de abrir esa cámara.
+        - La galería usa el selector de fotos del sistema y los PDF el de
+          documentos: los dos entregan solo lo elegido, sin permiso de
+          almacenamiento.
+        - open_filex (abrir un PDF recibido con el visor del teléfono) trae
+          en su manifiesto permisos de fotos, videos, audio y almacenamiento
+          que aquí no se usan —los PDF se guardan en la carpeta privada de
+          la aplicación— y que Google Play restringe. Se quitan.
+    -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_IMAGES"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_VIDEO"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.READ_MEDIA_AUDIO"
+        tools:node="remove" />
 
     <application
         android:label="Cliniq"
@@ -74,7 +103,10 @@
             <data android:mimeType="text/plain" />
         </intent>
 
-        <!-- Para abrir los documentos legales en el navegador -->
+        <!--
+            Para abrir en el navegador los documentos legales, el registro,
+            el panel web y la sala de la videoconsulta
+        -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
@@ -82,6 +114,17 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+
+        <!-- Tomar la foto de un adjunto con la cámara del teléfono -->
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+
+        <!-- Abrir un PDF recibido con el visor del teléfono -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/pdf" />
         </intent>
     </queries>
 
