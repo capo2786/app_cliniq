@@ -19,13 +19,10 @@ class Entorno {
   );
 
   /// Dónde vive el panel web. La aplicación solo lo abre (en el navegador
-  /// integrado) para el autorregistro y para el personal que entra por error.
+  /// integrado) para el personal que entra por error: el registro de
+  /// pacientes es una pantalla propia (`RegistroPage`).
   static const String webUrl = String.fromEnvironment(
     'WEB_URL',
     defaultValue: 'https://cliniq.gcaicedo-proyectos.com',
   );
-
-  /// El autorregistro de pacientes, en el panel web: la aplicación no copia
-  /// ese formulario (cédula, términos, confirmación por correo), lo abre.
-  static String get urlRegistro => '$webUrl/registro';
 }

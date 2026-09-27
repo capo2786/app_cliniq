@@ -11,6 +11,7 @@ import '../../../core/app/version_instalada.dart';
 import '../../../core/config/entorno.dart';
 import '../../../core/network/errores.dart';
 import '../../../core/presentacion/enlaces.dart';
+import '../../../core/presentacion/widgets/barra_de_accion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/campos.dart';
 import '../../../core/presentacion/widgets/entrada_animada.dart';
@@ -19,11 +20,13 @@ import '../../../core/service/biometria_service.dart';
 import '../../../core/servicios.dart';
 import '../../../core/storage/credenciales_service.dart';
 import '../../../core/tema/tokens.dart';
+import '../../legal/data/legal_service.dart';
 import '../data/acceso.dart';
 import '../data/auth_service.dart';
 import '../providers/auth_bloc.dart';
 import '../providers/auth_event.dart';
 import '../providers/auth_state.dart';
+import 'registro_page.dart';
 import 'widgets/paso_codigo.dart';
 import 'widgets/recuperar_contrasena.dart';
 import '../../../core/configuracion/config_publica_cubit.dart';
@@ -51,11 +54,15 @@ class LoginPage extends StatefulWidget {
   final BiometriaService? biometria;
   final AuthService? servicio;
 
+  /// Los documentos legales que se aceptan al crear una cuenta.
+  final LegalService? legal;
+
   const LoginPage({
     super.key,
     this.credenciales,
     this.biometria,
     this.servicio,
+    this.legal,
   });
 
   @override
@@ -235,6 +242,24 @@ class _LoginPageState extends State<LoginPage> {
     });
   }
 
+  /// «Crea tu cuenta»: el registro, dentro de la aplicación. Si se creó la
+  /// cuenta, vuelve con el correo para dejarlo escrito aquí.
+  Future<void> _crearCuenta() async {
+    cerrarTeclado();
+
+    final correo = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) =>
+            RegistroPage(servicio: widget.servicio, legal: widget.legal),
+      ),
+    );
+
+    if (!mounted || correo == null || correo.isEmpty) return;
+
+    _email.text = correo;
+    _password.clear();
+  }
+
   Future<void> _recuperar() async {
     await mostrarRecuperarContrasena(
       context,
@@ -332,7 +357,7 @@ class _LoginPageState extends State<LoginPage> {
                               : _formulario(state: state, cargando: cargando),
                         ),
                         const SizedBox(height: 18),
-                        const _SinCuenta(),
+                        _SinCuenta(alCrear: cargando ? null : _crearCuenta),
                         const SizedBox(height: 18),
                         const PieDeVersion(),
                       ],
@@ -780,11 +805,12 @@ class _ErrorDeAcceso extends StatelessWidget {
   }
 }
 
-/// Quien no tiene cuenta la crea en el panel web: el autorregistro pide la
-/// cédula, acepta los términos y confirma el correo, y la aplicación no
-/// copia ese formulario.
+/// Quien no tiene cuenta la crea aquí mismo, con el registro de la
+/// aplicación (el mismo del panel web, con el diseño de la aplicación).
 class _SinCuenta extends StatelessWidget {
-  const _SinCuenta();
+  final VoidCallback? alCrear;
+
+  const _SinCuenta({required this.alCrear});
 
   @override
   Widget build(BuildContext context) {
@@ -802,8 +828,7 @@ class _SinCuenta extends StatelessWidget {
         ),
         TextButton(
           key: const Key('boton-crear-cuenta'),
-          onPressed: () =>
-              abrirEnlace(context, Entorno.urlRegistro, queEs: 'el registro'),
+          onPressed: alCrear,
           style: TextButton.styleFrom(
             foregroundColor: AppColors.acentoSuave,
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),

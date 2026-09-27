@@ -4,6 +4,8 @@
 /// red ni complementos nativos.
 library;
 
+import 'dart:async';
+
 import 'package:app_cliniq/core/notificaciones/recordatorios_citas.dart';
 import 'package:app_cliniq/core/service/biometria_service.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
@@ -11,6 +13,7 @@ import 'package:app_cliniq/features/agendar/data/models/medico_portal.dart';
 import 'package:app_cliniq/features/agendar/data/models/turnos.dart';
 import 'package:app_cliniq/features/agendar/data/portal_service.dart';
 import 'package:app_cliniq/features/auth/data/auth_service.dart';
+import 'package:app_cliniq/features/auth/data/models/datos_registro.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
 import 'package:app_cliniq/features/dependientes/data/dependientes_service.dart';
@@ -103,6 +106,26 @@ class AuthServiceFalso implements AuthService {
     if (error != null) throw error;
 
     return 'Si el correo tiene una cuenta pendiente, te enviamos un enlace.';
+  }
+
+  /// Los registros pedidos, en orden.
+  final List<DatosRegistro> registros = [];
+
+  /// Si está puesto, registrar falla con este error.
+  Object? errorAlRegistrar;
+
+  /// Si está puesto, el registro espera a que se complete.
+  Completer<void>? registroPendiente;
+
+  @override
+  Future<void> registrar(DatosRegistro datos) async {
+    llamadas.add('registro:${datos.correo}');
+    registros.add(datos);
+
+    await registroPendiente?.future;
+
+    final error = errorAlRegistrar;
+    if (error != null) throw error;
   }
 
   @override

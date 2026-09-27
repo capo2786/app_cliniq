@@ -4,20 +4,24 @@ import 'package:app_cliniq/core/app/version_instalada.dart';
 import 'package:app_cliniq/core/configuracion/config_publica.dart';
 import 'package:app_cliniq/core/presentacion/widgets/logo_cliniq.dart';
 import 'package:app_cliniq/core/storage/almacen_claves.dart';
+import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/core/storage/credenciales_service.dart';
 import 'package:app_cliniq/core/tema/tema_app.dart';
 import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/data/auth_service.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/auth/presentacion/login_page.dart';
+import 'package:app_cliniq/features/auth/presentacion/registro_page.dart';
 import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
+import 'package:app_cliniq/features/legal/data/legal_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'dobles/clinica.dart';
+import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/navegador_falso.dart';
 
@@ -75,6 +79,10 @@ void main() {
               credenciales: credenciales,
               biometria: BiometriaFalsa(hay: huella),
               servicio: servicio,
+              legal: LegalService(
+                DioGrabador({'GET /legal/documentos': (_) => []}).dio,
+                CacheEnMemoria(),
+              ),
             ),
           ),
         ),
@@ -114,30 +122,42 @@ void main() {
     expect(find.text('Entrar con tu huella'), findsNothing);
   });
 
-  testWidgets('«Crea tu cuenta» abre el registro en el navegador '
-      'integrado, sin salir de la aplicación', (tester) async {
+  testWidgets('«Crea tu cuenta» abre el registro de la aplicación, sin '
+      'navegador ni panel web', (tester) async {
     final navegador = NavegadorFalso()..instalar();
     await montar(tester);
 
     await tocar(tester, find.byKey(const Key('boton-crear-cuenta')));
+    await tester.pump(const Duration(milliseconds: 400));
 
-    expect(navegador.abiertas, [
-      'https://cliniq.gcaicedo-proyectos.com/registro',
-    ]);
-    expect(navegador.ultimaFuera, isFalse);
+    expect(find.byType(RegistroPage), findsOneWidget);
+    expect(find.text('Crea tu cuenta'), findsWidgets);
+    expect(navegador.abiertas, isEmpty);
   });
 
-  testWidgets('si no hay navegador, el aviso deja la dirección a la vista', (
-    tester,
-  ) async {
-    NavegadorFalso(abre: false).instalar();
+  testWidgets('al volver del registro con la cuenta creada, el correo queda '
+      'escrito para entrar', (tester) async {
     await montar(tester);
 
     await tocar(tester, find.byKey(const Key('boton-crear-cuenta')));
+    await tester.pump(const Duration(milliseconds: 400));
 
+    Navigator.of(tester.element(find.byType(RegistroPage)))
+        .pop('ana@correo.com');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(RegistroPage), findsNothing);
     expect(
-      find.textContaining('https://cliniq.gcaicedo-proyectos.com/registro'),
-      findsOneWidget,
+      tester
+          .widget<EditableText>(
+            find.descendant(
+              of: find.byKey(const Key('campo-correo')),
+              matching: find.byType(EditableText),
+            ),
+          )
+          .controller
+          .text,
+      'ana@correo.com',
     );
   });
 

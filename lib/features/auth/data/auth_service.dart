@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../../../core/network/api_interceptor.dart';
+import 'models/datos_registro.dart';
 import 'models/usuario.dart';
 
 /// Lo que puede pasar al enviar correo y contraseña (o el código).
@@ -112,6 +114,21 @@ class AuthService {
     return mensaje?.trim().isNotEmpty == true
         ? mensaje!.trim()
         : mensajeReenvioNeutral;
+  }
+
+  /// `POST /auth/registro` (pública): crea la cuenta de un paciente, que
+  /// queda sin confirmar hasta que abra el enlace que le llega al correo.
+  ///
+  /// El API valida lo mismo que la pantalla y responde 400 con el motivo, 409
+  /// si el correo o el documento ya tienen cuenta y 429 si desde la misma
+  /// conexión se crearon demasiadas en una hora: esos mensajes se enseñan
+  /// tal cual.
+  Future<void> registrar(DatosRegistro datos) async {
+    await _dio.post<dynamic>(
+      '/auth/registro',
+      data: datos.aJson(),
+      options: Options(extra: const {rutaPublica: true}),
+    );
   }
 
   /// `GET /auth/me`: el perfil vigente, con permisos y legales pendientes.
