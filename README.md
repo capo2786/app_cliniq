@@ -483,27 +483,35 @@ de la clínica para enseñarlos. El plazo de una consulta se compara con
 `leerFechaLocal` los dejaría cinco horas corridos, y al revés con las citas.
 Cubierto por `test/instante_test.dart`.
 
-## Agendar: cómo se calculan los horarios
+## Agendar: los turnos los calcula la API
 
-`lib/features/agendar/dominio/` es el puerto 1:1 de
-`agenda.utils.ts` y `horarios.model.ts` del panel web, con los mismos
-nombres: `normalizarHorarios`, `rangosDelDia`, `bloqueoEn`, `duracionDe`,
-`margenDe`, `calcularHuecos` (la cita tiene que caber entera en el turno,
-margen a ambos lados de cada cita ocupada), `limiteAlcanzado`,
-`siguienteDiaConAtencion` y la división en mañana, tarde y noche. De
-`agendar.ts` vienen el primer día con atención (hoy solo si todavía cabe una
-cita con la anticipación mínima) y la etiqueta de «próxima fecha». El paso de
-la rejilla, la anticipación, el horizonte de días, los cortes de la tarde y
-la noche y las duraciones por defecto son los de la configuración
-(`ReglasAgendamiento`, desde `agenda.*`).
+La aplicación no calcula huecos. Los turnos libres llegan de la API, que usa
+las mismas reglas con que valida la reserva (jornada, bloqueos, duración,
+margen, límite diario, anticipación, horizonte y rejilla):
 
-El portal solo recibe lo ocupado del médico (`GET /portal/disponibilidad`,
-inicio y fin, nunca datos de otros pacientes). Al reprogramar, el horario de
-la propia cita queda libre. El servidor vuelve a validar todo al guardar.
+- `GET /portal/proximos-turnos` (con `ciudad` y `modalidad` opcionales): las
+  especialidades con cuántos médicos tienen turnos libres y el primero de
+  ellos («El primer turno disponible»), y solo esos médicos, cada uno con su
+  próximo turno. El buscador por nombre filtra esa lista en el teléfono.
+- `GET /portal/turnos/:doctorId?modalidad=…`: los turnos de un médico, de hoy
+  al horizonte de la clínica. Al reprogramar se manda `excluirCita` y el
+  horario de la propia cita (y los de al lado) se ofrecen libres.
 
-Una diferencia a propósito con el web: el filtro de especialidad ofrece solo
-las que tienen al menos un médico, en el orden del catálogo. En un teléfono,
-elegir una especialidad sin médicos es un callejón sin salida.
+`lib/features/agendar/dominio/huecos.dart` solo presenta: los días con
+turnos, las fichas de un día en mañana, tarde y noche con los cortes de la
+configuración (`agenda.horaInicioTarde`, `agenda.horaInicioNoche`) y las
+palabras naturales («hoy a las 15:30», «mañana», «lun 29»). Las fechas son
+hora local de la clínica (`clinica.zonaHoraria`).
+
+Sin red no se inventa nada: se dice que no se pudo y se ofrece reintentar.
+Si al agendar o reprogramar la API responde 409 (el turno se tomó
+entretanto), se enseña su mensaje, se vuelven a pedir los turnos y los
+próximos turnos, se conserva todo lo elegido y se vuelve a la hora sin ese
+turno.
+
+Una diferencia a propósito con el web: solo se ofrecen las especialidades
+con algún médico disponible. En un teléfono, elegir una especialidad sin
+turnos es un callejón sin salida.
 
 ## Consultas en línea
 
@@ -660,7 +668,7 @@ fvm flutter test
 | `seguridad_test.dart` | La contraseña mínima de la clínica |
 | `formulario_dependiente_test.dart` | Parentescos, documento, sexo y sangre de los catálogos; `validarCedula` |
 | `fecha_local_test.dart` | La zona se descarta y nunca se convierte; el reloj de la clínica |
-| `huecos_test.dart` | El puerto del cálculo de horarios del web, con la rejilla de la configuración |
+| `huecos_test.dart` | La presentación de los turnos: días, mañana, tarde y noche con los cortes de la configuración, anticipación, rechazados y palabras naturales |
 | `validaciones_test.dart` | Cédula con módulo 10 (o solo diez dígitos si la clínica lo apaga), pasaporte, fecha no futura, opciones de los catálogos |
 | `errores_test.dart` | `{status, message}` con texto o lista, 401 y 423 del acceso, la red |
 | `reglas_citas_test.dart` | Las horas para cambiar de la configuración, próximas e historial, cuenta regresiva, consejos del catálogo |
@@ -668,7 +676,9 @@ fvm flutter test
 | `contrato_api_test.dart` | Lo que se lee y se manda a la API |
 | `auth_bloc_test.dart` | Acceso correcto, segundo factor, 401, 423, sesión guardada y vencida, solo pacientes, correo sin confirmar |
 | `acceso_pacientes_test.dart` | Quién es paciente, el 403 `CORREO_NO_VERIFICADO` y `POST /auth/registro/reenviar` |
-| `agendar_bloc_test.dart` | El agendamiento completo, el horario tomado y la reprogramación |
+| `agendar_bloc_test.dart` | Especialidades, primer turno disponible, buscador, rejilla desde la API, el 409 al agendar y al reprogramar, sin red y la reprogramación con `excluirCita` |
+| `turnos_portal_test.dart` | `GET /portal/proximos-turnos` y `GET /portal/turnos/:doctorId`: lo que se pide y cómo se lee |
+| `pasos_agendar_test.dart` | Los pasos de especialidad, médico (con el buscador) y horario, pintados |
 | `citas_bloc_test.dart` | La copia sin conexión, cancelar y los recordatorios según la configuración (y cancelados si se apagan) |
 | `login_page_test.dart` | La pantalla de acceso con el nombre, el eslogan y el logotipo de la clínica, crear cuenta, el personal, el bloqueo, el código y el reenvío con los tiempos de la configuración |
 | `instante_test.dart` | Los instantes reales y la hora de la clínica |
