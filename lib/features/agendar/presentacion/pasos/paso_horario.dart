@@ -4,16 +4,18 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/fechas/fecha_local.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
-import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/tema/tokens.dart';
-import '../../../citas/presentacion/estilos_cita.dart';
 import '../../dominio/huecos.dart';
 import '../../providers/agendar_bloc.dart';
 import '../../providers/agendar_event.dart';
 import '../../providers/agendar_state.dart';
+import '../widgets/pastilla_modalidad.dart';
 
-/// Paso 5: el día en una tira que empieza en el primer día con atención, y
-/// los horarios en fichas agrupadas por mañana, tarde y noche.
+/// Paso 5: el día en una tira con los días que tienen turnos libres, y los
+/// turnos de ese día en fichas agrupadas por mañana, tarde y noche.
+///
+/// Los turnos son los que calcula la API (`/portal/turnos/:doctorId`): aquí
+/// no se calcula ninguno.
 class PasoHorario extends StatelessWidget {
   final AgendarState state;
 
@@ -23,7 +25,6 @@ class PasoHorario extends StatelessWidget {
   Widget build(BuildContext context) {
     final medico = state.medico;
     final original = state.original;
-    final modalidad = context.modalidad(state.tipo);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -43,10 +44,9 @@ class PasoHorario extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Flexible(
-                child: Pastilla(
-                  texto: '${modalidad.nombre} · ${state.duracion} min',
-                  color: modalidad.color,
-                  icono: modalidad.icono,
+                child: PastillaModalidad(
+                  tipo: state.tipo,
+                  detalle: '${state.duracion} min',
                 ),
               ),
             ],
@@ -81,7 +81,7 @@ class _TiraDeDias extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dias = state.diasDisponibles;
-    final bloc = context.read<AgendarBloc>();
+    final fecha = state.fecha;
 
     if (dias.isEmpty) return const SizedBox.shrink();
 
@@ -91,76 +91,85 @@ class _TiraDeDias extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemCount: dias.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final dia = dias[i];
-          final elegido = state.fecha != null && mismoDia(state.fecha!, dia);
-          final hoy = mismoDia(dia, state.ahora);
+        itemBuilder: (context, i) => _DiaDeLaTira(
+          dia: dias[i],
+          hoy: mismoDia(dias[i], state.ahora),
+          elegido: fecha != null && mismoDia(fecha, dias[i]),
+        ),
+      ),
+    );
+  }
+}
 
-          return Semantics(
-            button: true,
-            selected: elegido,
-            label: FormatoFecha.diaLargo(dia),
-            child: InkWell(
-              onTap: () => bloc.add(AgendarFechaElegida(dia)),
-              borderRadius: BorderRadius.circular(16),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 64,
-                decoration: BoxDecoration(
-                  gradient: elegido ? AppGradientes.accion : null,
-                  color: elegido ? null : AppColors.tarjetaPlana,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: elegido
-                        ? AppColors.acentoClaro
-                        : AppColors.bordeCampo,
-                  ),
-                  boxShadow: elegido
-                      ? [
-                          BoxShadow(
-                            color: AppColors.acento.withValues(alpha: 0.3),
-                            blurRadius: 14,
-                            offset: const Offset(0, 6),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      hoy ? 'Hoy' : FormatoFecha.diaCorto(dia),
-                      style: TextStyle(
-                        color: elegido
-                            ? Colors.white
-                            : AppColors.textoSecundario,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      '${dia.day}',
-                      style: TextStyle(
-                        color: elegido ? Colors.white : AppColors.texto,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      FormatoFecha.mesCortoMayusculas(dia),
-                      style: TextStyle(
-                        color: elegido ? Colors.white : AppColors.textoTenue,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+/// Un día de la tira: «Lun», «28», «SEP».
+class _DiaDeLaTira extends StatelessWidget {
+  final DateTime dia;
+  final bool hoy;
+  final bool elegido;
+
+  const _DiaDeLaTira({
+    required this.dia,
+    required this.hoy,
+    required this.elegido,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    TextStyle estilo(Color color, double tamano, FontWeight peso) => TextStyle(
+      color: elegido ? Colors.white : color,
+      fontSize: tamano,
+      fontWeight: peso,
+    );
+
+    return Semantics(
+      button: true,
+      selected: elegido,
+      label: FormatoFecha.diaLargo(dia),
+      child: InkWell(
+        onTap: () => context.read<AgendarBloc>().add(AgendarFechaElegida(dia)),
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 64,
+          decoration: BoxDecoration(
+            gradient: elegido ? AppGradientes.accion : null,
+            color: elegido ? null : AppColors.tarjetaPlana,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: elegido ? AppColors.acentoClaro : AppColors.bordeCampo,
             ),
-          );
-        },
+            boxShadow: elegido
+                ? [
+                    BoxShadow(
+                      color: AppColors.acento.withValues(alpha: 0.3),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                hoy ? 'Hoy' : FormatoFecha.diaCorto(dia),
+                style: estilo(AppColors.textoSecundario, 12, FontWeight.w700),
+              ),
+              Text(
+                '${dia.day}',
+                style: estilo(AppColors.texto, 22, FontWeight.w900),
+              ),
+              Text(
+                FormatoFecha.mesCortoMayusculas(dia),
+                style: estilo(
+                  AppColors.textoTenue,
+                  10,
+                  FontWeight.w800,
+                ).copyWith(letterSpacing: 0.8),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -179,7 +188,10 @@ class _Horarios extends StatelessWidget {
     final fecha = state.fecha;
     if (fecha == null) return;
 
-    final siguiente = dias.where((d) => d.isAfter(fecha)).firstOrNull;
+    // El siguiente con turnos; si no hay, el primero de la tira.
+    final siguiente =
+        dias.where((d) => d.isAfter(fecha)).firstOrNull ??
+        dias.where((d) => !mismoDia(d, fecha)).firstOrNull;
     if (siguiente != null) {
       context.read<AgendarBloc>().add(AgendarFechaElegida(siguiente));
     }
@@ -189,71 +201,49 @@ class _Horarios extends StatelessWidget {
   Widget build(BuildContext context) {
     final bloc = context.read<AgendarBloc>();
     final fecha = state.fecha;
-    final medico = state.medico;
 
     switch (state.estadoDia) {
       case EstadoDia.sinMedico:
         return const SizedBox.shrink();
-      case EstadoDia.sinFecha:
+      case EstadoDia.cargando:
+        return const CargandoCentro(mensaje: 'Buscando turnos libres…');
+      case EstadoDia.error:
+        return EstadoError(
+          mensaje: state.errorTurnos ?? 'No pudimos ver los turnos libres.',
+          alReintentar: () => bloc.add(const AgendarTurnosReintentados()),
+        );
+      case EstadoDia.sinTurnos:
         final dias = state.reglas.diasHorizonte;
         return EstadoVacio(
           icono: Icons.event_busy_rounded,
-          titulo: 'Sin fechas disponibles',
+          titulo: 'Sin turnos libres',
           descripcion:
-              'Este médico no tiene días de atención en los próximos '
-              '${dias == 1 ? 'día' : '$dias días'}. Prueba con otro médico.',
+              '${_quien(state.medico?.nombre)} no tiene turnos libres en '
+              'los próximos ${dias == 1 ? 'día' : '$dias días'}'
+              '${state.reprogramando ? '.' : '. Prueba con otro médico.'}',
+          accion: state.reprogramando ? null : 'Elegir otro médico',
+          alPulsar: state.reprogramando
+              ? null
+              : () => bloc.add(const AgendarPasoCambiado(PasoAgendar.medico)),
         );
-      case EstadoDia.pasado:
-        return const RecuadroAviso.alerta('Ese día ya pasó. Elige otro.');
-      case EstadoDia.bloqueado:
-        final motivo = state.bloqueo?.motivo ?? '';
+      case EstadoDia.sinFecha:
+        return const RecuadroAviso.informacion(
+          'Elige un día de la tira para ver sus turnos.',
+          icono: Icons.touch_app_outlined,
+        );
+      case EstadoDia.diaSinTurnos:
         return EstadoVacio(
-          icono: Icons.beach_access_rounded,
-          titulo: 'Ese día no atiende',
-          descripcion: motivo.isEmpty
-              ? '${_quien(medico?.nombre)} no atiende ese día.'
-              : '${_quien(medico?.nombre)} no atiende ese día: $motivo.',
-          accion: 'Ver el siguiente día',
-          alPulsar: () => _siguienteDia(context),
-        );
-      case EstadoDia.noAtiende:
-        return EstadoVacio(
-          icono: Icons.event_busy_rounded,
-          titulo: 'Ese día no hay atención',
-          descripcion: 'Elige otro día de la tira.',
-          accion: 'Ver el siguiente día',
-          alPulsar: () => _siguienteDia(context),
-        );
-      case EstadoDia.cargando:
-        return const CargandoCentro(mensaje: 'Viendo qué horarios quedan…');
-      case EstadoDia.error:
-        return EstadoError(
-          mensaje: state.errorOcupados ?? 'No pudimos ver los horarios.',
-          alReintentar: () => bloc.add(const AgendarOcupadosReintentados()),
-        );
-      case EstadoDia.limite:
-        return EstadoVacio(
-          icono: Icons.event_busy_rounded,
-          titulo: 'Agenda completa',
-          descripcion: 'El médico ya completó sus citas de ese día.',
+          icono: Icons.hourglass_disabled_rounded,
+          titulo: 'No quedan turnos libres',
+          descripcion: fecha == null
+              ? 'Elige otro día.'
+              : 'El ${FormatoFecha.diaLargo(fecha).toLowerCase()} ya no '
+                    'tiene turnos libres.',
           accion: 'Ver el siguiente día',
           alPulsar: () => _siguienteDia(context),
         );
       case EstadoDia.ok:
         break;
-    }
-
-    if (state.libres == 0) {
-      return EstadoVacio(
-        icono: Icons.hourglass_disabled_rounded,
-        titulo: 'No quedan horarios libres',
-        descripcion: fecha == null
-            ? 'Elige otro día.'
-            : 'El ${FormatoFecha.diaLargo(fecha).toLowerCase()} ya está '
-                  'ocupado.',
-        accion: 'Ver el siguiente día',
-        alPulsar: () => _siguienteDia(context),
-      );
     }
 
     final elegido = state.huecoValido;
@@ -274,29 +264,7 @@ class _Horarios extends StatelessWidget {
         const SizedBox(height: 12),
         for (final grupo in state.grupos.entries)
           if (grupo.value.isNotEmpty) ...[
-            Row(
-              children: [
-                Icon(
-                  switch (grupo.key) {
-                    Periodo.manana => Icons.wb_sunny_outlined,
-                    Periodo.tarde => Icons.wb_twilight_rounded,
-                    Periodo.noche => Icons.nights_stay_outlined,
-                  },
-                  size: 17,
-                  color: AppColors.primarioClaro,
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  grupo.key.titulo.toUpperCase(),
-                  style: const TextStyle(
-                    color: AppColors.textoSuave,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1.1,
-                  ),
-                ),
-              ],
-            ),
+            _EncabezadoPeriodo(periodo: grupo.key),
             const SizedBox(height: 10),
             Wrap(
               spacing: 8,
@@ -305,13 +273,47 @@ class _Horarios extends StatelessWidget {
                 for (final hueco in grupo.value)
                   _FichaHorario(
                     hueco: hueco,
-                    elegida: elegido?.hora == hueco.hora,
+                    elegida: elegido?.mismoHorario(hueco) ?? false,
                     onTap: () => bloc.add(AgendarHuecoElegido(hueco)),
                   ),
               ],
             ),
             const SizedBox(height: 18),
           ],
+      ],
+    );
+  }
+}
+
+/// «MAÑANA», «TARDE» o «NOCHE», con su icono.
+class _EncabezadoPeriodo extends StatelessWidget {
+  final Periodo periodo;
+
+  const _EncabezadoPeriodo({required this.periodo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(
+          switch (periodo) {
+            Periodo.manana => Icons.wb_sunny_outlined,
+            Periodo.tarde => Icons.wb_twilight_rounded,
+            Periodo.noche => Icons.nights_stay_outlined,
+          },
+          size: 17,
+          color: AppColors.primarioClaro,
+        ),
+        const SizedBox(width: 7),
+        Text(
+          periodo.titulo.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.textoSuave,
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.1,
+          ),
+        ),
       ],
     );
   }
@@ -330,14 +332,12 @@ class _FichaHorario extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ocupado = hueco.ocupado;
-
     return Semantics(
-      button: !ocupado,
+      button: true,
       selected: elegida,
-      label: ocupado ? '${hueco.hora}, ocupado' : hueco.hora,
+      label: hueco.hora,
       child: InkWell(
-        onTap: ocupado ? null : onTap,
+        onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
@@ -346,32 +346,18 @@ class _FichaHorario extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             gradient: elegida ? AppGradientes.accion : null,
-            color: elegida
-                ? null
-                : ocupado
-                ? AppColors.campo.withValues(alpha: 0.4)
-                : AppColors.tarjetaPlana,
+            color: elegida ? null : AppColors.tarjetaPlana,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: elegida
-                  ? AppColors.acentoClaro
-                  : ocupado
-                  ? AppColors.bordeDeshabilitado
-                  : AppColors.bordeCampo,
+              color: elegida ? AppColors.acentoClaro : AppColors.bordeCampo,
             ),
           ),
           child: Text(
             hueco.hora,
             style: TextStyle(
-              color: elegida
-                  ? Colors.white
-                  : ocupado
-                  ? AppColors.textoTenue
-                  : AppColors.texto,
+              color: elegida ? Colors.white : AppColors.texto,
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              decoration: ocupado ? TextDecoration.lineThrough : null,
-              decorationColor: AppColors.textoTenue,
             ),
           ),
         ),

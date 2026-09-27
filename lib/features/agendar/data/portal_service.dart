@@ -2,8 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/fechas/fecha_local.dart';
 import '../../citas/data/models/cita.dart';
-import '../dominio/huecos.dart';
-import 'models/medico_portal.dart';
+import 'models/turnos.dart';
 
 /// Lo que se manda para agendar una cita desde el portal.
 class NuevaCita {
@@ -35,25 +34,28 @@ class NuevaCita {
   };
 }
 
-/// El portal del paciente: médicos, lo ocupado de su agenda, agendar,
-/// reprogramar y cancelar.
+/// El portal del paciente: los turnos libres, agendar, reprogramar y
+/// cancelar.
 ///
 /// Usa las rutas propias del portal y no las del personal: el paciente no
 /// puede ver la agenda de un médico —tiene datos de otros pacientes—, solo
-/// los intervalos ocupados.
+/// los turnos que le puede tomar. Esos turnos los calcula la API con las
+/// mismas reglas con que valida la reserva; la aplicación no calcula nada.
 class PortalService {
   final Dio _dio;
 
   PortalService(this._dio);
 
-  /// `GET /portal/medicos`, con filtros opcionales.
-  Future<List<MedicoPortal>> medicos({
+  /// `GET /portal/proximos-turnos`: las especialidades con cuántos médicos
+  /// tienen turnos libres y el primero de ellos, y esos médicos con su
+  /// próximo turno. Los filtros son opcionales.
+  Future<ProximosTurnos> proximosTurnos({
     String? especialidad,
     String? ciudad,
     TipoCita? modalidad,
   }) async {
     final respuesta = await _dio.get<dynamic>(
-      '/portal/medicos',
+      '/portal/proximos-turnos',
       queryParameters: {
         if (especialidad != null && especialidad.isNotEmpty)
           'especialidad': especialidad,
@@ -63,44 +65,47 @@ class PortalService {
     );
 
     final datos = respuesta.data;
-    if (datos is! List) return const [];
+    if (datos is! Map) {
+      throw const FormatException('Respuesta de próximos turnos ilegible');
+    }
 
-    return [
-      for (final m in datos)
-        if (m is Map) MedicoPortal.desdeJson(m),
-    ].where((m) => m.uid.isNotEmpty).toList();
+    return ProximosTurnos.desdeJson(datos);
   }
 
-  /// `GET /portal/disponibilidad/:doctorId`: lo ocupado entre dos días
-  /// (inclusive), como intervalos en hora local. Máximo 62 días.
-  Future<List<IntervaloOcupado>> ocupados(
+  /// `GET /portal/turnos/:doctorId`: los turnos libres del médico en esa
+  /// modalidad. Sin [desde] ni [hasta], la API devuelve de hoy al horizonte
+  /// de reserva de la clínica.
+  ///
+  /// Al reprogramar, [excluirCita] es la cita que se mueve: su propio
+  /// horario y los de al lado cuentan como libres.
+  Future<TurnosMedico> turnos(
     String doctorId,
-    DateTime desde,
-    DateTime hasta,
-  ) async {
+    TipoCita modalidad, {
+    DateTime? desde,
+    DateTime? hasta,
+    String? excluirCita,
+  }) async {
     final respuesta = await _dio.get<dynamic>(
-      '/portal/disponibilidad/$doctorId',
-      queryParameters: {'desde': fechaIso(desde), 'hasta': fechaIso(hasta)},
+      '/portal/turnos/$doctorId',
+      queryParameters: {
+        'modalidad': modalidad.codigo,
+        if (desde != null) 'desde': fechaIso(desde),
+        if (hasta != null) 'hasta': fechaIso(hasta),
+        if (excluirCita != null && excluirCita.isNotEmpty)
+          'excluirCita': excluirCita,
+      },
     );
 
     final datos = respuesta.data;
-    if (datos is! List) return const [];
-
-    final intervalos = <IntervaloOcupado>[];
-    for (var i = 0; i < datos.length; i++) {
-      final x = datos[i];
-      if (x is! Map) continue;
-
-      final inicio = leerFechaLocal(x['start']);
-      final fin = leerFechaLocal(x['end']);
-      if (inicio == null || fin == null) continue;
-
-      intervalos.add(
-        IntervaloOcupado(id: 'ocupado-$i', inicio: inicio, fin: fin),
-      );
+    if (datos is! Map) {
+      throw const FormatException('Respuesta de turnos ilegible');
     }
 
-    return intervalos;
+    return TurnosMedico.desdeJson(
+      datos,
+      doctorId: doctorId,
+      modalidad: modalidad,
+    );
   }
 
   /// `POST /portal/citas`.

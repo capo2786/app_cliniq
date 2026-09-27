@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/presentacion/widgets/barra_de_accion.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
-import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/tema/tokens.dart';
-import '../../../citas/presentacion/estilos_cita.dart';
-import '../../data/models/medico_portal.dart';
-import '../../dominio/horarios.dart';
 import '../../dominio/huecos.dart';
 import '../../providers/agendar_bloc.dart';
 import '../../providers/agendar_event.dart';
 import '../../providers/agendar_state.dart';
+import '../widgets/buscador_medicos.dart';
+import '../widgets/con_proximos_turnos.dart';
+import '../widgets/tarjeta_medico.dart';
+import '../widgets/tarjeta_primer_turno.dart';
 
-/// Paso 3: el médico. Cada tarjeta dice qué modalidades ofrece, cuándo
-/// atiende y cuál es su primera fecha libre.
+/// Paso 3: el médico.
+///
+/// Arriba, «El primer turno disponible» de la especialidad: con un toque
+/// deja elegidos ese médico y ese turno y pasa al motivo. Debajo, un
+/// buscador por nombre y los médicos con turnos libres, cada uno con su
+/// próximo turno.
 class PasoMedico extends StatelessWidget {
   final AgendarState state;
 
@@ -21,194 +26,110 @@ class PasoMedico extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bloc = context.read<AgendarBloc>();
-    final medicos = state.medicosFiltrados;
-
-    if (medicos.isEmpty) {
-      return EstadoVacio(
-        icono: Icons.person_search_rounded,
-        titulo: 'Ningún médico coincide',
-        descripcion:
-            'No encontramos médicos con esos filtros. Cambia la '
-            'especialidad, la ciudad o la modalidad.',
-        accion: 'Cambiar filtros',
-        alPulsar: () =>
-            bloc.add(const AgendarPasoCambiado(PasoAgendar.filtros)),
-      );
-    }
-
-    return Column(
-      children: [
-        for (final medico in medicos) ...[
-          _TarjetaMedico(
-            medico: medico,
-            ahora: state.ahora,
-            reglas: state.reglas,
-            elegido: state.medicoId == medico.uid,
-            onTap: () => bloc.add(AgendarMedicoElegido(medico.uid)),
-          ),
-          const SizedBox(height: 12),
-        ],
-      ],
+    return ConProximosTurnos(
+      state: state,
+      child: state.medicosDeLaEspecialidad.isEmpty
+          ? _SinMedicos(especialidad: state.filtroEspecialidad)
+          : _ListaDeMedicos(state: state),
     );
   }
 }
 
-class _TarjetaMedico extends StatelessWidget {
-  final MedicoPortal medico;
-  final DateTime ahora;
-  final ReglasAgendamiento reglas;
-  final bool elegido;
-  final VoidCallback onTap;
+class _SinMedicos extends StatelessWidget {
+  final String especialidad;
 
-  const _TarjetaMedico({
-    required this.medico,
-    required this.ahora,
-    required this.reglas,
-    required this.elegido,
-    required this.onTap,
-  });
-
-  String get _iniciales {
-    final partes = medico.nombre
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (partes.isEmpty) return '?';
-    if (partes.length == 1) return partes.first[0].toUpperCase();
-    return (partes[0][0] + partes[1][0]).toUpperCase();
-  }
+  const _SinMedicos({required this.especialidad});
 
   @override
   Widget build(BuildContext context) {
-    final modalidades = medico.modalidadesOfrecidas;
-    final proxima = proximaFecha(
-      medico,
-      duracionDe(medico, modalidades.first, reglas),
-      ahora,
-      reglas,
-    );
-    final sinFechas = proxima == 'Sin fechas próximas';
-
-    return TarjetaTranslucida(
-      onTap: onTap,
-      tinte: elegido ? AppColors.acento : null,
-      padding: const EdgeInsets.all(15),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  gradient: AppGradientes.encabezado,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Text(
-                  _iniciales,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 17,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      medico.nombre,
-                      style: const TextStyle(
-                        color: AppColors.texto,
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    if (medico.especialidad != null || medico.ciudad != null)
-                      Text(
-                        [?medico.especialidad, ?medico.ciudad].join(' · '),
-                        style: const TextStyle(
-                          color: AppColors.textoSecundario,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const Icon(
-                Icons.chevron_right_rounded,
-                color: AppColors.textoSecundario,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final tipo in modalidades)
-                Builder(
-                  builder: (context) {
-                    final estilo = context.modalidad(tipo);
-
-                    return Pastilla(
-                      texto: estilo.nombre,
-                      color: estilo.color,
-                      icono: estilo.icono,
-                    );
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Icon(
-                Icons.schedule_rounded,
-                size: 15,
-                color: AppColors.primarioClaro,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  resumenHorario(medico.horariosAtencion),
-                  style: const TextStyle(
-                    color: AppColors.textoSuave,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Icon(
-                Icons.event_available_rounded,
-                size: 15,
-                color: sinFechas ? AppColors.textoTenue : AppColors.exito,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  sinFechas ? proxima : 'Próxima fecha: $proxima',
-                  style: TextStyle(
-                    color: sinFechas ? AppColors.textoTenue : AppColors.exito,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+    return EstadoVacio(
+      icono: Icons.person_search_rounded,
+      titulo: 'Ningún médico disponible',
+      descripcion: especialidad.isEmpty
+          ? 'Por ahora ningún médico tiene turnos libres con esos filtros.'
+          : 'Por ahora ningún médico de $especialidad tiene turnos libres. '
+                'Prueba con otra especialidad.',
+      accion: 'Cambiar especialidad',
+      alPulsar: () => context.read<AgendarBloc>().add(
+        const AgendarPasoCambiado(PasoAgendar.filtros),
       ),
+    );
+  }
+}
+
+class _ListaDeMedicos extends StatelessWidget {
+  final AgendarState state;
+
+  const _ListaDeMedicos({required this.state});
+
+  /// Cierra el teclado del buscador antes de elegir.
+  void _elegir(BuildContext context, AgendarEvent evento) {
+    cerrarTeclado();
+    context.read<AgendarBloc>().add(evento);
+  }
+
+  void _buscar(BuildContext context, String texto) =>
+      context.read<AgendarBloc>().add(AgendarBusquedaCambiada(texto));
+
+  @override
+  Widget build(BuildContext context) {
+    final especialidad = state.filtroEspecialidad;
+    final medicos = state.medicosFiltrados;
+    // Mientras se busca a alguien por nombre, la tarjeta de otro estorba.
+    final primero = state.busqueda.trim().isEmpty ? state.primerTurno : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          [
+            especialidad.isEmpty ? 'Todas las especialidades' : especialidad,
+            '${cantidadDeMedicos(state.medicosDeLaEspecialidad.length)} con '
+                'turnos libres',
+          ].join(' · '),
+          style: const TextStyle(
+            color: AppColors.textoSecundario,
+            fontSize: 13,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (primero != null) ...[
+          TarjetaPrimerTurno(
+            primero: primero,
+            ahora: state.ahora,
+            confirmando: state.confirmandoPrimerTurno,
+            onTap: () =>
+                _elegir(context, AgendarPrimerTurnoElegido(primero.turno)),
+          ),
+          const SizedBox(height: 18),
+        ],
+        BuscadorMedicos(
+          texto: state.busqueda,
+          alCambiar: (texto) => _buscar(context, texto),
+        ),
+        const SizedBox(height: 14),
+        if (medicos.isEmpty)
+          EstadoVacio(
+            icono: Icons.person_search_rounded,
+            titulo: 'Ningún médico se llama así',
+            descripcion:
+                'No encontramos a «${state.busqueda.trim()}» entre los '
+                'médicos con turnos libres.',
+            accion: 'Borrar búsqueda',
+            alPulsar: () => _buscar(context, ''),
+          )
+        else
+          for (final medico in medicos) ...[
+            TarjetaMedico(
+              medico: medico,
+              ahora: state.ahora,
+              elegido: state.medicoId == medico.uid,
+              onTap: () => _elegir(context, AgendarMedicoElegido(medico.uid)),
+            ),
+            const SizedBox(height: 12),
+          ],
+      ],
     );
   }
 }
