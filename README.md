@@ -50,9 +50,10 @@ fvm flutter run
 
 ## Servicios
 
-La aplicación consume `https://api-cliniq.gcaicedo-proyectos.com/api`, y los
-documentos legales, el registro de pacientes (`/registro`) y el panel del
-personal se abren en el panel web, `https://cliniq.gcaicedo-proyectos.com`. Ambas se pueden cambiar al compilar,
+La aplicación consume `https://api-cliniq.gcaicedo-proyectos.com/api`. Del
+panel web, `https://cliniq.gcaicedo-proyectos.com`, solo abre el registro de
+pacientes (`/registro`) y, para el personal que entra por error, el propio
+panel, las dos en el navegador integrado. Ambas se pueden cambiar al compilar,
 sin tocar el código:
 
 ```bash
@@ -149,7 +150,7 @@ antes de tocarla.
 | --- | --- |
 | `local_auth` | Entrar con huella o rostro |
 | `package_info_plus` | Versión instalada, en el pie del acceso y del perfil |
-| `url_launcher` | Abrir en el navegador los documentos legales, el registro, el panel web, los enlaces del menú sin pantalla propia y la sala de la videoconsulta; llamar o escribir a la clínica (`tel:`, `mailto:`) |
+| `url_launcher` | Abrir en el navegador integrado (`LaunchMode.inAppBrowserView`: Chrome Custom Tabs o Safari encima de la aplicación) el registro, el panel web y los enlaces externos del menú; llamar o escribir a la clínica (`tel:`, `mailto:`) |
 | `flutter_svg` | Pintar el logotipo de la clínica cuando llega en SVG (`clinica.logo`) |
 
 ### Adjuntos de las consultas en línea
@@ -193,9 +194,10 @@ identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   `READ_MEDIA_IMAGES/VIDEO/AUDIO`, que la aplicación no usa (los PDF van a
   su carpeta privada) y que Google Play restringe: se quitan con
   `tools:node="remove"`.
-- `<queries>` declara lo que se abre fuera: `http`/`https` (navegador,
-  videoconsulta), `tel:` y `mailto:` (llamar o escribir a la clínica),
-  `IMAGE_CAPTURE` (cámara) y `application/pdf` (visor).
+- `<queries>` declara lo que se abre con otra aplicación del teléfono:
+  `http`/`https` (el navegador integrado), `tel:` y `mailto:` (llamar o
+  escribir a la clínica), `IMAGE_CAPTURE` (cámara) y `application/pdf`
+  (visor).
 
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
@@ -326,7 +328,8 @@ lib/
     arranque/                 la espera de los datos de la clínica y de la sesión
     auth/                     acceso, segundo factor, recuperación, sesión
     legal/                    documentos legales de la API y su aceptación
-    navegacion/               el menú del servidor y a dónde lleva cada enlace
+    navegacion/               el menú del servidor, el enrutador de las rutas del sistema,
+                              las pantallas que abre cada una y «Muy pronto»
     inicio/                   el inicio y la barra de pestañas
     citas/                    mis citas, detalle, cancelar, las horas para cambiar y la videoconsulta
     consultas/                consultas en línea: lista, consulta nueva paso a paso y detalle con la conversación
@@ -395,12 +398,35 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
 La barra de abajo la arma el menú del servidor (`GET
 /menus/mi-menu?plataforma=APP`): los cuatro primeros enlaces por su orden,
 con el nombre, el icono y el color del administrador, más **Perfil**, que
-siempre está; el resto va a los accesos rápidos del inicio. Una ruta que la
-aplicación conoce (`/inicio`, `/mis-citas`, `/portal/agendar`,
-`/portal/dependientes`, `/portal/consultas`) abre su pantalla; una que no,
-`https://<web><ruta>` en el navegador. Agendar va destacado y no cambia de
-pestaña: abre el agendamiento encima. El menú se guarda para abrir sin red;
-sin copia, un aviso con «Reintentar».
+siempre está; el resto va a los accesos rápidos del inicio. Agendar va
+destacado y no cambia de pestaña: abre el agendamiento encima. El menú se
+guarda para abrir sin red; sin copia, un aviso con «Reintentar».
+
+**Ningún enlace saca a la persona de la aplicación.** El enrutador
+(`lib/features/navegacion/dominio/destinos.dart`, `rutasDelSistema`) entiende
+las rutas del sistema, también con parámetros, y lo usan el menú, los avisos
+de la campana y los enlaces de los textos (`abrirRuta`, en
+`navegacion/presentacion/enrutador.dart`):
+
+| Ruta | Pantalla |
+| --- | --- |
+| `/inicio`, `/mis-citas`, `/portal/dependientes`, `/portal/consultas`, `/perfil` | Su pestaña (o encima, si no está en la barra) |
+| `/portal/agendar` | Agendar, encima |
+| `/portal/consultas/:id` | El detalle de la consulta |
+| `/portal/videoconsulta/:citaId` | La videoconsulta de la cita |
+| `/notificaciones` | Los avisos de la campana |
+| `/portal/arco`, `/privacidad/solicitudes` | Mis derechos sobre mis datos |
+| `/portal/encuesta/:citaId` | La encuesta de la cita |
+| `/legal/:slug` | El documento legal |
+| `/mi-salud`, `/ayuda`, `/soporte`, `/soporte/tickets/:id` | «Muy pronto», hasta que lleguen sus pantallas |
+
+La consulta y el fragmento de la ruta se ignoran. Una ruta del menú que la
+aplicación no sabe abrir no se enseña (ni en la barra ni en los accesos); un
+enlace externo del menú (una dirección que puso el administrador) se abre en
+el navegador integrado; `tel:` y `mailto:`, con el marcador y el correo del
+teléfono. Las pantallas de cada destino se arman en un solo lugar,
+`navegacion/presentacion/pantallas_nativas.dart` (`pantallaNativa`): ahí se
+conectan las que falten.
 
 ## Pantalla de acceso
 
@@ -424,8 +450,9 @@ solo botón con el degradado de la marca. Al pie, la **versión instalada**.
   venció». Un 401 en las rutas del acceso no es eso: son credenciales o un
   código equivocados.
 - **Crear cuenta.** El pie dice «¿No tienes cuenta? Crea tu cuenta» y abre
-  el autorregistro del panel web (`/registro`) en el navegador: ahí se
-  piden la cédula y los términos y se confirma el correo.
+  el autorregistro del panel web (`/registro`) en el navegador integrado,
+  encima de la aplicación: ahí se piden la cédula y los términos y se
+  confirma el correo.
 - **Correo sin confirmar.** Una cuenta del autorregistro que todavía no abrió
   su enlace recibe 403 con `codigo: CORREO_NO_VERIFICADO`: la tarjeta dice
   «Confirma tu correo para entrar» y ofrece «Reenviar el enlace»
@@ -652,7 +679,7 @@ fvm flutter test
 | --- | --- |
 | `configuracion_test.dart` | `GET /configuracion/publica`: pública, copia sin red, sin copia no hay valores, lectura estricta, la zona horaria |
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
-| `menu_test.dart` | El menú: aplanado por orden, copia por persona, ruta conocida (pantalla) y desconocida (navegador), la barra y los accesos, el tablero |
+| `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
 | `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |

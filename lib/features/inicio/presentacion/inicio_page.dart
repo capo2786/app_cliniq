@@ -39,7 +39,7 @@ class InicioPage extends StatefulWidget {
   final ValueChanged<EnlaceMenu> alAbrirEnlace;
 
   /// Abre una pantalla de la aplicación (agendar, desde la próxima cita).
-  final ValueChanged<PantallaNativa> alAbrir;
+  final ValueChanged<DestinoNativo> alAbrir;
 
   const InicioPage({
     super.key,
@@ -179,8 +179,9 @@ class _InicioPageState extends State<InicioPage> {
                                 : 'Agenda con el médico que necesites, para '
                                       'ti o para alguien a tu cargo.',
                             accion: 'Agendar una cita',
-                            alPulsar: () =>
-                                widget.alAbrir(PantallaNativa.agendar),
+                            alPulsar: () => widget.alAbrir(
+                              const DestinoNativo(PantallaNativa.agendar),
+                            ),
                           )
                         else
                           TarjetaProximaCita(
@@ -567,8 +568,9 @@ class _AccesoConsultas extends StatelessWidget {
 }
 
 /// Los enlaces del menú que no caben en la barra: consultas en línea a lo
-/// ancho (con sus respuestas por leer) y los demás en una rejilla. Los que
-/// se abren en el navegador llevan su marca.
+/// ancho (con sus respuestas por leer) y los demás en una rejilla. Los
+/// externos (una página que puso el administrador) llevan su marca: se abren
+/// en el navegador integrado, sin salir de la aplicación.
 class _AccesosRapidos extends StatelessWidget {
   final List<EnlaceMenu> enlaces;
   final bool puedeConsultas;
@@ -634,7 +636,7 @@ class _Acceso extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = colorDelServidor(enlace.color) ?? AppColors.primarioClaro;
-    final enElNavegador = destinoDe(enlace) is DestinoWeb;
+    final externo = destinoDe(enlace) is DestinoWeb;
 
     return TarjetaTranslucida(
       key: Key('acceso-${enlace.key}'),
@@ -661,9 +663,9 @@ class _Acceso extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              if (enElNavegador)
+              if (externo)
                 const Tooltip(
-                  message: 'Se abre en el navegador',
+                  message: 'Página externa',
                   child: Icon(
                     Icons.open_in_new_rounded,
                     size: 16,
