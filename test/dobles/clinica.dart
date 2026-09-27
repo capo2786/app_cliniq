@@ -89,6 +89,7 @@ Map<String, dynamic> configJson({
     'maxIntentos': 5,
     'bloqueoMinutos': 15,
     'otpMinutos': 10,
+    'otpDigitos': 6,
     'resetMinutos': 30,
     'inactividadMinutos': 30,
     'reenvioSegundos': 60,

@@ -264,6 +264,9 @@ class ReglasSeguridad extends Equatable {
   final int passwordMinimo;
   final int bloqueoMinutos;
   final int otpMinutos;
+
+  /// Cuántos dígitos tiene el código de verificación en dos pasos.
+  final int otpDigitos;
   final int resetMinutos;
   final int reenvioSegundos;
 
@@ -271,6 +274,7 @@ class ReglasSeguridad extends Equatable {
     required this.passwordMinimo,
     required this.bloqueoMinutos,
     required this.otpMinutos,
+    required this.otpDigitos,
     required this.resetMinutos,
     required this.reenvioSegundos,
   });
@@ -279,6 +283,7 @@ class ReglasSeguridad extends Equatable {
     passwordMinimo: l.entero('passwordMinimo', minimo: 1),
     bloqueoMinutos: l.entero('bloqueoMinutos'),
     otpMinutos: l.entero('otpMinutos'),
+    otpDigitos: l.entero('otpDigitos', minimo: 1),
     resetMinutos: l.entero('resetMinutos'),
     reenvioSegundos: l.entero('reenvioSegundos'),
   );
@@ -288,6 +293,7 @@ class ReglasSeguridad extends Equatable {
     passwordMinimo,
     bloqueoMinutos,
     otpMinutos,
+    otpDigitos,
     resetMinutos,
     reenvioSegundos,
   ];

@@ -46,6 +46,7 @@ class _PasoCodigoState extends State<PasoCodigo> {
   @override
   Widget build(BuildContext context) {
     final estado = widget.estado;
+    final digitos = context.config.seguridad.otpDigitos;
 
     return Form(
       key: _formKey,
@@ -81,7 +82,7 @@ class _PasoCodigoState extends State<PasoCodigo> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Te enviamos un código de 6 dígitos a ${estado.destino}. '
+            'Te enviamos un código de $digitos dígitos a ${estado.destino}. '
             'Escríbelo para terminar de entrar. Vence en '
             '${minutos(context.config.seguridad.otpMinutos)}.',
             style: const TextStyle(
@@ -99,7 +100,7 @@ class _PasoCodigoState extends State<PasoCodigo> {
           CampoCliniq(
             key: const Key('campo-codigo'),
             controller: _codigo,
-            pista: '000000',
+            pista: '0' * digitos,
             icono: Icons.pin_outlined,
             habilitado: !estado.enviando,
             teclado: TextInputType.number,
@@ -107,11 +108,11 @@ class _PasoCodigoState extends State<PasoCodigo> {
             autofill: const [AutofillHints.oneTimeCode],
             formatos: [
               FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
+              LengthLimitingTextInputFormatter(digitos),
             ],
-            validator: (valor) => (valor?.trim().length ?? 0) == 6
+            validator: (valor) => (valor?.trim().length ?? 0) == digitos
                 ? null
-                : 'El código tiene 6 dígitos.',
+                : 'El código tiene $digitos dígitos.',
             onSubmitted: (_) => _enviar(),
           ),
           const SizedBox(height: 20),

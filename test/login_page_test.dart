@@ -381,6 +381,30 @@ void main() {
     expect(find.textContaining('Vence en 5 minutos.'), findsOneWidget);
   });
 
+  testWidgets('el código de dos pasos tiene los dígitos de la clínica', (
+    tester,
+  ) async {
+    servicio.alEntrar = (_, _) async =>
+        const SegundoFactorRequerido(desafio: 'd1', destino: 'a***@correo.com');
+    await montar(tester, config: configDePrueba(seguridad: {'otpDigitos': 4}));
+
+    await tester.enterText(
+      find.byKey(const Key('campo-correo')),
+      'ana@correo.com',
+    );
+    await tester.enterText(
+      find.byKey(const Key('campo-contrasena')),
+      'secreta1',
+    );
+    await tocar(tester, find.byKey(const Key('boton-entrar')));
+
+    expect(find.textContaining('un código de 4 dígitos'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('campo-codigo')), '123456');
+    await tester.pump();
+    expect(find.text('1234'), findsOneWidget);
+  });
+
   testWidgets('con verificación en dos pasos aparece el paso del código', (
     tester,
   ) async {
