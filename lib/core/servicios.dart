@@ -6,6 +6,7 @@ import '../features/ayuda/data/ayuda_service.dart';
 import '../features/auth/data/almacen_de_sesion.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/citas/data/citas_service.dart';
+import '../features/citas/data/permisos_de_video.dart';
 import '../features/citas/data/sala_jitsi.dart';
 import '../features/citas/data/videollamada_service.dart';
 import '../features/consultas/data/consultas_service.dart';
@@ -73,21 +74,22 @@ class Servicios {
 
   // ── Costuras de terceros ───────────────────────────────────────────
   /*
-   * Lo que depende de un tercero. La videollamada ya está enchufada: entra
-   * a la sala de Jitsi de la clínica dentro de la aplicación, con el SDK
-   * oficial (y, si el SDK no está o falla, en el navegador integrado). Los
-   * avisos push y los pagos siguen apagados; enchufar el de verdad es
-   * cambiar la línea correspondiente: todo lo demás se escribió contra la
-   * interfaz.
+   * Lo que depende de un tercero. Los avisos push y los pagos siguen
+   * apagados; enchufar el de verdad es cambiar la línea correspondiente:
+   * todo lo demás se escribió contra la interfaz.
    */
   static const ServicioPush push = PushApagado();
 
+  static const ServicioPagos pagos = PagosNoDisponibles();
+
+  /// La videoconsulta: la sala de Jitsi de la clínica en una ventana de la
+  /// propia aplicación, en un WebView bajo la cabecera de Cliniq, con la
+  /// cámara y el micrófono pedidos antes al sistema.
   static final ServicioVideollamada videollamada = VideollamadaEnLaApp(
     VideollamadaService(ApiClient().dio),
-    sala: SalaJitsi(),
+    sala: const SalaJitsi(),
+    permisos: const PermisosDelSistema(),
   );
-
-  static const ServicioPagos pagos = PagosNoDisponibles();
 
   // ── Módulos ────────────────────────────────────────────────────────
   static final AuthService auth = AuthService(ApiClient().dio);

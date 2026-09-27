@@ -44,10 +44,12 @@ dependencies:
   open_filex: ^4.7.0
   path_provider: ^2.1.6
 
-  # La videoconsulta dentro de la aplicación: el SDK oficial de Jitsi, con
-  # la sala y el token que da el servidor. Pide Android 24+ e iOS 15.1+
-  # (ver «Configuración nativa» en el README).
-  jitsi_meet_flutter_sdk: ^13.2.0
+  # La videoconsulta dentro de la aplicación: la sala de Jitsi de la clínica
+  # en un WebView propio, bajo la cabecera de Cliniq, sin navegador ni
+  # actividad aparte. permission_handler pide la cámara y el micrófono antes
+  # de abrirla (ver «Videoconsulta» y «Configuración nativa» en el README).
+  flutter_inappwebview: ^6.1.5
+  permission_handler: ^13.0.2
 
 dev_dependencies:
   flutter_test:
