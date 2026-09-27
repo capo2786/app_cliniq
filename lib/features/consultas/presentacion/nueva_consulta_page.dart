@@ -7,6 +7,7 @@ import '../../../core/configuracion/config_publica_cubit.dart';
 import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
+import '../../../core/presentacion/widgets/barra_de_accion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
@@ -326,6 +327,8 @@ class _VistaNuevaConsulta extends StatelessWidget {
             child: KeyedSubtree(
               key: ValueKey(state.paso),
               child: ListView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: context.margenDeScroll(superior: 12, inferior: 24),
                 children: [
                   if (state.paso != PasoConsulta.enviada)
@@ -435,21 +438,7 @@ class _BarraDeAccion extends StatelessWidget {
     final resumen = state.paso == PasoConsulta.resumen;
     final formulario = state.paso == PasoConsulta.formulario;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        12,
-        20,
-        12 + context.margenInferiorDelSistema,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.superficie,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.primarioClaro.withValues(alpha: 0.14),
-          ),
-        ),
-      ),
+    return BarraDeAccion(
       child: ConRed(
         builder: (context, hayRed) => BotonPrincipal(
           key: const Key('boton-seguir-consulta'),
@@ -461,10 +450,16 @@ class _BarraDeAccion extends StatelessWidget {
           // tocarlo es lo que marca qué.
           onPressed: resumen
               ? (hayRed && state.lista
-                    ? () => bloc.add(const NuevaConsultaConfirmada())
+                    ? () {
+                        cerrarTeclado();
+                        bloc.add(const NuevaConsultaConfirmada());
+                      }
                     : null)
               : (formulario || NuevaConsultaBloc.pasoCompleto(state))
-              ? () => bloc.add(const NuevaConsultaContinuada())
+              ? () {
+                  cerrarTeclado();
+                  bloc.add(const NuevaConsultaContinuada());
+                }
               : null,
         ),
       ),
