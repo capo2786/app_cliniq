@@ -79,8 +79,10 @@ class DatosClinica extends Equatable {
   final String telefonoEmergencia;
   final String eslogan;
 
-  /// Data URL (PNG, JPG o SVG) o `null`: sin logotipo propio se enseña el de
-  /// la marca, que la aplicación ya trae dibujado.
+  /// La dirección absoluta del logotipo (`GET /configuracion/logo?v=…`, que
+  /// sale de MinIO) o, de un servidor anterior, un data URL (PNG, JPG o
+  /// SVG). `null` si no hay, o si no es ninguna de las dos: sin logotipo
+  /// propio se enseña el de la marca, que la aplicación ya trae dibujado.
   final String? logo;
 
   /// Nombre IANA (`America/Guayaquil`).
@@ -104,13 +106,18 @@ class DatosClinica extends Equatable {
     this.colorAcento,
   });
 
+  /// De dónde sale el logotipo, o `null` si no hay uno propio.
+  OrigenDelLogo? get origenDelLogo => OrigenDelLogo.desde(logo);
+
   factory DatosClinica._leer(_Lector l) => DatosClinica(
     nombre: l.texto('nombre'),
     telefono: l.texto('telefono'),
     correoContacto: l.texto('correoContacto'),
     telefonoEmergencia: l.texto('telefonoEmergencia'),
     eslogan: l.texto('eslogan'),
-    logo: l.textoOpcional('logo'),
+    // Es opcional: uno que no se entiende no descarta la configuración,
+    // deja el logotipo de marca.
+    logo: OrigenDelLogo.desde(l.textoOpcional('logo'))?.texto,
     zonaHoraria: l.texto('zonaHoraria'),
     colorPrimario: l.colorOpcional('colorPrimario'),
     colorAcento: l.colorOpcional('colorAcento'),
@@ -128,6 +135,68 @@ class DatosClinica extends Equatable {
     colorPrimario,
     colorAcento,
   ];
+}
+
+/// De dónde sale el logotipo de la clínica (`clinica.logo`).
+///
+/// Hoy es una dirección absoluta a `GET /configuracion/logo`, pública, que
+/// el servidor lee de MinIO; lleva `?v=<huella corta>`, así que cambia cada
+/// vez que la clínica sube otro. Un servidor anterior lo manda como data
+/// URL dentro de la configuración, y se sigue aceptando.
+sealed class OrigenDelLogo extends Equatable {
+  const OrigenDelLogo();
+
+  /// Lo que llegó en la configuración, tal cual.
+  String get texto;
+
+  /// Lee `clinica.logo`: una dirección `https://` (o `http://`) con servidor,
+  /// o un data URL de imagen. Cualquier otra cosa —una ruta relativa, otro
+  /// esquema, un texto— es `null`.
+  static OrigenDelLogo? desde(String? valor) {
+    final texto = valor?.trim() ?? '';
+    if (texto.isEmpty) return null;
+
+    if (texto.toLowerCase().startsWith('data:')) {
+      return texto.toLowerCase().startsWith('data:image/')
+          ? LogoEnDataUrl(texto)
+          : null;
+    }
+
+    final url = Uri.tryParse(texto);
+    if (url == null ||
+        !(url.isScheme('https') || url.isScheme('http')) ||
+        url.host.isEmpty) {
+      return null;
+    }
+
+    return LogoEnLaRed(url);
+  }
+}
+
+/// El logotipo se baja de su dirección (y se guarda en el teléfono).
+class LogoEnLaRed extends OrigenDelLogo {
+  final Uri url;
+
+  const LogoEnLaRed(this.url);
+
+  @override
+  String get texto => url.toString();
+
+  @override
+  List<Object?> get props => [url];
+}
+
+/// El logotipo viene dentro de la configuración, como data URL.
+class LogoEnDataUrl extends OrigenDelLogo {
+  final String dataUrl;
+
+  const LogoEnDataUrl(this.dataUrl);
+
+  @override
+  String get texto => dataUrl;
+
+  @override
+  List<Object?> get props => [dataUrl];
 }
 
 /// `agenda`: citas, recordatorios y rejilla de horarios.

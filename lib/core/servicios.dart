@@ -22,6 +22,7 @@ import 'archivos/salida_de_archivos.dart';
 import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
 import 'configuracion/config_publica_service.dart';
+import 'configuracion/logo_clinica_service.dart';
 import 'fechas/fecha_local.dart';
 import 'integraciones/costuras.dart';
 import 'network/api_client.dart';
@@ -104,6 +105,15 @@ class Servicios {
     ApiClient().dio,
     cache,
   );
+
+  static LogoClinicaService _logo = LogoClinicaService(ApiClient().dio, cache);
+
+  /// El logotipo de la clínica desde su dirección (`clinica.logo`), con
+  /// copia en el teléfono.
+  static LogoClinicaService get logoClinica => _logo;
+
+  @visibleForTesting
+  static set logoParaPruebas(LogoClinicaService otro) => _logo = otro;
 
   static final CatalogoService catalogos = CatalogoService(
     ApiClient().dio,
@@ -196,8 +206,8 @@ class Servicios {
   /// Las citas, las consultas, los dependientes, los archivos descargados,
   /// los PDF firmados guardados y los recordatorios son de quien estaba
   /// dentro: en un teléfono compartido, la siguiente persona no tiene por qué
-  /// verlos ni oírlos. La configuración, los catálogos y los documentos
-  /// legales se quedan: son de la clínica.
+  /// verlos ni oírlos. La configuración, los catálogos, los documentos
+  /// legales y el logotipo se quedan: son de la clínica.
   static Future<void> limpiarDatosLocales() async {
     await recordatorios.cancelarTodo();
     await cache.vaciarDatosPersonales();
