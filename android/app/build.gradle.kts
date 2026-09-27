@@ -32,9 +32,7 @@ android {
 
     defaultConfig {
         applicationId = "ec.cliniq.sage.app"
-        // El SDK de Jitsi de la videoconsulta pide Android 7.0 (API 24) o
-        // posterior. Flutter ya parte de 24; esto lo deja fijo aunque cambie.
-        minSdk = maxOf(flutter.minSdkVersion, 24)
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

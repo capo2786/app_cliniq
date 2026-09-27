@@ -14,13 +14,15 @@
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <!--
-        La videoconsulta dentro de la aplicación (SDK de Jitsi): la cámara y
-        el micrófono. El SDK también los trae en su manifiesto; se declaran
-        aquí para que se vea qué pide la aplicación. Se piden al entrar a la
-        sala, no antes.
+        La videoconsulta dentro de la aplicación: la sala de Jitsi en un
+        WebView propio. El WebView solo puede darle la cámara y el micrófono
+        a la página si la aplicación ya los tiene, así que se piden al entrar
+        a la sala (permission_handler), no antes. MODIFY_AUDIO_SETTINGS lo
+        necesita WebRTC dentro del WebView para el audio de la llamada.
     -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Recordatorios locales 24 h y 1 h antes de cada cita -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -54,12 +56,7 @@
         android:name="android.permission.READ_MEDIA_AUDIO"
         tools:node="remove" />
 
-    <!--
-        tools:replace: el SDK de Jitsi trae su propio android:label y chocaría
-        con el de la aplicación al fusionar los manifiestos (lo pide su README).
-    -->
     <application
-        tools:replace="android:label"
         android:label="Cliniq"
         android:name="${applicationName}"
         android:icon="@mipmap/launcher_icon">
@@ -118,9 +115,9 @@
         </intent>
 
         <!--
-            El navegador integrado (Custom Tabs): el registro, el panel web,
-            los enlaces externos del menú y, si el SDK de video falla, la
-            sala de la videoconsulta
+            El navegador integrado (Custom Tabs): el registro, el panel web
+            y los enlaces externos del menú. La videoconsulta no: va en un
+            WebView de la aplicación
         -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
