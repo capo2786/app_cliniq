@@ -1,7 +1,11 @@
 // lib/features/navegacion/presentacion/enrutador.dart
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../../core/presentacion/avisos.dart';
+import '../../../core/presentacion/enlaces.dart';
 import '../data/menu_service.dart';
 import '../dominio/destinos.dart';
 import 'pantallas_nativas.dart';
@@ -76,4 +80,37 @@ bool abrirRuta(BuildContext context, String ruta, {String? titulo}) {
 
   abrirDestino(context, destino, titulo: titulo);
   return true;
+}
+
+/// Abre un enlace que venía dentro de un texto del servidor (un documento
+/// legal, un artículo de ayuda), sin salir de la aplicación:
+///
+/// - una ruta interna (`/legal/privacidad`), con su pantalla; si la
+///   aplicación no la sabe abrir, se dice;
+/// - `mailto:`, con el correo del teléfono;
+/// - una dirección web, en el navegador integrado.
+void abrirEnlaceDeTexto(BuildContext context, String direccion) {
+  final enlace = direccion.trim();
+
+  if (enlace.startsWith('/')) {
+    if (!abrirRuta(context, enlace)) {
+      mostrarAviso(
+        context,
+        'Ese enlace no tiene una pantalla en la aplicación.',
+      );
+    }
+    return;
+  }
+
+  final uri = Uri.tryParse(enlace);
+  if (uri == null) return;
+
+  if (uri.scheme == 'mailto' || uri.scheme == 'tel') {
+    unawaited(abrirContacto(context, uri));
+    return;
+  }
+
+  if (uri.scheme == 'http' || uri.scheme == 'https') {
+    unawaited(abrirEnlace(context, enlace, queEs: 'el enlace'));
+  }
 }

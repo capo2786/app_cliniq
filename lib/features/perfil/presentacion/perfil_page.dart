@@ -7,7 +7,6 @@ import '../../../core/app/version_instalada.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/avisos.dart';
-import '../../../core/presentacion/enlaces.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
@@ -22,6 +21,8 @@ import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
 import '../../dependientes/dominio/validaciones.dart';
 import '../../legal/providers/legal_bloc.dart';
+import '../../navegacion/dominio/destinos.dart';
+import '../../navegacion/presentacion/enrutador.dart';
 import '../providers/perfil_cubit.dart';
 import 'editar_perfil_page.dart';
 import 'widgets/seguridad.dart';
@@ -478,6 +479,13 @@ class _Seguridad extends StatelessWidget {
   }
 }
 
+/// Abre el texto de un documento legal dentro de la aplicación.
+void _leer(BuildContext context, String slug, String titulo) => abrirDestino(
+  context,
+  DestinoNativo(PantallaNativa.legal, {'slug': slug}),
+  titulo: titulo,
+);
+
 class _DocumentosAceptados extends StatelessWidget {
   const _DocumentosAceptados();
 
@@ -528,10 +536,10 @@ class _DocumentosAceptados extends StatelessWidget {
                       fontSize: 12,
                     ),
                   ),
-                  trailing: a.url == null
+                  trailing: a.slug == null
                       ? null
                       : TextButton(
-                          onPressed: () => abrirEnlace(context, a.url!),
+                          onPressed: () => _leer(context, a.slug!, a.titulo),
                           style: TextButton.styleFrom(
                             foregroundColor: AppColors.acentoSuave,
                           ),
@@ -547,8 +555,8 @@ class _DocumentosAceptados extends StatelessWidget {
 }
 
 /// Los documentos legales vigentes de la clínica que le aplican a esta
-/// cuenta, para leerlos cuando se quiera. Títulos y direcciones salen de
-/// `GET /legal/documentos`.
+/// cuenta, para leerlos cuando se quiera, dentro de la aplicación. Títulos y
+/// nombres cortos salen de `GET /legal/documentos`.
 class _DocumentosDeLaClinica extends StatelessWidget {
   final Usuario usuario;
 
@@ -600,11 +608,10 @@ class _DocumentosDeLaClinica extends StatelessWidget {
                                 ),
                               ),
                         trailing: Icon(
-                          Icons.open_in_new_rounded,
-                          size: 18,
+                          Icons.chevron_right_rounded,
                           color: AppColors.acentoSuave,
                         ),
-                        onTap: () => abrirEnlace(context, d.url),
+                        onTap: () => _leer(context, d.slug, d.titulo),
                       ),
                   ],
                 ),

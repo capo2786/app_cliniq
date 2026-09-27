@@ -97,7 +97,7 @@ arranca con valores inventados.**
 | Parentescos | `PARENTESCO_DEPENDIENTE` (dependientes), `PARENTESCO` (contacto de emergencia) | Formularios |
 | Especialidades y ciudades | `ESPECIALIDAD`, `CIUDAD` | Orden de los filtros de agendar |
 | Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios y perfil |
-| Documentos legales | `GET /legal/documentos` (clave, slug, versión, título) y `mis-aceptaciones` | Aceptación y perfil; se abren en `https://<web>/legal/<slug>` |
+| Documentos legales | `GET /legal/documentos` (clave, slug, versión, título), `mis-aceptaciones` y el texto de cada uno, `GET /legal/documentos/:slug` (Markdown con los datos de la clínica ya sustituidos) | Aceptación y perfil; se leen dentro de la aplicación, con copia para leerlos sin red |
 | Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil») y los accesos rápidos |
 
 La configuración, los catálogos y los documentos legales son públicos (se
@@ -142,7 +142,7 @@ antes de tocarla.
 | Paquete | Para qué |
 | --- | --- |
 | `flutter_secure_storage` | Llavero: sesión, perfil guardado, credenciales de la huella y la clave de la caché |
-| `hive_ce_flutter` | Caché cifrada: la configuración, los catálogos, los documentos legales, el menú, las citas y los dependientes para abrir sin conexión |
+| `hive_ce_flutter` | Caché cifrada: la configuración, los catálogos, los documentos legales y su texto, el menú, las citas y los dependientes para abrir sin conexión |
 
 ### Dispositivo y seguridad
 
@@ -318,7 +318,8 @@ lib/
     integraciones/costuras.dart  push, videollamada y pagos: interfaces (la videollamada ya enchufada)
     network/                  ApiClient, interceptores, mensajeDeError
     notificaciones/           recordatorios locales de citas
-    presentacion/             márgenes, avisos, enlaces, el observador de rutas, los widgets base,
+    presentacion/             márgenes, avisos, enlaces, el observador de rutas, los widgets base
+                              (también TextoMarkdown, para los textos del servidor),
                               el contacto y el logotipo de la clínica, iconos y colores del servidor
     red/                      el sondeo de la red y el cartel de sin conexión
     storage/                  llavero, credenciales y caché cifrada
@@ -327,7 +328,7 @@ lib/
   features/
     arranque/                 la espera de los datos de la clínica y de la sesión
     auth/                     acceso, segundo factor, recuperación, sesión
-    legal/                    documentos legales de la API y su aceptación
+    legal/                    documentos legales de la API, su aceptación y su lectura nativa
     navegacion/               el menú del servidor, el enrutador de las rutas del sistema,
                               las pantallas que abre cada una y «Muy pronto»
     inicio/                   el inicio y la barra de pestañas
@@ -352,9 +353,8 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
    guardado.
 2. **Acceso.** Ver «Pantalla de acceso».
 3. **Aceptación legal.** Si `legalPendientes` no está vacío, bloquea todo lo
-   demás. Cada documento tiene su botón «Leer», que abre
-   `https://cliniq.gcaicedo-proyectos.com/legal/<slug>` con el slug de la
-   API, y su casilla; «Aceptar y continuar»
+   demás. Cada documento tiene su botón «Leer», que abre su texto dentro de
+   la aplicación (ver «Documentos legales»), y su casilla; «Aceptar y continuar»
    se enciende cuando están todas marcadas, manda `POST /legal/aceptar` y
    relee `/auth/me`. La otra salida es cerrar sesión.
 4. **Inicio.** El saludo sobre el degradado de bienvenida; «Tu próxima cita»
@@ -389,8 +389,8 @@ tool/generar_iconos_test.dart genera los PNG del icono y del arranque
 8. **Perfil.** Datos personales y clínicos, con edición de lo que la API deja
    cambiar a uno mismo (el correo y la cédula se cambian en la clínica);
    cambiar contraseña, verificación en dos pasos, acceso con huella,
-   documentos aceptados con su enlace, los documentos legales vigentes de la
-   clínica, cerrar sesión y la versión.
+   documentos aceptados y los documentos legales vigentes de la clínica (los
+   dos se leen dentro de la aplicación), cerrar sesión y la versión.
 9. **Consultas en línea.** Ver «Consultas en línea».
 10. **Recordatorios.** Ver «Recordatorios».
 11. **Sin conexión.** Ver «Sin conexión».
@@ -427,6 +427,22 @@ el navegador integrado; `tel:` y `mailto:`, con el marcador y el correo del
 teléfono. Las pantallas de cada destino se arman en un solo lugar,
 `navegacion/presentacion/pantallas_nativas.dart` (`pantallaNativa`): ahí se
 conectan las que falten.
+
+## Documentos legales
+
+El texto de cada documento llega de `GET /legal/documentos/:slug` (pública)
+en Markdown, con las variables de la clínica ya sustituidas por el servidor,
+y se pinta con `TextoMarkdown` (`core/presentacion/widgets/texto_markdown.dart`):
+entiende lo mismo que el panel (`core/markdown.ts`) —párrafos, títulos `#` a
+`###`, **negrita**, listas y enlaces `http`, `https`, `mailto` o rutas
+internas— y nada más, así que no hay HTML que sanear. Un enlace interno
+(`/legal/privacidad`) abre su pantalla con el enrutador; uno web, el
+navegador integrado. Queda una copia por documento (`legal:texto:<slug>`,
+de la clínica: sobrevive al cierre de sesión) para leerlo sin red; un 404
+dice «Documento no encontrado» y no enseña la copia vieja. Lo usan la
+aceptación de documentos y el perfil. El registro de pacientes no está en la
+aplicación: se abre en el navegador integrado, y ahí el panel enseña los
+suyos.
 
 ## Pantalla de acceso
 
@@ -681,6 +697,7 @@ fvm flutter test
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
 | `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en el navegador integrado y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
+| `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
 | `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |
 | `contacto_clinica_test.dart` | Teléfono y correo para tocar, y el número de emergencias |

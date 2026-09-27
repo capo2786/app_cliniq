@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/presentacion/enlaces.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
@@ -19,6 +18,7 @@ import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
 import '../data/legal_service.dart';
 import '../providers/legal_bloc.dart';
+import 'documento_legal_page.dart';
 import '../../../core/configuracion/en_contexto.dart';
 
 /// Los documentos legales pendientes, antes de todo lo demás.
@@ -88,7 +88,7 @@ class _VistaLegal extends StatelessWidget {
                     descripcion:
                         'Para atenderte en ${context.config.clinica.nombre} '
                         'necesitamos que leas y aceptes estos documentos. '
-                        'Cada uno se abre en tu navegador.',
+                        'Toca «Leer» para verlos aquí mismo.',
                   ),
                 ),
                 const SizedBox(height: 22),
@@ -203,10 +203,18 @@ class _TarjetaDocumento extends StatelessWidget {
                   ],
                 ),
               ),
-              if (documento.url case final url?)
+              if (documento.slug case final slug?)
                 TextButton.icon(
-                  onPressed: () => abrirEnlace(context, url),
-                  icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                  key: Key('leer-${documento.clave}'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => DocumentoLegalPage(
+                        slug: slug,
+                        titulo: documento.titulo,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.menu_book_outlined, size: 17),
                   label: const Text('Leer'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.acentoSuave,

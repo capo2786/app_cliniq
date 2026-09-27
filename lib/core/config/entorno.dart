@@ -25,9 +25,6 @@ class Entorno {
     defaultValue: 'https://cliniq.gcaicedo-proyectos.com',
   );
 
-  /// Dirección pública de un documento legal por su nombre corto.
-  static String urlLegal(String slug) => '$webUrl/legal/$slug';
-
   /// El autorregistro de pacientes, en el panel web: la aplicación no copia
   /// ese formulario (cédula, términos, confirmación por correo), lo abre.
   static String get urlRegistro => '$webUrl/registro';
