@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../features/agendar/data/portal_service.dart';
+import '../features/ayuda/data/ayuda_service.dart';
 import '../features/auth/data/almacen_de_sesion.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/citas/data/citas_service.dart';
@@ -9,6 +10,7 @@ import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/legal/data/legal_service.dart';
 import '../features/mi_salud/data/mi_salud_service.dart';
+import '../features/soporte/data/soporte_service.dart';
 import 'archivos/archivos_service.dart';
 import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
@@ -118,6 +120,12 @@ class Servicios {
   // ── Mi salud, centro de ayuda y soporte ────────────────────────────
   /// La historia clínica que ve el paciente, sus recetas y sus órdenes.
   static final MiSaludService miSalud = MiSaludService(ApiClient().dio, cache);
+
+  /// Los artículos del centro de ayuda.
+  static final AyudaService ayuda = AyudaService(ApiClient().dio, cache);
+
+  /// Los tickets de soporte de quien entró.
+  static final SoporteService soporte = SoporteService(ApiClient().dio, cache);
 
   static SelectorDeArchivos _selector = SelectorDelSistema();
 
