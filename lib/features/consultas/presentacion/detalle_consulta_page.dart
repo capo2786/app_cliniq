@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/configuracion/config_publica_cubit.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
@@ -48,6 +49,7 @@ class DetalleConsultaPage extends StatelessWidget {
         servicio: Servicios.consultas,
         uid: uid,
         id: consultaId,
+        archivos: context.read<ConfigPublicaCubit>().config.archivos,
       ),
       child: const _VistaDetalle(),
     );
@@ -366,6 +368,7 @@ class _Encabezado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final plazo = tiempoRestante(detalle, ahora);
+    final estado = context.estadoConsulta(detalle.estado);
 
     return Container(
       width: double.infinity,
@@ -398,7 +401,7 @@ class _Encabezado extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             [
-              detalle.medicoVisible,
+              ?detalle.medicoVisible,
               if (detalle.especialidad.isNotEmpty) detalle.especialidad,
             ].join(' · '),
             style: const TextStyle(
@@ -425,9 +428,9 @@ class _Encabezado extends StatelessWidget {
             runSpacing: 6,
             children: [
               Pastilla(
-                texto: detalle.estado.nombre,
-                color: detalle.estado.color,
-                icono: detalle.estado.icono,
+                texto: estado.nombre,
+                color: estado.color,
+                icono: estado.icono,
               ),
               if (plazo != null)
                 Pastilla(
@@ -454,6 +457,7 @@ class _EstadoYPlazo extends StatelessWidget {
   Widget build(BuildContext context) {
     final vence = detalle.venceEn;
     final seguimiento = detalle.seguimientoHasta;
+    final explicacion = context.estadoConsulta(detalle.estado).descripcion;
 
     switch (detalle.estado) {
       case EstadoConsulta.enviada:
@@ -466,13 +470,17 @@ class _EstadoYPlazo extends StatelessWidget {
             icono: Icons.running_with_errors_rounded,
           );
         }
-        return RecuadroAviso.informacion(
-          vence == null
-              ? detalle.estado.explicacion
-              : '${detalle.estado.explicacion} Tiene hasta el '
-                    '${momentoLegible(vence).toLowerCase()} para responderte.',
-          icono: Icons.schedule_rounded,
-        );
+        final plazo = vence == null
+            ? null
+            : 'El médico tiene hasta el '
+                  '${momentoLegible(vence).toLowerCase()} para responderte.';
+        final texto = [
+          if (explicacion.isNotEmpty) explicacion,
+          ?plazo,
+        ].join(' ');
+        if (texto.isEmpty) return const SizedBox.shrink();
+
+        return RecuadroAviso.informacion(texto, icono: Icons.schedule_rounded);
 
       case EstadoConsulta.respondida:
         return RecuadroAviso(
@@ -507,7 +515,9 @@ class _EstadoYPlazo extends StatelessWidget {
         );
 
       case EstadoConsulta.borrador:
-        return RecuadroAviso.alerta(detalle.estado.explicacion);
+        return explicacion.isEmpty
+            ? const SizedBox.shrink()
+            : RecuadroAviso.alerta(explicacion);
     }
   }
 }

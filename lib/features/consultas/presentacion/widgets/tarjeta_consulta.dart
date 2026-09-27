@@ -30,9 +30,9 @@ class TarjetaConsulta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final estado = consulta.estado;
+    final estado = context.estadoConsulta(consulta.estado);
     final plazo = tiempoRestante(consulta, ahora);
-    final apagada = estado.terminada;
+    final apagada = consulta.estado.terminada;
     final actividad = consulta.ultimaActividad;
 
     return TarjetaTranslucida(
@@ -76,7 +76,7 @@ class TarjetaConsulta extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       [
-                        consulta.medicoVisible,
+                        ?consulta.medicoVisible,
                         if (consulta.especialidad.isNotEmpty)
                           consulta.especialidad,
                       ].join(' · '),

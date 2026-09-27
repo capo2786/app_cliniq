@@ -118,9 +118,8 @@ MisAceptaciones interpretarAceptaciones(Object? datos) {
             clave: a['clave'].toString(),
             version: a['version']?.toString() ?? '',
             // `aceptadoEn` es un instante real, no una hora congelada.
-            aceptadoEn: DateTime.tryParse(
-              a['aceptadoEn']?.toString() ?? '',
-            )?.toLocal(),
+            aceptadoEn: DateTime.tryParse(a['aceptadoEn']?.toString() ?? '')
+                ?.toLocal(),
           ),
     ],
     pendientes: [

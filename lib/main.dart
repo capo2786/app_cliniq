@@ -7,11 +7,15 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'core/arranque/arranque_seguro.dart';
 import 'core/catalogos/catalogos_cubit.dart';
+import 'core/configuracion/config_publica.dart';
+import 'core/configuracion/config_publica_cubit.dart';
+import 'core/fechas/zona_clinica.dart';
 import 'core/network/api_client.dart';
 import 'core/presentacion/rutas.dart';
 import 'core/servicios.dart';
 import 'core/tema/tema_app.dart';
 import 'features/arranque/presentacion/arranque_page.dart';
+import 'features/arranque/presentacion/espera_datos_clinica.dart';
 import 'features/auth/presentacion/login_page.dart';
 import 'features/auth/providers/auth_bloc.dart';
 import 'features/auth/providers/auth_state.dart';
@@ -61,12 +65,18 @@ void main() {
   }, (error, pila) => registrarFallo('el arranque', error, pila));
 }
 
+/// Lo que se hace con cada configuración que entra en uso.
+void aplicarConfiguracion(ConfigPublica config) {
+  ZonaClinica.aplicar(config.clinica.zonaHoraria);
+}
+
 /// La aplicación: los blocs compartidos y la puerta de entrada.
 ///
-/// Los blocs que usan varias pantallas —la sesión, las citas, las consultas
-/// en línea, los dependientes y los catálogos— nacen aquí. Una pantalla que
-/// se abre por navegación (agendar, una consulta nueva) crea el suyo para
-/// cargar datos frescos en cada visita.
+/// Los blocs que usan varias pantallas —la configuración y los catálogos de
+/// la clínica, la sesión, las citas, las consultas en línea y los
+/// dependientes— nacen aquí. Una pantalla que se abre por navegación
+/// (agendar, una consulta nueva) crea el suyo para cargar datos frescos en
+/// cada visita.
 class CliniqApp extends StatelessWidget {
   const CliniqApp({super.key});
 
@@ -74,6 +84,19 @@ class CliniqApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        // La configuración y los catálogos son públicos: se piden al abrir,
+        // antes de saber si hay sesión, porque el acceso ya los necesita.
+        BlocProvider<ConfigPublicaCubit>(
+          lazy: false,
+          create: (_) => ConfigPublicaCubit(
+            Servicios.configuracion,
+            alAplicar: aplicarConfiguracion,
+          )..cargar(),
+        ),
+        BlocProvider<CatalogosCubit>(
+          lazy: false,
+          create: (_) => CatalogosCubit(Servicios.catalogos)..cargar(),
+        ),
         BlocProvider<AuthBloc>(
           create: (_) => AuthBloc(
             servicio: Servicios.auth,
@@ -85,11 +108,13 @@ class CliniqApp extends StatelessWidget {
           ),
         ),
         BlocProvider<CitasBloc>(
-          create: (_) => CitasBloc(
+          create: (context) => CitasBloc(
             citas: Servicios.citas,
             portal: Servicios.portal,
             recordatorios: Servicios.recordatorios,
             reloj: Servicios.reloj,
+            config: () => context.read<ConfigPublicaCubit>().state.config,
+            catalogos: () => context.read<CatalogosCubit>().state,
           ),
         ),
         BlocProvider<ConsultasBloc>(
@@ -98,24 +123,86 @@ class CliniqApp extends StatelessWidget {
         BlocProvider<DependientesBloc>(
           create: (_) => DependientesBloc(Servicios.dependientes),
         ),
-        BlocProvider<CatalogosCubit>(
-          create: (_) => CatalogosCubit(Servicios.catalogos),
+      ],
+      child: _DatosDeLaClinicaAlDia(
+        child: BlocSelector<ConfigPublicaCubit, ConfigPublicaState, String>(
+          selector: (state) => state.config?.clinica.nombre ?? '',
+          builder: (context, nombre) => MaterialApp(
+            title: nombre,
+            debugShowCheckedModeBanner: false,
+            theme: temaCliniq(),
+            locale: const Locale('es'),
+            supportedLocales: const [Locale('es'), Locale('es', 'EC')],
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            navigatorObservers: [observadorDeRutas],
+            home: const EsperaDatosDeLaClinica(child: PuertaDeEntrada()),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Mantiene al día la configuración y los catálogos.
+///
+/// Se vuelven a pedir cada vez que la aplicación vuelve al frente: si el
+/// administrador cambió algo, se nota la próxima vez que se abre. Y cuando
+/// cambian, los recordatorios de las citas se vuelven a programar con las
+/// reglas y los textos nuevos (o se cancelan, si la clínica los apagó).
+class _DatosDeLaClinicaAlDia extends StatefulWidget {
+  final Widget child;
+
+  const _DatosDeLaClinicaAlDia({required this.child});
+
+  @override
+  State<_DatosDeLaClinicaAlDia> createState() => _DatosDeLaClinicaAlDiaState();
+}
+
+class _DatosDeLaClinicaAlDiaState extends State<_DatosDeLaClinicaAlDia>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+
+    unawaited(context.read<ConfigPublicaCubit>().cargar());
+    unawaited(context.read<CatalogosCubit>().cargar());
+  }
+
+  void _revisarRecordatorios(BuildContext context) {
+    context.read<CitasBloc>().add(const CitasRecordatoriosRevisados());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<ConfigPublicaCubit, ConfigPublicaState>(
+          listenWhen: (antes, ahora) =>
+              ahora.config != null && antes.config != ahora.config,
+          listener: (context, _) => _revisarRecordatorios(context),
+        ),
+        BlocListener<CatalogosCubit, CatalogosState>(
+          listenWhen: (antes, ahora) => antes.listas != ahora.listas,
+          listener: (context, _) => _revisarRecordatorios(context),
         ),
       ],
-      child: MaterialApp(
-        title: 'Cliniq',
-        debugShowCheckedModeBanner: false,
-        theme: temaCliniq(),
-        locale: const Locale('es'),
-        supportedLocales: const [Locale('es'), Locale('es', 'EC')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        navigatorObservers: [observadorDeRutas],
-        home: const PuertaDeEntrada(),
-      ),
+      child: widget.child,
     );
   }
 }

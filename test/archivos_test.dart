@@ -9,6 +9,7 @@ import 'package:app_cliniq/core/archivos/archivos_service.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dobles/clinica.dart';
 import 'dobles/dio_grabador.dart';
 
 /// Bytes que empiezan como un PDF, un PNG o un JPG de verdad.
@@ -36,59 +37,141 @@ Uint8List png([int largo = 64]) => Uint8List.fromList([
 Uint8List jpg([int largo = 64]) =>
     Uint8List.fromList([0xff, 0xd8, 0xff, ...List.filled(largo, 3)]);
 
-/// Los adjuntos se validan antes de subirlos, con las reglas del servidor.
+/// «RIFF», tamaño, «WEBP».
+Uint8List webp() => Uint8List.fromList([
+  ...'RIFF'.codeUnits,
+  0x24,
+  0,
+  0,
+  0,
+  ...'WEBPVP8 '.codeUnits,
+  ...List.filled(32, 4),
+]);
+
+/// Una caja «ftyp» con la marca «heic».
+Uint8List heic() => Uint8List.fromList([
+  0,
+  0,
+  0,
+  24,
+  ...'ftypheic'.codeUnits,
+  ...List.filled(32, 5),
+]);
+
+/// Los adjuntos se validan antes de subirlos, con las reglas del servidor:
+/// los tipos y el tamaño que configuró la clínica.
 void main() {
+  // La de prueba: PDF, JPG y PNG de hasta 20 MB.
+  final reglas = configDePrueba().archivos;
+  final tope = reglas.tamanoMaximoBytes;
+
   group('El tipo sale del contenido', () {
-    test('PDF, PNG y JPG por su firma', () {
+    test('PDF, PNG, JPG, WEBP y HEIC por su firma', () {
       expect(tipoPorContenido(pdf()), 'application/pdf');
       expect(tipoPorContenido(png()), 'image/png');
       expect(tipoPorContenido(jpg()), 'image/jpeg');
+      expect(tipoPorContenido(webp()), 'image/webp');
+      expect(tipoPorContenido(heic()), 'image/heic');
     });
 
     test('lo demás no tiene tipo, diga lo que diga el nombre', () {
       expect(tipoPorContenido(Uint8List.fromList([1, 2, 3, 4])), isNull);
       expect(tipoPorContenido(Uint8List(0)), isNull);
 
-      final heic = ArchivoLocal(
+      // Una caja «ftyp» sin marca conocida no es HEIC.
+      final raro = ArchivoLocal(
         nombre: 'foto.jpg',
-        bytes: Uint8List.fromList([0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70]),
+        bytes: Uint8List.fromList([0, 0, 0, 24, ...'ftypxxxx'.codeUnits]),
       );
-      expect(heic.mime, isNull);
-      expect(problemaDelArchivo(heic), contains('no es un PDF, JPG ni PNG'));
+      expect(raro.mime, isNull);
+      expect(
+        problemaDelArchivo(raro, reglas),
+        contains('no es un PDF, JPG ni PNG'),
+      );
     });
   });
 
   group('Antes de subir', () {
     test('un PDF de menos de 20 MB se puede subir', () {
       expect(
-        problemaDelArchivo(ArchivoLocal(nombre: 'examen.pdf', bytes: pdf())),
+        problemaDelArchivo(
+          ArchivoLocal(nombre: 'examen.pdf', bytes: pdf()),
+          reglas,
+        ),
         isNull,
       );
     });
 
     test('más de 20 MB no se sube, y se dice cuánto pesa', () {
-      final grande = ArchivoLocal(
-        nombre: 'tomografia.pdf',
-        bytes: pdf(tamanoMaximoArchivo),
-      );
+      final grande = ArchivoLocal(nombre: 'tomografia.pdf', bytes: pdf(tope));
 
-      expect(grande.tamano, greaterThan(tamanoMaximoArchivo));
-      expect(problemaDelArchivo(grande), contains('20 MB'));
+      expect(grande.tamano, greaterThan(tope));
+      expect(
+        problemaDelArchivo(grande, reglas),
+        contains('el máximo es 20 MB'),
+      );
     });
 
     test('exactamente 20 MB todavía vale', () {
-      final justo = ArchivoLocal(
-        nombre: 'justo.pdf',
-        bytes: pdf(tamanoMaximoArchivo - 5),
-      );
+      final justo = ArchivoLocal(nombre: 'justo.pdf', bytes: pdf(tope - 5));
 
-      expect(justo.tamano, tamanoMaximoArchivo);
-      expect(problemaDelArchivo(justo), isNull);
+      expect(justo.tamano, tope);
+      expect(problemaDelArchivo(justo, reglas), isNull);
+    });
+
+    test('el tope es el de la configuración: con 5 MB, 6 MB ya no', () {
+      final cinco = configDePrueba(archivos: {'tamanoMaximoMb': 5}).archivos;
+      final seis = ArchivoLocal(nombre: 'rx.pdf', bytes: pdf(6 * 1024 * 1024));
+
+      expect(problemaDelArchivo(seis, reglas), isNull);
+      expect(problemaDelArchivo(seis, cinco), contains('el máximo es 5 MB'));
+    });
+
+    test('los tipos son los de la configuración', () {
+      final foto = ArchivoLocal(nombre: 'foto.webp', bytes: webp());
+      final conWebp = configDePrueba(
+        archivos: {
+          'tipos': ['application/pdf', 'image/webp', 'image/heic'],
+        },
+      ).archivos;
+
+      expect(
+        problemaDelArchivo(foto, reglas),
+        contains('no es un PDF, JPG ni PNG'),
+        reason: 'la clínica de prueba no acepta WEBP',
+      );
+      expect(problemaDelArchivo(foto, conWebp), isNull);
+      expect(
+        problemaDelArchivo(
+          ArchivoLocal(nombre: 'a.jpg', bytes: jpg()),
+          conWebp,
+        ),
+        contains('no es un PDF, WEBP ni HEIC'),
+      );
+      expect(
+        problemaDelArchivo(
+          ArchivoLocal(nombre: 'b.heic', bytes: heic()),
+          conWebp,
+        ),
+        isNull,
+      );
+    });
+
+    test('lo que se puede adjuntar, en palabras', () {
+      expect(loQueSePuedeAdjuntar(reglas), 'PDF, JPG o PNG de hasta 20 MB');
+      expect(formatosLegibles(['application/pdf']), 'PDF');
+      expect(
+        formatosLegibles(['image/png', 'image/heic'], conjuncion: 'ni'),
+        'PNG ni HEIC',
+      );
     });
 
     test('un archivo vacío tampoco', () {
       expect(
-        problemaDelArchivo(ArchivoLocal(nombre: 'x.pdf', bytes: Uint8List(0))),
+        problemaDelArchivo(
+          ArchivoLocal(nombre: 'x.pdf', bytes: Uint8List(0)),
+          reglas,
+        ),
         contains('vacío'),
       );
     });
@@ -98,6 +181,8 @@ void main() {
       expect(nombreConExtension('foto.JPEG', 'image/jpeg'), 'foto.JPEG');
       expect(nombreConExtension('scan', 'application/pdf'), 'scan.pdf');
       expect(nombreConExtension('foto.heic', 'image/jpeg'), 'foto.jpg');
+      expect(nombreConExtension('foto.heif', 'image/heic'), 'foto.heif');
+      expect(nombreConExtension('imagen', 'image/webp'), 'imagen.webp');
       expect(
         nombreConExtension('informe.de.marzo', 'application/pdf'),
         'informe.de.marzo.pdf',

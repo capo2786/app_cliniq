@@ -10,13 +10,13 @@
 /// escribió, y en Quito eran las 09:00.
 ///
 /// Por eso aquí es al revés que en `fecha_local.dart`: la zona **se respeta**
-/// al leer y, para enseñar, se convierte a la hora de la clínica
-/// (America/Guayaquil, UTC−5 todo el año). Pasar un instante por
-/// `leerFechaLocal` lo dejaría cinco horas corrido, y pasar una cita por aquí
-/// también.
+/// al leer y, para enseñar, se convierte a la hora de la clínica (la zona de
+/// la configuración pública, ver `ZonaClinica`). Pasar un instante por
+/// `leerFechaLocal` lo dejaría corrido tantas horas como el desfase de la
+/// clínica, y pasar una cita por aquí también.
 library;
 
-import '../config/entorno.dart';
+import 'zona_clinica.dart';
 
 final RegExp _conZona = RegExp(r'(Z|z|[+-]\d{2}(:?\d{2})?)$');
 
@@ -41,7 +41,8 @@ DateTime? leerInstante(Object? valor) {
 /// El instante en la hora de la clínica, como fecha sin zona, lista para
 /// `FormatoFecha`: el mensaje de las 14:00 UTC se enseña a las 09:00.
 DateTime enHoraDeLaClinica(DateTime instante) {
-  final enClinica = instante.toUtc().add(Entorno.desfaseClinica);
+  final utc = instante.toUtc();
+  final enClinica = utc.add(ZonaClinica.desfaseEn(utc));
 
   return DateTime(
     enClinica.year,

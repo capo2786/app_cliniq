@@ -10,6 +10,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/consultas.dart';
+import 'dobles/clinica.dart';
 
 /// La hoja para cancelar una consulta enviada: el motivo es obligatorio y
 /// admite hasta 500 caracteres (`MOTIVO_CANCELACION_MAX` del servidor), con
@@ -38,6 +39,7 @@ void main() {
             servicio: servicio,
             uid: 'u1',
             id: 'c1',
+            archivos: configDePrueba().archivos,
             latidos: () => const Stream<void>.empty(),
           )..add(const DetalleConsultaSolicitado()),
           child: Builder(

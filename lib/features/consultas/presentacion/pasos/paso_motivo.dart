@@ -38,7 +38,7 @@ class PasoMotivoConsulta extends StatelessWidget {
       children: [
         Text(
           '${state.especialidad}. Elige el motivo que más se parece a lo que '
-          'te pasa; si ninguno encaja, «Otro motivo».',
+          'te pasa.',
           style: const TextStyle(
             color: AppColors.textoSecundario,
             fontSize: 13,

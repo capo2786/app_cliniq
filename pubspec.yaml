@@ -30,6 +30,10 @@ dependencies:
   package_info_plus: ^10.1.0
   url_launcher: ^6.3.2
 
+  # El logotipo de la clínica llega de la configuración como data URL, y
+  # puede ser SVG además de PNG o JPG.
+  flutter_svg: ^2.3.0
+
   # Fechas y recordatorios. La versión de flutter_local_notifications importa:
   # es la misma que usa UCEBell y la que ya se sabe que compila con este SDK.
   intl: ^0.20.2
@@ -51,9 +55,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Sin recursos empaquetados: el logotipo se dibuja con código
+  # Sin recursos empaquetados: el logotipo de marca se dibuja con código
   # (PintorLogoCliniq) y los PNG de assets/images solo sirven para generar el
-  # icono y el arranque nativos.
+  # icono y el arranque nativos. El logotipo de cada clínica llega de la
+  # configuración pública (`clinica.logo`).
 
 # Icono de la aplicación.
 #

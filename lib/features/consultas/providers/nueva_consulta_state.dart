@@ -78,6 +78,10 @@ class AdjuntoSubido extends AdjuntoConsulta {
 class NuevaConsultaState extends Equatable {
   final PasoConsulta paso;
 
+  /// Cuántos archivos admite una consulta: `telemedicina.maxArchivosConsulta`
+  /// de la configuración de la clínica.
+  final int maximoAdjuntos;
+
   // Carga inicial
   final bool cargando;
   final String? error;
@@ -123,6 +127,7 @@ class NuevaConsultaState extends Equatable {
   final AvisoConsultas? aviso;
 
   const NuevaConsultaState({
+    required this.maximoAdjuntos,
     this.paso = PasoConsulta.paciente,
     this.cargando = true,
     this.error,
@@ -257,6 +262,7 @@ class NuevaConsultaState extends Equatable {
     AvisoConsultas? aviso,
   }) {
     return NuevaConsultaState(
+      maximoAdjuntos: maximoAdjuntos,
       paso: paso ?? this.paso,
       cargando: cargando ?? this.cargando,
       error: limpiarError ? null : (error ?? this.error),
@@ -287,8 +293,12 @@ class NuevaConsultaState extends Equatable {
     );
   }
 
+  /// Todavía cabe otro archivo.
+  bool get cabeOtroAdjunto => adjuntos.length < maximoAdjuntos;
+
   @override
   List<Object?> get props => [
+    maximoAdjuntos,
     paso,
     cargando,
     error,

@@ -3,38 +3,132 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'catalogo_service.dart';
 
+/// Lo que se dice cuando falta un catálogo y no hay copia guardada.
+const String mensajeSinCatalogos =
+    'No pudimos cargar las listas de la clínica. Revisa tu conexión e '
+    'intenta de nuevo.';
+
 /// Los catálogos ya cargados, para cualquier pantalla que los necesite.
 class CatalogosState extends Equatable {
-  final Map<String, List<String>> listas;
+  final Map<String, List<ItemCatalogo>> listas;
+
+  /// Ya terminó al menos una carga (buena o mala).
   final bool cargados;
 
-  const CatalogosState({this.listas = const {}, this.cargados = false});
+  final bool cargando;
 
-  List<String> _de(String clave) =>
-      listas[clave] ?? catalogosDePartida[clave] ?? const [];
+  /// Los catálogos que no se pudieron cargar ni tenían copia guardada.
+  final Set<String> faltantes;
 
-  List<String> get motivosCancelacion => _de(Catalogos.motivoCancelacion);
+  const CatalogosState({
+    this.listas = const {},
+    this.cargados = false,
+    this.cargando = false,
+    this.faltantes = const {},
+  });
 
-  List<String> get especialidades => _de(Catalogos.especialidad);
+  /// Están todos los que la aplicación usa, del servidor o de la copia.
+  bool get completos =>
+      cargados && Catalogos.todos.every((c) => listas.containsKey(c));
 
-  List<String> get parentescos => _de(Catalogos.parentesco);
+  /// El mensaje para la pantalla cuando falta alguno.
+  String? get error => cargados && !completos ? mensajeSinCatalogos : null;
+
+  /// Si se tiene este catálogo (aunque esté vacío).
+  bool tiene(String clave) => listas.containsKey(clave);
+
+  /// Los elementos de un catálogo, en el orden del panel.
+  List<ItemCatalogo> items(String clave) => listas[clave] ?? const [];
+
+  List<String> nombres(String clave) => [
+    for (final i in items(clave)) i.nombre,
+  ];
+
+  /// El elemento con ese código, o `null`.
+  ItemCatalogo? porCodigo(String clave, String? codigo) {
+    final buscado = codigo?.trim().toUpperCase();
+    if (buscado == null || buscado.isEmpty) return null;
+
+    for (final item in items(clave)) {
+      if (item.codigo.toUpperCase() == buscado) return item;
+    }
+    return null;
+  }
+
+  /// La etiqueta de un código (`F` → «Femenino»), o `null` si el catálogo no
+  /// lo tiene.
+  String? nombreDe(String clave, String? codigo) =>
+      porCodigo(clave, codigo)?.nombre;
+
+  /// El elemento marcado como predeterminado por el administrador.
+  ItemCatalogo? porDefecto(String clave) {
+    for (final item in items(clave)) {
+      if (item.esPorDefecto) return item;
+    }
+    return null;
+  }
+
+  List<String> get motivosCancelacion =>
+      nombres(Catalogos.motivoCancelacionPaciente);
+
+  List<String> get especialidades => nombres(Catalogos.especialidad);
+
+  List<String> get parentescosDependiente =>
+      nombres(Catalogos.parentescoDependiente);
+
+  List<String> get parentescos => nombres(Catalogos.parentesco);
+
+  List<String> get ciudades => nombres(Catalogos.ciudad);
 
   @override
-  List<Object?> get props => [listas, cargados];
+  List<Object?> get props => [listas, cargados, cargando, faltantes];
 }
 
-/// Carga los tres catálogos de una vez al entrar.
+/// Carga todos los catálogos de una vez: al abrir la aplicación —antes de
+/// entrar, porque son públicos— y cada vez que vuelve al frente.
 ///
-/// Nunca falla: sin red devuelve lo guardado o los valores de partida, así
-/// que una pantalla que los pide siempre tiene opciones que ofrecer.
+/// Lo que el servidor responde reemplaza lo anterior; lo que no se pudo
+/// traer se queda como estaba (en memoria o en la copia guardada). Si falta
+/// alguno sin copia, [CatalogosState.error] lo dice y la pantalla ofrece
+/// «Reintentar»: no hay listas de respaldo.
 class CatalogosCubit extends Cubit<CatalogosState> {
   final CatalogoService _servicio;
 
-  CatalogosCubit(this._servicio) : super(const CatalogosState());
+  Future<void>? _enCurso;
 
-  Future<void> cargar() async {
-    final listas = await _servicio.cargar();
+  /// Con [inicial] arranca ya con catálogos (las pruebas de una pantalla
+  /// suelta, que no pasan por la carga).
+  CatalogosCubit(this._servicio, {CatalogosState? inicial})
+    : super(inicial ?? const CatalogosState());
 
-    if (!isClosed) emit(CatalogosState(listas: listas, cargados: true));
+  Future<void> cargar() => _enCurso ??= _cargar().whenComplete(() {
+    _enCurso = null;
+  });
+
+  Future<void> _cargar() async {
+    emit(
+      CatalogosState(
+        listas: state.listas,
+        cargados: state.cargados,
+        cargando: true,
+        faltantes: state.faltantes,
+      ),
+    );
+
+    final cargados = await _servicio.cargar();
+    if (isClosed) return;
+
+    final listas = {...state.listas, ...cargados.listas};
+
+    emit(
+      CatalogosState(
+        listas: listas,
+        cargados: true,
+        faltantes: {
+          for (final clave in cargados.faltantes)
+            if (!listas.containsKey(clave)) clave,
+        },
+      ),
+    );
   }
 }

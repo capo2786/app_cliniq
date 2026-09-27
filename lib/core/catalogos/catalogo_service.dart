@@ -1,141 +1,228 @@
 import 'package:dio/dio.dart';
+import 'package:equatable/equatable.dart';
 
+import '../network/api_interceptor.dart';
 import '../storage/cache_local.dart';
 
 /// Los catálogos que usa la aplicación, con los nombres de la API.
 class Catalogos {
   const Catalogos._();
 
-  static const String motivoCancelacion = 'MOTIVO_CANCELACION';
   static const String especialidad = 'ESPECIALIDAD';
+  static const String motivoCancelacionPaciente = 'MOTIVO_CANCELACION_PACIENTE';
+  static const String parentescoDependiente = 'PARENTESCO_DEPENDIENTE';
+
+  /// El parentesco del contacto de emergencia del perfil (los dependientes
+  /// usan [parentescoDependiente]).
   static const String parentesco = 'PARENTESCO';
 
+  static const String modalidadCita = 'MODALIDAD_CITA';
+  static const String preparacionCita = 'PREPARACION_CITA';
+  static const String ciudad = 'CIUDAD';
+  static const String sexo = 'SEXO';
+  static const String tipoDocumento = 'TIPO_DOCUMENTO';
+  static const String tipoSangre = 'TIPO_SANGRE';
+
+  /// Etiqueta, color, icono y descripción de los estados (códigos fijos).
+  static const String estadoCita = 'ESTADO_CITA';
+  static const String estadoConsulta = 'ESTADO_CONSULTA';
+
   static const List<String> todos = [
-    motivoCancelacion,
     especialidad,
+    motivoCancelacionPaciente,
+    parentescoDependiente,
     parentesco,
+    modalidadCita,
+    preparacionCita,
+    ciudad,
+    sexo,
+    tipoDocumento,
+    tipoSangre,
+    estadoCita,
+    estadoConsulta,
   ];
 }
 
-/// Valores de partida, iguales a los que siembra la API y a los del panel
-/// web (`CATALOGOS_DE_PARTIDA`). Solo se usan si el servidor no responde y
-/// no hay copia guardada: un formulario sin opciones no se puede llenar.
-const Map<String, List<String>> catalogosDePartida = {
-  Catalogos.especialidad: [
-    'Medicina General',
-    'Medicina Familiar',
-    'Medicina Interna',
-    'Pediatría',
-    'Ginecología y Obstetricia',
-    'Cardiología',
-    'Dermatología',
-    'Endocrinología',
-    'Gastroenterología',
-    'Neurología',
-    'Traumatología',
-    'Psicología',
-    'Psiquiatría',
-    'Nutrición',
-    'Odontología',
-  ],
-  Catalogos.motivoCancelacion: [
-    'El paciente pidió cancelar',
-    'El paciente no puede asistir',
-    'El médico no está disponible',
-    'Se reprogramó para otra fecha',
-    'Emergencia médica',
-    'Error al registrar la cita',
-    'Otro motivo',
-  ],
-  Catalogos.parentesco: [
-    'Madre',
-    'Padre',
-    'Cónyuge',
-    'Hijo/a',
-    'Hermano/a',
-    'Otro familiar',
-    'Amigo/a',
-  ],
-};
+/// Un elemento de un catálogo, completo: el código que usa el sistema y
+/// todo lo que el administrador edita.
+class ItemCatalogo extends Equatable {
+  final String codigo;
+  final String nombre;
+  final String descripcion;
+
+  /// `#RRGGBB` o vacío.
+  final String color;
+
+  /// Nombre de un icono del juego del panel (`video`, `estetoscopio`…) o
+  /// vacío.
+  final String icono;
+
+  final int orden;
+  final bool esPorDefecto;
+
+  const ItemCatalogo({
+    required this.codigo,
+    required this.nombre,
+    this.descripcion = '',
+    this.color = '',
+    this.icono = '',
+    this.orden = 0,
+    this.esPorDefecto = false,
+  });
+
+  /// Lee un elemento del lote, o `null` si no tiene nombre (sin nombre no hay
+  /// nada que enseñar) o si viene inactivo.
+  static ItemCatalogo? desdeJson(Object? json) {
+    if (json is! Map || json['isActive'] == false) return null;
+
+    String texto(String campo) => json[campo]?.toString().trim() ?? '';
+
+    final nombre = texto('nombre');
+    if (nombre.isEmpty) return null;
+
+    final orden = json['orden'];
+
+    return ItemCatalogo(
+      codigo: texto('codigo'),
+      nombre: nombre,
+      descripcion: texto('descripcion'),
+      color: texto('color'),
+      icono: texto('icono'),
+      orden: orden is num ? orden.toInt() : int.tryParse('$orden') ?? 0,
+      esPorDefecto: json['esPorDefecto'] == true,
+    );
+  }
+
+  Map<String, dynamic> aJson() => {
+    'codigo': codigo,
+    'nombre': nombre,
+    'descripcion': descripcion,
+    'color': color,
+    'icono': icono,
+    'orden': orden,
+    'esPorDefecto': esPorDefecto,
+  };
+
+  @override
+  List<Object?> get props => [
+    codigo,
+    nombre,
+    descripcion,
+    color,
+    icono,
+    orden,
+    esPorDefecto,
+  ];
+}
+
+/// Los catálogos cargados y de dónde salió cada uno.
+class CatalogosCargados {
+  final Map<String, List<ItemCatalogo>> listas;
+
+  /// Los que salieron de la copia del teléfono porque el servidor no
+  /// respondió.
+  final Set<String> desdeCache;
+
+  /// Los pedidos que no se pudieron cargar ni había copia.
+  final Set<String> faltantes;
+
+  const CatalogosCargados({
+    required this.listas,
+    this.desdeCache = const {},
+    this.faltantes = const {},
+  });
+}
 
 /// Las listas que se administran desde el panel, leídas por la aplicación.
 ///
-/// `GET /catalogos/lote?keys=A,B,C` devuelve `{A: [elementos], …}` con los
-/// elementos activos ya ordenados. Se guarda una copia en el teléfono: un
-/// catálogo cambia poco, y sin él no se puede ni cancelar una cita.
+/// `GET /catalogos/lote?keys=A,B,C` es pública (`@Public()`) y devuelve
+/// `{A: [elementos], …}` con los elementos activos ya ordenados, completos:
+/// `{codigo, nombre, descripcion, color, icono, orden, esPorDefecto}`. Se
+/// conservan todos esos campos.
+///
+/// Lo que responde el servidor manda, aunque sea una lista vacía. Sin red se
+/// usa la última copia guardada de cada catálogo; sin copia, el catálogo
+/// queda en [CatalogosCargados.faltantes]. La aplicación no trae ninguna
+/// lista de respaldo: nunca se inventan opciones.
 class CatalogoService {
-  static const String _claveCache = 'catalogos:lote';
+  static const String ruta = '/catalogos/lote';
+
+  /// Con el prefijo `catalogos`, que es de la clínica y sobrevive al cierre
+  /// de sesión. La clave cambió al guardar los elementos completos: la copia
+  /// vieja (`catalogos:lote`, solo nombres) no se lee.
+  static const String claveCache = 'catalogos:elementos';
 
   final Dio _dio;
   final CacheLocal _cache;
 
   CatalogoService(this._dio, this._cache);
 
-  /// Los nombres de cada catálogo pedido, en el orden del panel.
-  ///
-  /// Con red se descarga y se guarda; sin red se usa lo guardado; y si nunca
-  /// se descargó, los valores de partida. Un catálogo que llega vacío
-  /// también cae a lo guardado o a la partida: vacío no sirve para nada.
-  Future<Map<String, List<String>>> cargar([
+  Future<CatalogosCargados> cargar([
     List<String> claves = Catalogos.todos,
   ]) async {
     final guardado = await _leerGuardado();
 
+    Map<String, List<ItemCatalogo>> recibido;
     try {
       final respuesta = await _dio.get<dynamic>(
-        '/catalogos/lote',
+        ruta,
         queryParameters: {'keys': claves.join(',')},
+        options: Options(extra: const {rutaPublica: true}),
       );
 
-      final recibido = interpretarLote(respuesta.data);
-      final resultado = {
-        for (final clave in claves)
-          clave: _primeroConAlgo([
-            recibido[clave],
-            guardado[clave],
-            catalogosDePartida[clave],
-          ]),
-      };
+      if (respuesta.data is! Map) {
+        throw const FormatException('El lote de catálogos no es un objeto');
+      }
 
-      await _cache.guardar(_claveCache, {...guardado, ...resultado});
-
-      return resultado;
+      recibido = interpretarLote(respuesta.data);
     } catch (_) {
-      return {
-        for (final clave in claves)
-          clave: _primeroConAlgo([guardado[clave], catalogosDePartida[clave]]),
-      };
+      recibido = const {};
     }
+
+    final listas = <String, List<ItemCatalogo>>{};
+    final desdeCache = <String>{};
+    final faltantes = <String>{};
+
+    for (final clave in claves) {
+      final delServidor = recibido[clave];
+      final copia = guardado[clave];
+
+      if (delServidor != null) {
+        listas[clave] = delServidor;
+      } else if (copia != null) {
+        listas[clave] = copia;
+        desdeCache.add(clave);
+      } else {
+        faltantes.add(clave);
+      }
+    }
+
+    if (recibido.isNotEmpty) {
+      await _cache.guardar(claveCache, {
+        for (final entrada in {...guardado, ...recibido}.entries)
+          entrada.key: [for (final item in entrada.value) item.aJson()],
+      });
+    }
+
+    return CatalogosCargados(
+      listas: listas,
+      desdeCache: desdeCache,
+      faltantes: faltantes,
+    );
   }
 
-  Future<Map<String, List<String>>> _leerGuardado() async {
+  Future<Map<String, List<ItemCatalogo>>> _leerGuardado() async {
     try {
-      final datos = await _cache.leer(_claveCache);
-      if (datos is! Map) return {};
-
-      return {
-        for (final entrada in datos.entries)
-          if (entrada.value is List)
-            entrada.key.toString(): (entrada.value as List)
-                .map((x) => x.toString())
-                .toList(),
-      };
+      return interpretarLote(await _cache.leer(claveCache));
     } catch (_) {
-      return {};
+      return const {};
     }
-  }
-
-  static List<String> _primeroConAlgo(List<List<String>?> candidatos) {
-    for (final lista in candidatos) {
-      if (lista != null && lista.isNotEmpty) return lista;
-    }
-
-    return const [];
   }
 }
 
-/// Lee la respuesta del lote: `{CLAVE: [{nombre, isActive, …}]}`.
-Map<String, List<String>> interpretarLote(Object? datos) {
+/// Lee la respuesta del lote: `{CLAVE: [{codigo, nombre, …}]}`, en el orden
+/// en que llegan (el servidor ya los ordena).
+Map<String, List<ItemCatalogo>> interpretarLote(Object? datos) {
   if (datos is! Map) return {};
 
   return {
@@ -143,10 +230,7 @@ Map<String, List<String>> interpretarLote(Object? datos) {
       if (entrada.value is List)
         entrada.key.toString().toUpperCase(): [
           for (final item in entrada.value as List)
-            if (item is Map &&
-                item['isActive'] != false &&
-                (item['nombre']?.toString().trim().isNotEmpty ?? false))
-              item['nombre'].toString().trim(),
+            ?ItemCatalogo.desdeJson(item),
         ],
   };
 }

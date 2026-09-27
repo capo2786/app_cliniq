@@ -25,6 +25,7 @@ import '../providers/consultas_state.dart';
 import 'detalle_consulta_page.dart';
 import 'nueva_consulta_page.dart';
 import 'widgets/tarjeta_consulta.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// Consultas en línea: las del paciente y las de sus dependientes, con los
 /// borradores arriba, las abiertas después y las terminadas al final.
@@ -173,9 +174,7 @@ class _ConsultasPageState extends State<ConsultasPage> {
           TarjetaEncabezado(
             icono: Icons.forum_outlined,
             titulo: 'Consultas en línea',
-            descripcion:
-                'Escríbele a un médico sin ir a la clínica y recibe su '
-                'respuesta en menos de $horasDeRespuesta horas.',
+            descripcion: descripcionDeConsultas(context.config.telemedicina),
           ),
           const SizedBox(height: 16),
           ConRed(

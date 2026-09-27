@@ -12,6 +12,8 @@ import '../../providers/nueva_consulta_event.dart';
 import '../../providers/nueva_consulta_state.dart';
 import '../widgets/adjuntos.dart';
 import '../widgets/campo_dinamico.dart';
+import '../../../../core/archivos/archivo_local.dart';
+import '../../../../core/configuracion/en_contexto.dart';
 
 /// Paso 5: las preguntas del motivo, la descripción con las propias
 /// palabras y los archivos (fotos, recetas, exámenes).
@@ -73,7 +75,7 @@ class PasoFormulario extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 [
-                  if (state.medico != null) state.medico!.nombreVisible,
+                  if (state.medico != null) state.medico!.nombre,
                   if (state.pacienteNombre.isNotEmpty)
                     'para ${state.pacienteNombre}',
                 ].join(' · '),
@@ -134,10 +136,12 @@ class PasoFormulario extends StatelessWidget {
         const EtiquetaSeccion('Archivos'),
         Text(
           motivo.requiereAdjunto
-              ? 'Este motivo necesita al menos un archivo: una foto o un PDF. '
-                    'PDF, JPG o PNG de hasta 20 MB.'
+              ? 'Este motivo necesita al menos un archivo. '
+                    '${loQueSePuedeAdjuntar(context.config.archivos)}; hasta '
+                    '${state.maximoAdjuntos} en total.'
               : 'Opcional: fotos, recetas o exámenes que ayuden al médico. '
-                    'PDF, JPG o PNG de hasta 20 MB.',
+                    '${loQueSePuedeAdjuntar(context.config.archivos)}; hasta '
+                    '${state.maximoAdjuntos} en total.',
           style: TextStyle(
             color: motivo.requiereAdjunto
                 ? AppColors.alertaTexto
@@ -169,7 +173,7 @@ class PasoFormulario extends StatelessWidget {
           RecuadroAviso.error(errores[claveAdjuntos]!),
           const SizedBox(height: 10),
         ],
-        if (state.adjuntos.length < maximoAdjuntos)
+        if (state.cabeOtroAdjunto)
           BotonSecundario(
             key: const Key('boton-adjuntar'),
             texto: state.adjuntos.isEmpty

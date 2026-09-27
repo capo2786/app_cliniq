@@ -82,9 +82,6 @@ class MedicoConsulta extends Equatable {
     this.especialidad = '',
   });
 
-  /// «Dr(a). Ana Pérez», como en el resto de la aplicación.
-  String get nombreVisible => 'Dr(a). $nombre';
-
   static MedicoConsulta? desdeJson(Object? json) {
     if (json is! Map) return null;
 
@@ -93,7 +90,7 @@ class MedicoConsulta extends Equatable {
 
     return MedicoConsulta(
       uid: uid,
-      nombre: json['nombre']?.toString().trim() ?? 'Médico',
+      nombre: json['nombre']?.toString().trim() ?? '',
       especialidad: json['especialidad']?.toString().trim() ?? '',
     );
   }

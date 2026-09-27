@@ -11,6 +11,7 @@ import 'package:app_cliniq/features/citas/presentacion/widgets/videoconsulta.dar
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dobles/clinica.dart';
 import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 
@@ -43,34 +44,56 @@ void main() {
   };
 
   group('La ventana de la sala', () {
-    // La clínica elige cuánto antes y después abre la sala (hasta 120 y 240
-    // minutos): la aplicación ofrece entrar en la ventana más amplia y el
-    // servidor dice la regla exacta.
-    test('se ofrece desde 120 minutos antes del inicio', () {
-      expect(maximoMinutosAntesDeLaSala, 120);
+    // La de la configuración de prueba: abre 15 minutos antes del inicio y
+    // cierra 60 después del fin (`telemedicina.minutosAntes/minutosDespues`).
+    final ventana = VentanaDeSala.de(configDePrueba().telemedicina);
+
+    test('abre los minutos de antes que dice la clínica', () {
+      expect(ventana.minutosAntes, 15);
       expect(
-        estadoDeSala(cita(), DateTime(2026, 9, 28, 7, 59, 59)),
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 9, 44, 59), ventana),
         EstadoSala.porAbrir,
       );
       expect(
-        estadoDeSala(cita(), DateTime(2026, 9, 28, 8)),
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 9, 45), ventana),
         EstadoSala.abierta,
       );
     });
 
-    test('sigue durante la cita y hasta 240 minutos después del fin', () {
-      expect(maximoMinutosDespuesDeLaSala, 240);
+    test('sigue durante la cita y hasta los minutos de después del fin', () {
+      expect(ventana.minutosDespues, 60);
       expect(
-        estadoDeSala(cita(), DateTime(2026, 9, 28, 10, 10)),
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 10, 10), ventana),
         EstadoSala.abierta,
       );
       expect(
-        estadoDeSala(cita(), DateTime(2026, 9, 28, 14, 20)),
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 11, 20), ventana),
         EstadoSala.abierta,
       );
       expect(
-        estadoDeSala(cita(), DateTime(2026, 9, 28, 14, 20, 1)),
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 11, 20, 1), ventana),
         EstadoSala.cerrada,
+      );
+    });
+
+    test('otra configuración, otra ventana', () {
+      final amplia = VentanaDeSala.de(
+        configDePrueba(
+          telemedicina: {'minutosAntes': 120, 'minutosDespues': 240},
+        ).telemedicina,
+      );
+
+      expect(
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 8), amplia),
+        EstadoSala.abierta,
+      );
+      expect(
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 8), ventana),
+        EstadoSala.porAbrir,
+      );
+      expect(
+        estadoDeSala(cita(), DateTime(2026, 9, 28, 14, 20), amplia),
+        EstadoSala.abierta,
       );
     });
 
@@ -78,7 +101,8 @@ void main() {
       expect(
         estadoDeSala(
           cita(estado: EstadoCita.atendida),
-          DateTime(2026, 9, 28, 11, 30),
+          DateTime(2026, 9, 28, 10, 50),
+          ventana,
         ),
         EstadoSala.abierta,
       );
@@ -88,63 +112,89 @@ void main() {
       final hora = DateTime(2026, 9, 28, 10);
 
       expect(
-        estadoDeSala(cita(estado: EstadoCita.cancelada), hora),
+        estadoDeSala(cita(estado: EstadoCita.cancelada), hora, ventana),
         EstadoSala.noAplica,
       );
       expect(
-        estadoDeSala(cita(tipo: TipoCita.presencial), hora),
+        estadoDeSala(cita(tipo: TipoCita.presencial), hora, ventana),
         EstadoSala.noAplica,
       );
       expect(
-        estadoDeSala(cita(tipo: TipoCita.asincrona), hora),
+        estadoDeSala(cita(tipo: TipoCita.asincrona), hora, ventana),
         EstadoSala.noAplica,
       );
     });
 
-    test('desde cuándo se puede intentar entrar, con la hora, y otro día con '
-        'la fecha', () {
+    test('a qué hora abre, con los minutos de la clínica, y otro día con la '
+        'fecha', () {
       expect(
-        cuandoAbreLaSala(cita(), DateTime(2026, 9, 28, 7)),
-        'Podrás intentar entrar desde las 08:00; si todavía es temprano, te '
-        'diremos a qué hora abre la sala.',
+        cuandoAbreLaSala(cita(), DateTime(2026, 9, 28, 7), ventana),
+        'La sala abre a las 09:45, 15 minutos antes de la cita.',
       );
       expect(
-        cuandoAbreLaSala(cita(), DateTime(2026, 9, 27, 20)),
-        contains('desde mañana a las 08:00'),
+        cuandoAbreLaSala(cita(), DateTime(2026, 9, 27, 20), ventana),
+        contains('mañana a las 09:45'),
       );
       expect(
-        cuandoAbreLaSala(cita(), DateTime(2026, 9, 25, 20)),
-        contains('desde el lunes 28 de septiembre a las 08:00'),
+        cuandoAbreLaSala(cita(), DateTime(2026, 9, 25, 20), ventana),
+        contains('el lunes 28 de septiembre a las 09:45'),
       );
     });
   });
 
   group('La tarjeta de la lista', () {
-    Future<void> montar(WidgetTester tester, DateTime ahora) async {
+    Future<void> montar(
+      WidgetTester tester,
+      DateTime ahora, {
+      Map<String, dynamic>? telemedicina,
+    }) async {
       await tester.pumpWidget(
-        MaterialApp(
-          theme: temaCliniq(),
-          home: Scaffold(
-            body: TarjetaCita(cita: cita(), ahora: ahora),
+        conDatosDeLaClinica(
+          config: configDePrueba(telemedicina: telemedicina),
+          MaterialApp(
+            theme: temaCliniq(),
+            home: Scaffold(
+              body: TarjetaCita(cita: cita(), ahora: ahora),
+            ),
           ),
         ),
       );
     }
 
-    testWidgets('«Sala abierta» sigue la misma ventana que el botón', (
+    testWidgets('«Sala abierta» sigue la ventana de la configuración', (
       tester,
     ) async {
-      await montar(tester, DateTime(2026, 9, 28, 7, 59));
+      await montar(tester, DateTime(2026, 9, 28, 9, 44));
       expect(find.text('Sala abierta'), findsNothing);
 
-      await montar(tester, DateTime(2026, 9, 28, 8));
+      await montar(tester, DateTime(2026, 9, 28, 9, 45));
       expect(find.text('Sala abierta'), findsOneWidget);
 
-      await montar(tester, DateTime(2026, 9, 28, 14, 20));
+      await montar(tester, DateTime(2026, 9, 28, 11, 20));
       expect(find.text('Sala abierta'), findsOneWidget);
 
-      await montar(tester, DateTime(2026, 9, 28, 14, 21));
+      await montar(tester, DateTime(2026, 9, 28, 11, 21));
       expect(find.text('Sala abierta'), findsNothing);
+    });
+
+    testWidgets('con otra configuración, la otra ventana', (tester) async {
+      await montar(
+        tester,
+        DateTime(2026, 9, 28, 9, 40),
+        telemedicina: {'minutosAntes': 30},
+      );
+      expect(find.text('Sala abierta'), findsOneWidget);
+    });
+
+    testWidgets('el nombre, el color y el estado salen de los catálogos', (
+      tester,
+    ) async {
+      await montar(tester, DateTime(2026, 9, 28, 7));
+
+      expect(find.text('Telemedicina'), findsOneWidget);
+      expect(find.text('Programada'), findsOneWidget);
+      expect(find.text('Ana Pérez'), findsOneWidget);
+      expect(find.textContaining('Dr(a).'), findsNothing);
     });
   });
 
@@ -288,14 +338,16 @@ void main() {
       required ServicioVideollamada servicio,
     }) async {
       await tester.pumpWidget(
-        MaterialApp(
-          theme: temaCliniq(),
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: BotonVideoconsulta(
-                cita: cita(),
-                servicio: servicio,
-                reloj: RelojClinica.fijo(ahora),
+        conDatosDeLaClinica(
+          MaterialApp(
+            theme: temaCliniq(),
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: BotonVideoconsulta(
+                  cita: cita(),
+                  servicio: servicio,
+                  reloj: RelojClinica.fijo(ahora),
+                ),
               ),
             ),
           ),
@@ -303,18 +355,18 @@ void main() {
       );
     }
 
-    testWidgets('antes de la ventana se ve apagado y dice desde cuándo', (
+    testWidgets('antes de la ventana se ve apagado y dice a qué hora abre', (
       tester,
     ) async {
       final servicio = _VideoFalso();
       await montar(
         tester,
-        ahora: DateTime(2026, 9, 28, 7, 30),
+        ahora: DateTime(2026, 9, 28, 9, 30),
         servicio: servicio,
       );
 
       expect(find.text('Entrar a la videoconsulta'), findsOneWidget);
-      expect(find.textContaining('desde las 08:00'), findsOneWidget);
+      expect(find.textContaining('a las 09:45'), findsOneWidget);
       expect(find.textContaining('cámara y el micrófono'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('boton-videoconsulta')));
@@ -323,7 +375,7 @@ void main() {
     });
 
     testWidgets('con la sala abierta entra; si el servidor dice que no, '
-        'se enseña su mensaje', (tester) async {
+        'se enseña su mensaje con el contacto de la clínica', (tester) async {
       final servicio = _VideoFalso(
         error: const ErrorDeVideollamada(
           'La videoconsulta no está disponible en este momento.',
@@ -335,7 +387,7 @@ void main() {
         servicio: servicio,
       );
 
-      expect(find.textContaining('Podrás intentar entrar'), findsNothing);
+      expect(find.textContaining('La sala abre'), findsNothing);
       expect(find.textContaining('cámara y el micrófono'), findsOneWidget);
 
       await tester.tap(find.byKey(const Key('boton-videoconsulta')));
@@ -347,12 +399,13 @@ void main() {
         find.text('La videoconsulta no está disponible en este momento.'),
         findsOneWidget,
       );
+      // El teléfono y el correo de la configuración, para tocarlos.
+      expect(find.text('02 255 0000'), findsOneWidget);
+      expect(find.text('contacto@andina.ec'), findsOneWidget);
     });
 
-    testWidgets('temprano para la clínica pero dentro de la ventana: se '
-        'puede tocar y el 409 del servidor dice la regla exacta', (
-      tester,
-    ) async {
+    testWidgets('a la hora exacta en que abre ya se puede tocar; si el '
+        'servidor igual dice que no, su mensaje manda', (tester) async {
       final servicio = _VideoFalso(
         error: const ErrorDeVideollamada(
           'La sala se abre 15 minutos antes de la cita.',
@@ -360,7 +413,7 @@ void main() {
       );
       await montar(
         tester,
-        ahora: DateTime(2026, 9, 28, 8, 30),
+        ahora: DateTime(2026, 9, 28, 9, 45),
         servicio: servicio,
       );
 
@@ -378,7 +431,7 @@ void main() {
     testWidgets('pasada la ventana ya no se ve', (tester) async {
       await montar(
         tester,
-        ahora: DateTime(2026, 9, 28, 14, 21),
+        ahora: DateTime(2026, 9, 28, 11, 21),
         servicio: _VideoFalso(),
       );
 

@@ -32,9 +32,6 @@ class MedicoPortal implements MedicoConAgenda {
     this.bloqueos = const [],
   });
 
-  /// «Dr(a). Ana Pérez»
-  String get nombreVisible => 'Dr(a). $nombre';
-
   /// Las modalidades en el orden de siempre; sin dato, las tres (igual que
   /// `modalidadesDe` en el web).
   List<TipoCita> get modalidadesOfrecidas => modalidades.isEmpty
@@ -55,7 +52,7 @@ class MedicoPortal implements MedicoConAgenda {
 
     return MedicoPortal(
       uid: texto(json['uid']) ?? texto(json['_id']) ?? '',
-      nombre: texto(json['nombre']) ?? 'Médico',
+      nombre: texto(json['nombre']) ?? '',
       especialidad: texto(json['especialidad']),
       ciudad: texto(json['ciudad']),
       modalidades: modalidades,

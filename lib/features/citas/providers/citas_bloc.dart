@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/catalogos/catalogos_cubit.dart';
+import '../../../core/configuracion/config_publica.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/network/errores.dart';
 import '../../../core/notificaciones/recordatorios_citas.dart';
@@ -15,11 +17,17 @@ import 'citas_state.dart';
 ///
 /// Vive en la raíz de la aplicación porque la usan el inicio (la próxima
 /// cita) y la pestaña de citas: las dos tienen que ver la misma lista.
+///
+/// Los recordatorios siguen la configuración de la clínica —cuáles suenan, o
+/// ninguno— y sus textos salen de los catálogos: por eso lee los dos cada vez
+/// que los programa.
 class CitasBloc extends Bloc<CitasEvent, CitasState> {
   final CitasService _citas;
   final PortalService _portal;
   final ProgramadorDeRecordatorios _recordatorios;
   final RelojClinica _reloj;
+  final ConfigPublica? Function() _config;
+  final CatalogosState Function() _catalogos;
 
   String? _uid;
   int _secuencia = 0;
@@ -29,12 +37,45 @@ class CitasBloc extends Bloc<CitasEvent, CitasState> {
     required this._portal,
     required this._recordatorios,
     RelojClinica? reloj,
+    required this._config,
+    required this._catalogos,
   }) : _reloj = reloj ?? RelojClinica(),
        super(const CitasState()) {
     on<CitasSolicitadas>(_alSolicitar);
     on<CitaCancelacionSolicitada>(_alCancelar);
     on<CitaActualizada>(_alActualizar);
     on<CitasVaciadas>(_alVaciar);
+    on<CitasRecordatoriosRevisados>(_alRevisarRecordatorios);
+  }
+
+  /// Programa los recordatorios de estas citas con la configuración vigente.
+  /// Sin configuración todavía no se toca nada: se programan cuando llegue
+  /// (ver [CitasRecordatoriosRevisados]).
+  void _reprogramar(List<Cita> citas) {
+    final config = _config();
+    if (config == null) return;
+
+    unawaited(
+      _recordatorios.programar(
+        recordatoriosPara(
+          citas,
+          _reloj.ahora(),
+          agenda: config.agenda,
+          catalogos: _catalogos(),
+        ),
+      ),
+    );
+  }
+
+  /// Cambió la configuración o los catálogos: los recordatorios se rehacen
+  /// con las citas que ya se tienen. Si la clínica los apagó, se cancelan.
+  void _alRevisarRecordatorios(
+    CitasRecordatoriosRevisados event,
+    Emitter<CitasState> emit,
+  ) {
+    if (_uid == null) return;
+
+    _reprogramar(state.citas);
   }
 
   Future<void> _alSolicitar(
@@ -76,9 +117,7 @@ class CitasBloc extends Bloc<CitasEvent, CitasState> {
 
       // Cada sincronización buena reprograma los recordatorios: una cita
       // cancelada desde la clínica deja de sonar.
-      if (!resultado.desdeCache) {
-        unawaited(_recordatorios.reprogramar(resultado.citas, _reloj.ahora()));
-      }
+      if (!resultado.desdeCache) _reprogramar(resultado.citas);
     } catch (error) {
       emit(
         state.copiarCon(
@@ -124,7 +163,7 @@ class CitasBloc extends Bloc<CitasEvent, CitasState> {
         ),
       );
 
-      unawaited(_recordatorios.reprogramar(citas, _reloj.ahora()));
+      _reprogramar(citas);
 
       final uid = _uid;
       if (uid != null) add(CitasSolicitadas(uid));
@@ -153,7 +192,7 @@ class CitasBloc extends Bloc<CitasEvent, CitasState> {
 
     emit(state.copiarCon(citas: citas));
 
-    unawaited(_recordatorios.reprogramar(citas, _reloj.ahora()));
+    _reprogramar(citas);
 
     final uid = _uid;
     if (uid != null) add(CitasSolicitadas(uid));

@@ -10,6 +10,7 @@ library;
 
 import '../../../core/fechas/fecha_local.dart';
 import '../../citas/data/models/cita.dart';
+import 'reglas_agendamiento.dart';
 
 /// Los días de la semana con los nombres que guarda la API.
 const List<String> diasSemana = [
@@ -92,7 +93,7 @@ class HorarioDia {
 
 /// Cómo arma su agenda cada médico: duración por modalidad, margen entre
 /// pacientes y máximo de citas por día. Lo que no configura cae en los
-/// valores de la clínica.
+/// valores de la clínica (`ReglasAgendamiento`).
 class ConfigAgenda {
   /// Minutos por modalidad (código de la API → minutos).
   final Map<String, int> duraciones;
@@ -246,11 +247,18 @@ String resumenHorario(List<HorarioDia>? horarios) {
   return todosIguales ? '$dias · $primero' : '$dias · horario variable';
 }
 
-/// Duración en minutos de una modalidad con este médico.
-int duracionDe(MedicoConAgenda? medico, TipoCita tipo) {
+/// Duración en minutos de una modalidad con este médico: la suya, o la de la
+/// clínica si no configuró ninguna.
+int duracionDe(
+  MedicoConAgenda? medico,
+  TipoCita tipo,
+  ReglasAgendamiento reglas,
+) {
   final propia = medico?.configAgenda?.duraciones[tipo.codigo];
 
-  return propia != null && propia > 0 ? propia : tipo.duracionPorDefecto;
+  return propia != null && propia > 0
+      ? propia
+      : reglas.duracionPorDefecto(tipo);
 }
 
 /// Minutos de margen entre citas del médico (nunca negativos).

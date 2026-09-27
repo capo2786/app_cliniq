@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/presentacion/widgets/campos.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/tema/tokens.dart';
-import '../../../citas/data/models/cita.dart';
 import '../../../citas/presentacion/estilos_cita.dart';
 import '../../providers/agendar_bloc.dart';
 import '../../providers/agendar_event.dart';
@@ -77,13 +77,20 @@ class PasoFiltros extends StatelessWidget {
                 const AgendarFiltrosCambiados(quitarModalidad: true),
               ),
             ),
-            for (final tipo in TipoCita.values)
-              _Chip(
-                texto: tipo.nombre,
-                icono: tipo.icono,
-                color: tipo.color,
-                elegido: state.filtroModalidad == tipo,
-                onTap: () => bloc.add(AgendarFiltrosCambiados(modalidad: tipo)),
+            for (final tipo in modalidadesDelCatalogo(context.catalogos))
+              Builder(
+                builder: (context) {
+                  final estilo = context.modalidad(tipo);
+
+                  return _Chip(
+                    texto: estilo.nombre,
+                    icono: estilo.icono,
+                    color: estilo.color,
+                    elegido: state.filtroModalidad == tipo,
+                    onTap: () =>
+                        bloc.add(AgendarFiltrosCambiados(modalidad: tipo)),
+                  );
+                },
               ),
           ],
         ),

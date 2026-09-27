@@ -3,6 +3,17 @@ import 'package:flutter/foundation.dart';
 
 import '../red/estado_de_la_red.dart';
 
+/// Marca (en `RequestOptions.extra`) de una ruta pública (`@Public()` en la
+/// API): la configuración pública, los catálogos y los documentos legales.
+///
+/// Se piden sin el token —se leen antes de entrar, en la pantalla de acceso—
+/// y un 401 en una de ellas nunca se toma como una sesión vencida.
+const String rutaPublica = 'cliniq.rutaPublica';
+
+/// Si la petición va a una ruta pública.
+bool esRutaPublica(RequestOptions opciones) =>
+    opciones.extra[rutaPublica] == true;
+
 /// Adjunta el token de la sesión y detecta cuándo venció.
 ///
 /// La API no tiene token de renovación: cuando el JWT caduca, cualquier
@@ -35,7 +46,8 @@ class ApiInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final token = leerToken();
 
-    if (token != null &&
+    if (!esRutaPublica(options) &&
+        token != null &&
         token.isNotEmpty &&
         !options.headers.containsKey('Authorization')) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -72,6 +84,7 @@ class ApiInterceptor extends Interceptor {
 
     if (err.response?.statusCode == 401 &&
         llevabaSesion &&
+        !esRutaPublica(err.requestOptions) &&
         !esRutaDeAcceso(err.requestOptions.path)) {
       alVencerLaSesion();
     }

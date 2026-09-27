@@ -8,6 +8,7 @@ import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/cerrar_sesion.dart';
+import '../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../core/presentacion/widgets/tarjetas.dart';
@@ -66,6 +67,7 @@ class CitasPage extends StatelessWidget {
                           'Esta sección es para pacientes. Si crees '
                           'que es un error, consúltalo en la clínica.',
                     ),
+                    Center(child: ContactoClinica()),
                   ],
                 )
               : BlocListener<CitasBloc, CitasState>(

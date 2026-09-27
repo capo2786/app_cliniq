@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/presentacion/widgets/entrada_animada.dart';
-import '../../../core/presentacion/widgets/logo_cliniq.dart';
+import '../../../core/presentacion/widgets/logo_clinica.dart';
 import '../../../core/tema/tokens.dart';
 
-/// Lo que se ve mientras se restaura la sesión guardada.
+/// Lo que se ve mientras se restaura la sesión guardada o llegan los datos de
+/// la clínica.
 ///
-/// Tiene el mismo fondo y el mismo logotipo que la pantalla de arranque
-/// nativa, para que el paso de una a otra no se note: la persona ve una sola
-/// pantalla que termina de cargar, no dos.
+/// Tiene el mismo fondo que la pantalla de arranque nativa, para que el paso
+/// de una a otra no se note: la persona ve una sola pantalla que termina de
+/// cargar, no dos. El logotipo es el de la clínica en cuanto se conoce su
+/// configuración; antes, el de marca.
 class ArranquePage extends StatelessWidget {
   const ArranquePage({super.key});
 
@@ -21,7 +23,7 @@ class ArranquePage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              InsigniaCliniq(tamano: 104),
+              LogoDeLaClinica(tamano: 104, insignia: true),
               SizedBox(height: 28),
               SizedBox(
                 width: 28,

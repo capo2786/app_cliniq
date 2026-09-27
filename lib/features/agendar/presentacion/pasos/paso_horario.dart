@@ -23,6 +23,7 @@ class PasoHorario extends StatelessWidget {
   Widget build(BuildContext context) {
     final medico = state.medico;
     final original = state.original;
+    final modalidad = context.modalidad(state.tipo);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -32,7 +33,7 @@ class PasoHorario extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  medico.nombreVisible,
+                  medico.nombre,
                   style: const TextStyle(
                     color: AppColors.texto,
                     fontSize: 14.5,
@@ -43,9 +44,9 @@ class PasoHorario extends StatelessWidget {
               const SizedBox(width: 8),
               Flexible(
                 child: Pastilla(
-                  texto: '${state.tipo.nombre} · ${state.duracion} min',
-                  color: state.tipo.color,
-                  icono: state.tipo.icono,
+                  texto: '${modalidad.nombre} · ${state.duracion} min',
+                  color: modalidad.color,
+                  icono: modalidad.icono,
                 ),
               ),
             ],
@@ -170,6 +171,9 @@ class _Horarios extends StatelessWidget {
 
   const _Horarios({required this.state});
 
+  static String _quien(String? nombre) =>
+      nombre == null || nombre.trim().isEmpty ? 'El médico' : nombre;
+
   void _siguienteDia(BuildContext context) {
     final dias = state.diasDisponibles;
     final fecha = state.fecha;
@@ -191,12 +195,13 @@ class _Horarios extends StatelessWidget {
       case EstadoDia.sinMedico:
         return const SizedBox.shrink();
       case EstadoDia.sinFecha:
-        return const EstadoVacio(
+        final dias = state.reglas.diasHorizonte;
+        return EstadoVacio(
           icono: Icons.event_busy_rounded,
           titulo: 'Sin fechas disponibles',
           descripcion:
               'Este médico no tiene días de atención en los próximos '
-              '60 días. Prueba con otro médico.',
+              '${dias == 1 ? 'día' : '$dias días'}. Prueba con otro médico.',
         );
       case EstadoDia.pasado:
         return const RecuadroAviso.alerta('Ese día ya pasó. Elige otro.');
@@ -206,9 +211,8 @@ class _Horarios extends StatelessWidget {
           icono: Icons.beach_access_rounded,
           titulo: 'Ese día no atiende',
           descripcion: motivo.isEmpty
-              ? '${medico?.nombreVisible ?? 'El médico'} no atiende ese día.'
-              : '${medico?.nombreVisible ?? 'El médico'} no atiende ese día: '
-                    '$motivo.',
+              ? '${_quien(medico?.nombre)} no atiende ese día.'
+              : '${_quien(medico?.nombre)} no atiende ese día: $motivo.',
           accion: 'Ver el siguiente día',
           alPulsar: () => _siguienteDia(context),
         );

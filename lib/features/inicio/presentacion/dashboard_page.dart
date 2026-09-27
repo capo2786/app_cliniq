@@ -126,15 +126,13 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   void _abrirAgendar() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AgendarPage()));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const AgendarPage()));
   }
 
   void _abrirConsultas() {
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const ConsultasPage()));
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const ConsultasPage()));
   }
 
   void _irA(DestinoRapido destino) {

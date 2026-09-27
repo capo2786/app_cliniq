@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/archivos/archivo_local.dart';
+import '../../../core/configuracion/config_publica.dart';
 import '../../../core/network/errores.dart';
 import '../../dependientes/data/dependientes_service.dart';
 import '../../dependientes/data/models/dependiente.dart';
@@ -29,16 +30,25 @@ class NuevaConsultaBloc extends Bloc<NuevaConsultaEvent, NuevaConsultaState> {
   final DependientesService _dependientes;
   final String _uid;
 
+  /// Qué archivos se aceptan y hasta qué tamaño (configuración de la
+  /// clínica).
+  final ReglasArchivos _archivos;
+
   int _secuencia = 0;
 
+  /// [maximoAdjuntos] es `telemedicina.maxArchivosConsulta` y [archivos],
+  /// `archivos.*` de la configuración de la clínica.
   NuevaConsultaBloc({
     required this._consultas,
     required this._dependientes,
     required this._uid,
     required String nombreTitular,
+    required int maximoAdjuntos,
+    required this._archivos,
     bool puedeDependientes = true,
   }) : super(
          NuevaConsultaState(
+           maximoAdjuntos: maximoAdjuntos,
            nombreTitular: nombreTitular,
            puedeDependientes: puedeDependientes,
          ),
@@ -325,15 +335,20 @@ class NuevaConsultaBloc extends Bloc<NuevaConsultaEvent, NuevaConsultaState> {
     final nuevos = <AdjuntoConsulta>[];
 
     for (final archivo in event.seleccion.archivos) {
-      final problema = problemaDelArchivo(archivo);
+      final problema = problemaDelArchivo(archivo, _archivos);
 
       if (problema != null) {
         problemas.add(problema);
         continue;
       }
 
-      if (state.adjuntos.length + nuevos.length >= maximoAdjuntos) {
-        problemas.add('Puedes adjuntar hasta $maximoAdjuntos archivos.');
+      final maximo = state.maximoAdjuntos;
+      if (state.adjuntos.length + nuevos.length >= maximo) {
+        problemas.add(
+          maximo == 1
+              ? 'Puedes adjuntar 1 archivo.'
+              : 'Puedes adjuntar hasta $maximo archivos.',
+        );
         break;
       }
 

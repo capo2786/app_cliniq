@@ -5,6 +5,7 @@ import '../../../../core/catalogos/catalogos_cubit.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/botones.dart';
 import '../../../../core/presentacion/widgets/campos.dart';
+import '../../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/cita.dart';
@@ -34,9 +35,10 @@ Future<bool?> mostrarCancelarCita(BuildContext context, Cita cita) {
 
 /// Cancelar con un motivo del catálogo y, si se quiere, un detalle.
 ///
-/// El motivo es obligatorio porque el médico lo recibe en su aviso: «el
-/// paciente no puede asistir» y «se reprogramó para otra fecha» le piden
-/// cosas distintas.
+/// Los motivos son los que la clínica deja elegir a un paciente
+/// (`MOTIVO_CANCELACION_PACIENTE`), no los del personal. El motivo es
+/// obligatorio porque el médico lo recibe en su aviso: «no puedo asistir» y
+/// «ya me siento mejor» le dicen cosas distintas.
 class _CancelarCita extends StatefulWidget {
   final Cita cita;
 
@@ -87,6 +89,7 @@ class _CancelarCitaState extends State<_CancelarCita> {
   @override
   Widget build(BuildContext context) {
     final motivos = context.watch<CatalogosCubit>().state.motivosCancelacion;
+    final medico = widget.cita.medicoVisible;
 
     return BlocConsumer<CitasBloc, CitasState>(
       listenWhen: (antes, ahora) =>
@@ -142,8 +145,9 @@ class _CancelarCitaState extends State<_CancelarCita> {
                   const SizedBox(height: 8),
                   Text(
                     '${FormatoFecha.diaLargo(widget.cita.inicio)}, '
-                    '${FormatoFecha.hora(widget.cita.inicio)} con '
-                    '${widget.cita.medicoVisible}. Le avisaremos al médico.',
+                    '${FormatoFecha.hora(widget.cita.inicio)}'
+                    '${medico == null ? '' : ' con $medico'}. Le avisaremos '
+                    'al médico.',
                     style: const TextStyle(
                       color: AppColors.textoSecundario,
                       fontSize: 13,
@@ -169,6 +173,15 @@ class _CancelarCitaState extends State<_CancelarCita> {
                         ? 'Elige el motivo de la cancelación.'
                         : null,
                   ),
+                  if (motivos.isEmpty) ...[
+                    const SizedBox(height: 8),
+                    const RecuadroAviso.alerta(
+                      'La clínica todavía no configuró los motivos de '
+                      'cancelación. Comunícate con ella para cancelar.',
+                    ),
+                    const SizedBox(height: 4),
+                    const ContactoClinica(),
+                  ],
                   const SizedBox(height: 16),
                   const EtiquetaCampo('Detalle (opcional)'),
                   CampoCliniq(

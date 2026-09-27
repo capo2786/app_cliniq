@@ -126,8 +126,8 @@ String mensajeDeVideollamada(Object error) {
 
   if (estado == 503) {
     return delServidor ??
-        'La videoconsulta no está disponible en este momento. Llama a la '
-            'clínica para que te atiendan.';
+        'La videoconsulta no está disponible en este momento. Comunícate '
+            'con la clínica para que te atiendan.';
   }
 
   return mensajeDeError(
@@ -174,7 +174,7 @@ class VideollamadaEnNavegador implements ServicioVideollamada {
     final direccion = Uri.tryParse(sala.url);
     if (direccion == null || direccion.scheme != 'https') {
       throw const ErrorDeVideollamada(
-        'La sala no tiene una dirección válida. Llama a la clínica.',
+        'La sala no tiene una dirección válida. Comunícate con la clínica.',
       );
     }
 

@@ -49,3 +49,9 @@ class CitaActualizada extends CitasEvent {
 class CitasVaciadas extends CitasEvent {
   const CitasVaciadas();
 }
+
+/// Cambió la configuración de la clínica o sus catálogos: los recordatorios
+/// se vuelven a programar (o se cancelan, si la clínica los apagó).
+class CitasRecordatoriosRevisados extends CitasEvent {
+  const CitasRecordatoriosRevisados();
+}

@@ -9,6 +9,9 @@ import '../../providers/nueva_consulta_bloc.dart';
 import '../../providers/nueva_consulta_event.dart';
 import '../../providers/nueva_consulta_state.dart';
 import '../widgets/adjuntos.dart';
+import '../../../../core/configuracion/en_contexto.dart';
+import '../../../../core/presentacion/widgets/contacto_clinica.dart';
+import '../../../citas/dominio/reglas_citas.dart' show horas;
 
 /// Paso 6: todo lo que va a leer el médico, para revisarlo antes de enviar.
 class PasoResumenConsulta extends StatelessWidget {
@@ -53,7 +56,7 @@ class PasoResumenConsulta extends StatelessWidget {
               FilaDato(
                 icono: Icons.medical_information_outlined,
                 rotulo: 'Médico',
-                valor: state.medico?.nombreVisible,
+                valor: state.medico?.nombre,
               ),
             ],
           ),
@@ -122,16 +125,19 @@ class PasoResumenConsulta extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 4),
-        const Text(
-          'Al enviarla, el médico tiene $horasDeRespuesta horas para '
+        Text(
+          'Al enviarla, el médico tiene '
+          '${horas(context.config.telemedicina.horasRespuesta)} para '
           'responderte y te avisaremos por correo. Si es una emergencia, no '
-          'esperes: ve a la emergencia más cercana o llama al 911.',
-          style: TextStyle(
+          'esperes: ve a la emergencia más cercana o llama al '
+          '${context.config.clinica.telefonoEmergencia}.',
+          style: const TextStyle(
             color: AppColors.textoTenue,
             fontSize: 12,
             height: 1.4,
           ),
         ),
+        const BotonEmergencia(),
       ],
     );
   }

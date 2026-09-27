@@ -3,10 +3,14 @@
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/fechas/instante.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 
 /// Los instantes reales (consultas, mensajes, archivos) se leen respetando la
 /// zona y se enseñan en la hora de la clínica: al revés que las citas.
 void main() {
+  // La zona de la clínica llega de su configuración (`clinica.zonaHoraria`).
+  setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
+
   group('leerInstante', () {
     test('con Z es un instante en UTC', () {
       final instante = leerInstante('2026-09-28T14:00:00.000Z');

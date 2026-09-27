@@ -5,8 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
-/// La copia local de lo último que se descargó: citas, dependientes y
-/// catálogos.
+/// La copia local de lo último que se descargó: citas, dependientes, el menú,
+/// la configuración de la clínica y sus catálogos.
 ///
 /// Sirve para dos cosas. Una, abrir la aplicación sin Internet y ver igual
 /// las citas: la sala de espera de una clínica no siempre tiene cobertura.
@@ -28,8 +28,11 @@ abstract class CacheLocal {
 }
 
 /// Los prefijos que guardan datos de la clínica y no de alguien: se quedan
-/// al cerrar sesión, porque sin ellos un formulario no se puede ni empezar.
-const Set<String> prefijosDeLaClinica = {'catalogos'};
+/// al cerrar sesión, porque sin ellos ni la pantalla de acceso sabe qué
+/// clínica es. Son la configuración pública, los catálogos y la lista de
+/// documentos legales; el menú no, porque depende de los permisos de quien
+/// entró.
+const Set<String> prefijosDeLaClinica = {'catalogos', 'configuracion', 'legal'};
 
 bool esDatoDeLaClinica(String clave) {
   final corte = clave.indexOf(':');

@@ -1,76 +1,87 @@
+import '../../../core/configuracion/config_publica.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/formato/fechas.dart';
 import '../data/models/cita.dart';
 
-/// Hasta cuántos minutos antes del inicio puede abrir la clínica la sala, y
-/// hasta cuántos después del fin puede cerrarla: los topes que el servidor
-/// acepta en la configuración de telemedicina (`minutosAntes` de 0 a 120,
-/// `minutosDespues` de 0 a 240; por defecto 15 y 60).
-///
-/// La aplicación no sabe qué valores eligió la clínica, así que ofrece entrar
-/// en la ventana más amplia posible y deja la regla exacta al servidor: fuera
-/// de la suya contesta 409 con la explicación («La sala se abre 15 minutos
-/// antes de la cita»), que se enseña tal cual. Fuera de esta ventana, en
-/// cambio, la sala seguro está cerrada y no se ofrece un botón que solo
-/// llevaría a ese error.
-const int maximoMinutosAntesDeLaSala = 120;
-const int maximoMinutosDespuesDeLaSala = 240;
+/// La ventana de la sala de una videoconsulta: cuántos minutos antes del
+/// inicio abre y cuántos después del fin cierra. Son los de la configuración
+/// de la clínica (`telemedicina.minutosAntes` y `minutosDespues`), los mismos
+/// con que el servidor decide si deja entrar. Fuera de la ventana el
+/// servidor contesta 409 con su explicación, que se enseña tal cual.
+class VentanaDeSala {
+  final int minutosAntes;
+  final int minutosDespues;
+
+  const VentanaDeSala({
+    required this.minutosAntes,
+    required this.minutosDespues,
+  });
+
+  factory VentanaDeSala.de(ReglasTelemedicina reglas) => VentanaDeSala(
+    minutosAntes: reglas.minutosAntes,
+    minutosDespues: reglas.minutosDespues,
+  );
+}
 
 /// En qué momento de su ventana está una cita.
 enum EstadoSala {
   /// No es de telemedicina, o se canceló.
   noAplica,
 
-  /// Todavía es temprano: ninguna configuración la tendría abierta.
+  /// Todavía es temprano: la sala no abre hasta los minutos de antes.
   porAbrir,
 
-  /// Se ofrece entrar; el servidor dice si la sala ya abrió o ya cerró.
+  /// Se ofrece entrar.
   abierta,
 
-  /// Ya pasó: ninguna configuración la tendría abierta.
+  /// Ya pasó el cierre.
   cerrada,
 }
 
-/// Desde cuándo se ofrece entrar: 120 minutos antes del inicio, lo más
-/// temprano que la clínica puede abrir la sala.
-DateTime aperturaDeSala(Cita cita) =>
-    cita.inicio.subtract(const Duration(minutes: maximoMinutosAntesDeLaSala));
+/// Desde cuándo se ofrece entrar: los minutos de antes del inicio.
+DateTime aperturaDeSala(Cita cita, VentanaDeSala ventana) =>
+    cita.inicio.subtract(Duration(minutes: ventana.minutosAntes));
 
-/// Hasta cuándo: 240 minutos después del fin, lo más tarde que la clínica
-/// puede cerrarla.
-DateTime cierreDeSala(Cita cita) =>
-    cita.fin.add(const Duration(minutes: maximoMinutosDespuesDeLaSala));
+/// Hasta cuándo: los minutos de después del fin.
+DateTime cierreDeSala(Cita cita, VentanaDeSala ventana) =>
+    cita.fin.add(Duration(minutes: ventana.minutosDespues));
 
 /// El estado de la sala de una cita ahora.
 ///
 /// Las horas de la cita son hora congelada de la clínica y [ahora] también
 /// (`RelojClinica.ahora()`): se comparan tal cual, sin zonas.
-EstadoSala estadoDeSala(Cita cita, DateTime ahora) {
+EstadoSala estadoDeSala(Cita cita, DateTime ahora, VentanaDeSala ventana) {
   if (cita.tipo != TipoCita.telemedicina) return EstadoSala.noAplica;
   if (cita.estado == EstadoCita.cancelada) return EstadoSala.noAplica;
 
-  if (ahora.isBefore(aperturaDeSala(cita))) return EstadoSala.porAbrir;
-  if (ahora.isAfter(cierreDeSala(cita))) return EstadoSala.cerrada;
+  if (ahora.isBefore(aperturaDeSala(cita, ventana))) {
+    return EstadoSala.porAbrir;
+  }
+  if (ahora.isAfter(cierreDeSala(cita, ventana))) return EstadoSala.cerrada;
 
   return EstadoSala.abierta;
 }
 
-/// Desde cuándo se podrá intentar entrar, en palabras: «Podrás intentar
-/// entrar desde las 08:00; si todavía es temprano, te diremos a qué hora
-/// abre la sala.» Otro día, con la fecha.
-String cuandoAbreLaSala(Cita cita, DateTime ahora) {
-  final apertura = aperturaDeSala(cita);
+/// Desde cuándo se podrá entrar, en palabras: «La sala abre a las 08:45,
+/// 15 minutos antes de la cita.» Otro día, con la fecha.
+String cuandoAbreLaSala(Cita cita, DateTime ahora, VentanaDeSala ventana) {
+  final apertura = aperturaDeSala(cita, ventana);
   final hora = FormatoFecha.hora(apertura);
 
-  final desde = mismoDia(apertura, ahora)
-      ? 'desde las $hora'
+  final cuando = mismoDia(apertura, ahora)
+      ? 'a las $hora'
       : mismoDia(apertura, sumarDias(ahora, 1))
-      ? 'desde mañana a las $hora'
-      : 'desde el ${FormatoFecha.diaLargo(apertura).toLowerCase()} a las '
-            '$hora';
+      ? 'mañana a las $hora'
+      : 'el ${FormatoFecha.diaLargo(apertura).toLowerCase()} a las $hora';
 
-  return 'Podrás intentar entrar $desde; si todavía es temprano, te diremos '
-      'a qué hora abre la sala.';
+  final antes = ventana.minutosAntes;
+  final margen = antes == 0
+      ? 'a la hora de la cita'
+      : antes == 1
+      ? '1 minuto antes de la cita'
+      : '$antes minutos antes de la cita';
+
+  return 'La sala abre $cuando, $margen.';
 }
 
 /// El aviso de siempre antes de entrar: el navegador va a pedir permisos.

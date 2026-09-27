@@ -8,20 +8,21 @@ import 'campo_formulario.dart';
 ///
 /// `BORRADOR → ENVIADA → EN_REVISION → RESPONDIDA → CERRADA`, y una
 /// `ENVIADA` se puede `CANCELADA`.
+///
+/// Solo los códigos y su lógica: la etiqueta, el color, el icono y la
+/// descripción de cada uno están en el catálogo `ESTADO_CONSULTA`.
 enum EstadoConsulta {
-  borrador('BORRADOR', 'Borrador'),
-  enviada('ENVIADA', 'Enviada'),
-  enRevision('EN_REVISION', 'En revisión'),
-  respondida('RESPONDIDA', 'Respondida'),
-  cerrada('CERRADA', 'Cerrada'),
-  cancelada('CANCELADA', 'Cancelada');
+  borrador('BORRADOR'),
+  enviada('ENVIADA'),
+  enRevision('EN_REVISION'),
+  respondida('RESPONDIDA'),
+  cerrada('CERRADA'),
+  cancelada('CANCELADA');
 
   /// Como lo escribe la API.
   final String codigo;
 
-  final String nombre;
-
-  const EstadoConsulta(this.codigo, this.nombre);
+  const EstadoConsulta(this.codigo);
 
   /// Enviada o en revisión: el médico todavía no respondió.
   bool get esperandoRespuesta =>
@@ -214,9 +215,9 @@ class ConsultaResumen extends Equatable {
     this.ultimoEsMedico,
   });
 
-  /// «Dr(a). Ana Pérez»
-  String get medicoVisible =>
-      medicoNombre.isEmpty ? 'Médico por confirmar' : 'Dr(a). $medicoNombre';
+  /// El nombre del médico tal como llega, o `null` si todavía no tiene: no
+  /// se le antepone ningún título ni se inventa uno.
+  String? get medicoVisible => medicoNombre.isEmpty ? null : medicoNombre;
 
   /// El médico escribió lo último y la consulta sigue abierta: hay algo que
   /// leer.

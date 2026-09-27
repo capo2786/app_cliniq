@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/formato/fechas.dart';
+import '../../../../core/notificaciones/recordatorios_citas.dart';
 import '../../../../core/presentacion/widgets/botones.dart';
 import '../../../../core/presentacion/widgets/entrada_animada.dart';
 import '../../../../core/tema/tokens.dart';
@@ -21,6 +23,10 @@ class PasoListo extends StatelessWidget {
   Widget build(BuildContext context) {
     final cita = state.agendada;
     final reprogramada = state.reprogramando;
+    final recordatorios = textoDeRecordatorios(context.config.agenda);
+    final consejos = cita == null
+        ? const <String>[]
+        : consejosPara(context.catalogos, cita.tipo);
 
     return EntradaAnimada(
       child: Column(
@@ -53,11 +59,13 @@ class PasoListo extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Te enviamos la confirmación a tu correo. Te recordaremos un día '
-            'y una hora antes.',
+          Text(
+            [
+              'Te enviamos la confirmación a tu correo.',
+              ?recordatorios,
+            ].join(' '),
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.textoSecundario,
               fontSize: 13.5,
               height: 1.4,
@@ -66,8 +74,10 @@ class PasoListo extends StatelessWidget {
           const SizedBox(height: 22),
           if (cita != null) ...[
             TarjetaCita(cita: cita),
-            const SizedBox(height: 14),
-            ConsejosDePreparacion(consejos: consejosPara(cita.tipo)),
+            if (consejos.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              ConsejosDePreparacion(consejos: consejos),
+            ],
             const SizedBox(height: 8),
             Text(
               '${cuentaRegresiva(cita, state.ahora)} · '

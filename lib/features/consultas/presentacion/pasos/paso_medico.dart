@@ -4,10 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../agendar/presentacion/widgets/opcion_seleccionable.dart';
-import '../../dominio/reglas_consultas.dart';
 import '../../providers/nueva_consulta_bloc.dart';
 import '../../providers/nueva_consulta_event.dart';
 import '../../providers/nueva_consulta_state.dart';
+import '../../../../core/configuracion/en_contexto.dart';
+import '../../../citas/dominio/reglas_citas.dart' show horas;
 
 /// Paso 4: el médico que va a responder. Solo están los que atienden
 /// consultas en línea en la especialidad elegida.
@@ -38,10 +39,11 @@ class PasoMedicoConsulta extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'El médico que elijas tiene $horasDeRespuesta horas para '
+        Text(
+          'El médico que elijas tiene '
+          '${horas(context.config.telemedicina.horasRespuesta)} para '
           'responderte desde que envías la consulta.',
-          style: TextStyle(
+          style: const TextStyle(
             color: AppColors.textoSecundario,
             fontSize: 13,
             height: 1.4,
@@ -50,7 +52,7 @@ class PasoMedicoConsulta extends StatelessWidget {
         const SizedBox(height: 16),
         for (final medico in medicos) ...[
           OpcionSeleccionable(
-            titulo: medico.nombreVisible,
+            titulo: medico.nombre,
             descripcion: medico.especialidad.isEmpty
                 ? state.especialidad
                 : medico.especialidad,

@@ -26,7 +26,7 @@ class PasoModalidad extends StatelessWidget {
         Text(
           medico == null
               ? 'Elige cómo quieres la consulta.'
-              : '${medico.nombreVisible} atiende así:',
+              : '${medico.nombre} atiende así:',
           style: const TextStyle(
             color: AppColors.textoSecundario,
             fontSize: 13,
@@ -35,14 +35,24 @@ class PasoModalidad extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         for (final tipo in state.modalidadesMedico) ...[
-          OpcionSeleccionable(
-            titulo: tipo.nombre,
-            descripcion:
-                '${tipo.descripcion} · ${duracionDe(medico, tipo)} minutos',
-            icono: tipo.icono,
-            color: tipo.color,
-            elegida: state.tipo == tipo,
-            onTap: () => bloc.add(AgendarModalidadElegida(tipo)),
+          Builder(
+            builder: (context) {
+              final estilo = context.modalidad(tipo);
+              final minutos =
+                  '${duracionDe(medico, tipo, state.reglas)} '
+                  'minutos';
+
+              return OpcionSeleccionable(
+                titulo: estilo.nombre,
+                descripcion: estilo.descripcion.isEmpty
+                    ? minutos
+                    : '${estilo.descripcion} · $minutos',
+                icono: estilo.icono,
+                color: estilo.color,
+                elegida: state.tipo == tipo,
+                onTap: () => bloc.add(AgendarModalidadElegida(tipo)),
+              );
+            },
           ),
           const SizedBox(height: 10),
         ],

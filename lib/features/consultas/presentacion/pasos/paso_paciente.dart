@@ -12,6 +12,8 @@ import '../../../dependientes/presentacion/formulario_dependiente_page.dart';
 import '../../providers/nueva_consulta_bloc.dart';
 import '../../providers/nueva_consulta_event.dart';
 import '../../providers/nueva_consulta_state.dart';
+import '../../../../core/configuracion/en_contexto.dart';
+import '../../../citas/dominio/reglas_citas.dart' show horas;
 
 /// Paso 1: ¿para quién es la consulta? Para uno mismo o para un dependiente.
 class PasoPacienteConsulta extends StatelessWidget {
@@ -39,11 +41,12 @@ class PasoPacienteConsulta extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Escríbele a un médico sin ir a la clínica: le cuentas qué pasa, '
-          'adjuntas fotos o exámenes y te responde por aquí en menos de 48 '
-          'horas. Puede ser para ti o para alguien a tu cargo.',
-          style: TextStyle(
+          'adjuntas fotos o exámenes y te responde por aquí en menos de '
+          '${horas(context.config.telemedicina.horasRespuesta)}. Puede ser '
+          'para ti o para alguien a tu cargo.',
+          style: const TextStyle(
             color: AppColors.textoSecundario,
             fontSize: 13,
             height: 1.4,

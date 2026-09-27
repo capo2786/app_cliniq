@@ -3,9 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/catalogos/catalogos_cubit.dart';
+import '../../../core/configuracion/config_publica_cubit.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
+import '../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../core/servicios.dart';
@@ -15,6 +18,7 @@ import '../../auth/providers/auth_bloc.dart';
 import '../../citas/data/models/cita.dart';
 import '../../citas/providers/citas_bloc.dart';
 import '../../citas/providers/citas_event.dart';
+import '../dominio/reglas_agendamiento.dart';
 import '../providers/agendar_bloc.dart';
 import '../providers/agendar_event.dart';
 import '../providers/agendar_state.dart';
@@ -45,14 +49,19 @@ class AgendarPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usuario = context.read<AuthBloc>().usuario;
+    final catalogos = context.read<CatalogosCubit>().state;
 
     return BlocProvider(
       create: (_) => AgendarBloc(
         portal: Servicios.portal,
         dependientes: Servicios.dependientes,
-        catalogos: Servicios.catalogos,
         uid: usuario?.uid ?? '',
         nombreTitular: usuario?.nombre ?? '',
+        reglas: ReglasAgendamiento.de(
+          context.read<ConfigPublicaCubit>().config.agenda,
+        ),
+        especialidades: catalogos.especialidades,
+        ciudades: catalogos.ciudades,
         puedeDependientes: usuario?.puede(Permisos.dependientes) ?? false,
         reloj: Servicios.reloj,
       )..add(AgendarIniciado(reprogramar: reprogramar, para: para)),
@@ -121,6 +130,7 @@ class _VistaAgendar extends StatelessWidget {
                               'pacientes. Si crees que es un error, '
                               'consúltalo en la clínica.',
                         ),
+                        Center(child: ContactoClinica()),
                       ],
                     )
                   : _cuerpo(context, state),

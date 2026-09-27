@@ -135,7 +135,7 @@ void main() {
       expect(c.tipo, TipoCita.telemedicina);
       expect(c.estado, EstadoCita.reagendada);
       expect(c.pendiente, isTrue);
-      expect(c.medicoVisible, 'Dr(a). Ana Pérez');
+      expect(c.medicoVisible, 'Ana Pérez', reason: 'sin título antepuesto');
       expect(c.paraDependiente, isTrue);
       expect(c.pacienteNombre, 'Tomás Pérez');
     });
@@ -247,28 +247,38 @@ void main() {
   });
 
   group('Catálogos y documentos legales', () {
-    test('el lote trae los nombres activos por clave', () {
+    test('el lote trae los elementos activos completos, por clave', () {
       final lote = interpretarLote({
-        'MOTIVO_CANCELACION': [
-          {'nombre': 'Emergencia médica', 'isActive': true},
-          {'nombre': 'Retirado', 'isActive': false},
+        'MOTIVO_CANCELACION_PACIENTE': [
+          {
+            'codigo': 'NO_PUEDO',
+            'nombre': 'No puedo asistir',
+            'descripcion': 'Otro compromiso',
+            'color': '#ff0000',
+            'icono': 'ban',
+            'orden': 1,
+            'esPorDefecto': true,
+            'isActive': true,
+          },
+          {'codigo': 'VIEJO', 'nombre': 'Retirado', 'isActive': false},
         ],
-        'parentesco': [
-          {'nombre': 'Madre'},
+        'parentesco_dependiente': [
+          {'codigo': 'MADRE', 'nombre': 'Madre'},
         ],
       });
 
-      expect(lote['MOTIVO_CANCELACION'], ['Emergencia médica']);
-      expect(lote['PARENTESCO'], ['Madre']);
-    });
-
-    test('los valores de partida son los mismos del web', () {
-      expect(
-        catalogosDePartida[Catalogos.motivoCancelacion],
-        contains('Otro motivo'),
-      );
-      expect(catalogosDePartida[Catalogos.parentesco], hasLength(7));
-      expect(catalogosDePartida[Catalogos.especialidad], contains('Pediatría'));
+      expect(lote[Catalogos.motivoCancelacionPaciente], [
+        const ItemCatalogo(
+          codigo: 'NO_PUEDO',
+          nombre: 'No puedo asistir',
+          descripcion: 'Otro compromiso',
+          color: '#ff0000',
+          icono: 'ban',
+          orden: 1,
+          esPorDefecto: true,
+        ),
+      ]);
+      expect(lote[Catalogos.parentescoDependiente]!.single.codigo, 'MADRE');
     });
 
     test('cada documento se abre por su nombre corto', () {

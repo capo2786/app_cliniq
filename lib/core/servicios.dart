@@ -11,6 +11,7 @@ import '../features/legal/data/legal_service.dart';
 import 'archivos/archivos_service.dart';
 import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
+import 'configuracion/config_publica_service.dart';
 import 'fechas/fecha_local.dart';
 import 'integraciones/costuras.dart';
 import 'network/api_client.dart';
@@ -40,7 +41,8 @@ class Servicios {
 
   static CacheLocal _cache = CacheHive();
 
-  /// La copia local de citas, dependientes y catálogos.
+  /// La copia local de citas, dependientes, el menú, la configuración de la
+  /// clínica y sus catálogos.
   static CacheLocal get cache => _cache;
 
   /// Cambia la caché por otra antes de que nadie la use. Solo para pruebas:
@@ -81,6 +83,12 @@ class Servicios {
 
   static final LegalService legal = LegalService(ApiClient().dio);
 
+  /// La configuración pública de la clínica (`/configuracion/publica`).
+  static final ConfigPublicaService configuracion = ConfigPublicaService(
+    ApiClient().dio,
+    cache,
+  );
+
   static final CatalogoService catalogos = CatalogoService(
     ApiClient().dio,
     cache,
@@ -116,8 +124,8 @@ class Servicios {
   ///
   /// Las citas, las consultas, los dependientes, los archivos descargados y
   /// los recordatorios son de quien estaba dentro: en un teléfono compartido,
-  /// la siguiente persona no tiene por qué verlos ni oírlos. Los catálogos se
-  /// quedan: son de la clínica.
+  /// la siguiente persona no tiene por qué verlos ni oírlos. La configuración,
+  /// los catálogos y los documentos legales se quedan: son de la clínica.
   static Future<void> limpiarDatosLocales() async {
     await recordatorios.cancelarTodo();
     await cache.vaciarDatosPersonales();

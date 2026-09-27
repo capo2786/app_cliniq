@@ -1,7 +1,9 @@
+import '../../../core/configuracion/config_publica.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/fechas/instante.dart';
 import '../../../core/formato/fechas.dart';
 import '../data/models/campo_formulario.dart';
+import '../../citas/dominio/reglas_citas.dart' show horas;
 import '../data/models/consulta.dart';
 
 /// Hasta cuántos caracteres admite la descripción y cada mensaje (los mismos
@@ -13,11 +15,28 @@ const int maximoMensaje = 4000;
 /// tope del servidor, `MOTIVO_CANCELACION_MAX`).
 const int maximoMotivoCancelacion = 500;
 
-/// Cuántos archivos se pueden adjuntar a una consulta desde la aplicación.
-const int maximoAdjuntos = 10;
+/*
+ * Cuántos archivos se pueden adjuntar, las horas que tiene el médico para
+ * responder y los días de seguimiento son los de la configuración de la
+ * clínica (`telemedicina.maxArchivosConsulta`, `horasRespuesta`,
+ * `diasSeguimiento`): se leen de ahí, nunca de aquí.
+ */
 
-/// Horas que tiene el médico para responder (`CONSULTA_HORAS_RESPUESTA`).
-const int horasDeRespuesta = 48;
+/// Lo que se promete de las consultas en línea, con los plazos de la
+/// clínica: «Escríbele a un médico sin ir a la clínica y recibe su respuesta
+/// en menos de 48 horas. Después tienes 7 días de seguimiento para
+/// escribirle.»
+String descripcionDeConsultas(ReglasTelemedicina reglas) {
+  final respuesta =
+      'Escríbele a un médico sin ir a la clínica y recibe su respuesta en '
+      'menos de ${horas(reglas.horasRespuesta)}.';
+
+  final dias = reglas.diasSeguimiento;
+  if (dias <= 0) return respuesta;
+
+  return '$respuesta Después tienes ${dias == 1 ? '1 día' : '$dias días'} de '
+      'seguimiento para escribirle.';
+}
 
 /// Claves de los errores del formulario que no son una pregunta. Llevan un
 /// guion bajo delante para no chocar con la clave de ninguna pregunta.

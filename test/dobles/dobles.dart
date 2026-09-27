@@ -4,7 +4,6 @@
 /// red ni complementos nativos.
 library;
 
-import 'package:app_cliniq/core/catalogos/catalogo_service.dart';
 import 'package:app_cliniq/core/notificaciones/recordatorios_citas.dart';
 import 'package:app_cliniq/core/service/biometria_service.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
@@ -139,12 +138,12 @@ class BiometriaFalsa implements BiometriaService {
 
 /// Solo anota lo que le pidieron programar.
 class ProgramadorFalso implements ProgramadorDeRecordatorios {
-  final List<List<Cita>> programados = [];
+  final List<List<Recordatorio>> programados = [];
   int cancelaciones = 0;
 
   @override
-  Future<void> reprogramar(List<Cita> citas, DateTime ahora) async =>
-      programados.add(citas);
+  Future<void> programar(List<Recordatorio> recordatorios) async =>
+      programados.add(recordatorios);
 
   @override
   Future<void> cancelarTodo() async => cancelaciones++;
@@ -252,13 +251,6 @@ class DependientesFalso implements DependientesService {
 
   @override
   Future<void> eliminar(String id) async {}
-}
-
-class CatalogosFalso implements CatalogoService {
-  @override
-  Future<Map<String, List<String>>> cargar([
-    List<String> claves = Catalogos.todos,
-  ]) async => {for (final c in claves) c: catalogosDePartida[c] ?? const []};
 }
 
 /// Una caché en memoria, reutilizando la de la aplicación.

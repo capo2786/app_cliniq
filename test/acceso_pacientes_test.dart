@@ -76,9 +76,8 @@ void main() {
           },
         });
 
-        final mensaje = await AuthService(
-          api.dio,
-        ).reenviarConfirmacion('  Ana@Correo.com ');
+        final mensaje = await AuthService(api.dio)
+            .reenviarConfirmacion('  Ana@Correo.com ');
 
         expect(api.claves, ['POST /auth/registro/reenviar']);
         expect(api.pedidos.single.data, {'email': 'ana@correo.com'});

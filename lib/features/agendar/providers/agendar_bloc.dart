@@ -1,12 +1,10 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/catalogos/catalogo_service.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/network/errores.dart';
 import '../../citas/data/models/cita.dart';
 import '../../dependientes/data/dependientes_service.dart';
 import '../../dependientes/data/models/dependiente.dart';
-import '../data/models/medico_portal.dart';
 import '../data/portal_service.dart';
 import '../dominio/horarios.dart';
 import '../dominio/huecos.dart';
@@ -26,22 +24,28 @@ const String avisoHorarioTomado =
 class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
   final PortalService _portal;
   final DependientesService _dependientes;
-  final CatalogoService _catalogos;
   final RelojClinica _reloj;
   final String _uid;
 
+  /// [reglas] son las de la configuración de la clínica; [especialidades] y
+  /// [ciudades], los catálogos que ordenan los filtros.
   AgendarBloc({
     required this._portal,
     required this._dependientes,
-    required this._catalogos,
     required this._uid,
     required String nombreTitular,
+    required ReglasAgendamiento reglas,
+    List<String> especialidades = const [],
+    List<String> ciudades = const [],
     bool puedeDependientes = true,
     RelojClinica? reloj,
   }) : _reloj = reloj ?? RelojClinica(),
        super(
          AgendarState(
            ahora: (reloj ?? RelojClinica()).ahora(),
+           reglas: reglas,
+           especialidades: especialidades,
+           catalogoCiudades: ciudades,
            nombreTitular: nombreTitular,
            puedeDependientes: puedeDependientes,
          ),
@@ -74,16 +78,7 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     emit(state.copiarCon(cargando: true, limpiarError: true, ahora: _ahora));
 
     try {
-      final resultados = await Future.wait([
-        _portal.medicos(),
-        _catalogos.cargar([Catalogos.especialidad]),
-      ]);
-
-      final medicos = resultados[0] as List<MedicoPortal>;
-      final especialidades =
-          (resultados[1]
-              as Map<String, List<String>>)[Catalogos.especialidad] ??
-          const <String>[];
+      final medicos = await _portal.medicos();
 
       final dependientes = state.puedeDependientes
           ? await _listarDependientes()
@@ -92,7 +87,6 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
       var siguiente = state.copiarCon(
         cargando: false,
         medicos: medicos,
-        especialidades: especialidades,
         dependientes: dependientes,
         ahora: _ahora,
       );
@@ -188,7 +182,12 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
         : modalidades.first;
 
     // Arranca en el primer día con atención: hoy solo si aún cabe una cita.
-    final fecha = primerDiaConAtencion(medico, duracionDe(medico, tipo), ahora);
+    final fecha = primerDiaConAtencion(
+      medico,
+      duracionDe(medico, tipo, state.reglas),
+      ahora,
+      state.reglas,
+    );
 
     emit(
       state.copiarCon(
@@ -219,8 +218,9 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     final ahora = _ahora;
     final primero = primerDiaConAtencion(
       medico,
-      duracionDe(medico, event.tipo),
+      duracionDe(medico, event.tipo, state.reglas),
       ahora,
+      state.reglas,
     );
 
     // Con otra duración, hoy puede dejar de caber: se corre al primer día.
@@ -528,9 +528,11 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
     emit(
       AgendarState(
         ahora: _ahora,
+        reglas: state.reglas,
         cargando: false,
         medicos: state.medicos,
         especialidades: state.especialidades,
+        catalogoCiudades: state.catalogoCiudades,
         dependientes: state.dependientes,
         puedeDependientes: state.puedeDependientes,
         nombreTitular: state.nombreTitular,

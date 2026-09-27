@@ -45,11 +45,18 @@ const int maximoMotivo = 500;
 class AgendarState extends Equatable {
   final PasoAgendar paso;
 
+  /// Las reglas de la rejilla, de la configuración de la clínica.
+  final ReglasAgendamiento reglas;
+
   // Carga inicial
   final bool cargando;
   final String? error;
   final List<MedicoPortal> medicos;
+
+  /// Los catálogos `ESPECIALIDAD` y `CIUDAD`: solo dan el orden de los
+  /// filtros (las opciones son las que tienen médicos).
   final List<String> especialidades;
+  final List<String> catalogoCiudades;
   final List<Dependiente> dependientes;
   final bool puedeDependientes;
   final String nombreTitular;
@@ -86,11 +93,13 @@ class AgendarState extends Equatable {
 
   const AgendarState({
     required this.ahora,
+    required this.reglas,
     this.paso = PasoAgendar.paciente,
     this.cargando = true,
     this.error,
     this.medicos = const [],
     this.especialidades = const [],
+    this.catalogoCiudades = const [],
     this.dependientes = const [],
     this.puedeDependientes = true,
     this.nombreTitular = '',
@@ -124,18 +133,10 @@ class AgendarState extends Equatable {
   MedicoPortal? get medico =>
       medicos.where((m) => m.uid == medicoId).firstOrNull;
 
-  /// Las ciudades donde hay médicos, en orden alfabético.
-  List<String> get ciudades {
-    final ciudades =
-        {
-            for (final m in medicos)
-              if (m.ciudad != null && m.ciudad!.trim().isNotEmpty)
-                m.ciudad!.trim(),
-          }.toList()
-          ..sort((a, b) => normalizarTexto(a).compareTo(normalizarTexto(b)));
-
-    return ciudades;
-  }
+  /// Las ciudades donde hay médicos, en el orden del catálogo `CIUDAD`; las
+  /// que no están en el catálogo van al final, en orden alfabético.
+  List<String> get ciudades =>
+      _conMedicos(catalogoCiudades, [for (final m in medicos) m.ciudad]);
 
   /// Las especialidades que tienen al menos un médico, en el orden del
   /// catálogo; las que no están en el catálogo van al final.
@@ -143,15 +144,21 @@ class AgendarState extends Equatable {
   /// El web ofrece el catálogo entero. En un teléfono, elegir una
   /// especialidad sin médicos es un callejón sin salida, así que solo se
   /// ofrecen las que llevan a alguien.
-  List<String> get especialidadesConMedicos {
+  List<String> get especialidadesConMedicos =>
+      _conMedicos(especialidades, [for (final m in medicos) m.especialidad]);
+
+  static List<String> _conMedicos(
+    List<String> catalogo,
+    List<String?> deLosMedicos,
+  ) {
     final presentes = {
-      for (final m in medicos)
-        if (m.especialidad != null && m.especialidad!.trim().isNotEmpty)
-          normalizarTexto(m.especialidad): m.especialidad!.trim(),
+      for (final valor in deLosMedicos)
+        if (valor != null && valor.trim().isNotEmpty)
+          normalizarTexto(valor): valor.trim(),
     };
 
     final ordenadas = <String>[
-      for (final e in especialidades)
+      for (final e in catalogo)
         if (presentes.remove(normalizarTexto(e)) != null) e,
     ];
 
@@ -185,7 +192,7 @@ class AgendarState extends Equatable {
     return dependientes.where((d) => d.uid == para).firstOrNull?.nombre ?? '';
   }
 
-  int get duracion => duracionDe(medico, tipo);
+  int get duracion => duracionDe(medico, tipo, reglas);
 
   BloqueoAgenda? get bloqueo {
     final f = fecha;
@@ -238,7 +245,8 @@ class AgendarState extends Equatable {
       duracion: duracion,
       margen: margenDe(medico),
       citas: ocupadosSinOriginal,
-      ahora: ahoraConAnticipacion(ahora),
+      ahora: ahoraConAnticipacion(ahora, reglas),
+      reglas: reglas,
     );
   }
 
@@ -257,7 +265,7 @@ class AgendarState extends Equatable {
   /// El primer día que se ofrece: hoy si todavía cabe una cita.
   DateTime? get primerDia {
     final m = medico;
-    return m == null ? null : primerDiaConAtencion(m, duracion, ahora);
+    return m == null ? null : primerDiaConAtencion(m, duracion, ahora, reglas);
   }
 
   /// Los días de la tira: los próximos con atención desde el primero.
@@ -266,7 +274,12 @@ class AgendarState extends Equatable {
     final primero = primerDia;
     if (m == null || primero == null) return const [];
 
-    final dias = diasConAtencion(m, primero);
+    final dias = diasConAtencion(
+      m,
+      primero,
+      reglas: reglas,
+      hasta: sumarDias(inicioDelDia(ahora), reglas.diasHorizonte),
+    );
     final f = fecha;
 
     // Si el día elegido quedó fuera (la cita original, por ejemplo), se
@@ -299,6 +312,7 @@ class AgendarState extends Equatable {
     bool limpiarError = false,
     List<MedicoPortal>? medicos,
     List<String>? especialidades,
+    List<String>? catalogoCiudades,
     List<Dependiente>? dependientes,
     bool? puedeDependientes,
     String? nombreTitular,
@@ -330,11 +344,13 @@ class AgendarState extends Equatable {
     DateTime? ahora,
   }) {
     return AgendarState(
+      reglas: reglas,
       paso: paso ?? this.paso,
       cargando: cargando ?? this.cargando,
       error: limpiarError ? null : (error ?? this.error),
       medicos: medicos ?? this.medicos,
       especialidades: especialidades ?? this.especialidades,
+      catalogoCiudades: catalogoCiudades ?? this.catalogoCiudades,
       dependientes: dependientes ?? this.dependientes,
       puedeDependientes: puedeDependientes ?? this.puedeDependientes,
       nombreTitular: nombreTitular ?? this.nombreTitular,
@@ -367,11 +383,13 @@ class AgendarState extends Equatable {
 
   @override
   List<Object?> get props => [
+    reglas,
     paso,
     cargando,
     error,
     medicos,
     especialidades,
+    catalogoCiudades,
     dependientes,
     puedeDependientes,
     nombreTitular,

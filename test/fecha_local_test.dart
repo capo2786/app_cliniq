@@ -2,6 +2,7 @@
 
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 
 /// Las fechas de la API son hora local de la clínica «congelada» como UTC.
 ///
@@ -9,6 +10,9 @@ import 'package:flutter_test/flutter_test.dart';
 /// leída como un instante UTC aparece a las 04:00 en un teléfono de Quito.
 /// Estas pruebas fijan que la zona se descarta y nunca se convierte.
 void main() {
+  // La zona de la clínica llega de su configuración (`clinica.zonaHoraria`).
+  setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
+
   group('Leer fechas de la API', () {
     test('la Z se descarta: las 09:00Z son las 09:00 locales', () {
       final fecha = aFechaLocal('2026-09-28T09:00:00.000Z');

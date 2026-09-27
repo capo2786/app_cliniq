@@ -6,6 +6,8 @@ import '../../../../core/tema/tokens.dart';
 import '../../dominio/reglas_consultas.dart';
 import '../../providers/nueva_consulta_state.dart';
 import '../detalle_consulta_page.dart';
+import '../../../../core/configuracion/en_contexto.dart';
+import '../../../citas/dominio/reglas_citas.dart' show horas;
 
 /// El final: la consulta salió, con su número y hasta cuándo responde el
 /// médico.
@@ -64,8 +66,9 @@ class PasoEnviada extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             vence == null
-                ? 'El médico tiene $horasDeRespuesta horas para responderte. '
-                      'Te avisaremos por correo.'
+                ? 'El médico tiene '
+                      '${horas(context.config.telemedicina.horasRespuesta)} '
+                      'para responderte. Te avisaremos por correo.'
                 : '${consulta?.medicoVisible ?? 'El médico'} tiene hasta el '
                       '${momentoLegible(vence).toLowerCase()} para '
                       'responderte. Te avisaremos por correo.',

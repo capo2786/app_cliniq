@@ -134,9 +134,8 @@ class ConsultasService {
       return ResultadoConsultas(
         consultas: interpretarConsultas(datos['consultas']),
         desdeCache: true,
-        guardadasEn: DateTime.tryParse(
-          datos['guardadasEn']?.toString() ?? '',
-        )?.toLocal(),
+        guardadasEn: DateTime.tryParse(datos['guardadasEn']?.toString() ?? '')
+            ?.toLocal(),
       );
     } catch (_) {
       return null;
@@ -170,9 +169,8 @@ class ConsultasService {
       return ResultadoDetalle(
         detalle: ConsultaDetalle.desdeJson(datos['detalle'] as Map),
         desdeCache: true,
-        guardadaEn: DateTime.tryParse(
-          datos['guardadaEn']?.toString() ?? '',
-        )?.toLocal(),
+        guardadaEn: DateTime.tryParse(datos['guardadaEn']?.toString() ?? '')
+            ?.toLocal(),
       );
     } catch (_) {
       return null;

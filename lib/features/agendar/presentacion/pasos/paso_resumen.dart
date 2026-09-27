@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
@@ -20,6 +21,9 @@ class PasoResumen extends StatelessWidget {
     final hueco = state.huecoValido ?? state.hueco;
     final medico = state.medico;
     final original = state.original;
+    final modalidad = context.modalidad(state.tipo);
+    final consejos = consejosPara(context.catalogos, state.tipo);
+    final horasMinimas = context.config.agenda.horasMinimasCambio;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -29,7 +33,7 @@ class PasoResumen extends StatelessWidget {
           const SizedBox(height: 14),
         ],
         TarjetaTranslucida(
-          tinte: state.tipo.color,
+          tinte: modalidad.color,
           child: Column(
             children: [
               FilaDato(
@@ -43,14 +47,14 @@ class PasoResumen extends StatelessWidget {
                 valor: medico == null
                     ? null
                     : [
-                        medico.nombreVisible,
-                        if (medico.especialidad != null) medico.especialidad!,
+                        if (medico.nombre.isNotEmpty) medico.nombre,
+                        ?medico.especialidad,
                       ].join(' · '),
               ),
               FilaDato(
-                icono: state.tipo.icono,
+                icono: modalidad.icono,
                 rotulo: 'Modalidad',
-                valor: '${state.tipo.nombre} · ${state.duracion} minutos',
+                valor: '${modalidad.nombre} · ${state.duracion} minutos',
               ),
               if (original != null)
                 FilaDato(
@@ -77,13 +81,15 @@ class PasoResumen extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        ConsejosDePreparacion(consejos: consejosPara(state.tipo)),
+        if (consejos.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          ConsejosDePreparacion(consejos: consejos),
+        ],
         const SizedBox(height: 14),
-        const Text(
+        Text(
           'Te enviaremos la confirmación a tu correo. Podrás cancelarla o '
-          'reprogramarla hasta $horasMinimasCambio horas antes.',
-          style: TextStyle(
+          'reprogramarla hasta ${horas(horasMinimas)} antes.',
+          style: const TextStyle(
             color: AppColors.textoTenue,
             fontSize: 12,
             height: 1.4,

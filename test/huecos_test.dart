@@ -6,13 +6,20 @@ import 'package:app_cliniq/features/agendar/dominio/huecos.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dobles/clinica.dart';
+
 /// El puerto del cálculo de horarios del panel web.
 ///
 /// Estas pruebas fijan las mismas reglas que `agenda.utils.ts` y
 /// `horarios.model.ts`: turnos, bloqueos, duración por modalidad, margen a
-/// ambos lados de cada cita, paso de 15 minutos, límite diario, el primer día
-/// con atención y los grupos de mañana, tarde y noche.
+/// ambos lados de cada cita, límite diario, el primer día con atención y los
+/// grupos de mañana, tarde y noche. El paso, la anticipación, el horizonte,
+/// los cortes y las duraciones por defecto son los de la configuración de la
+/// clínica (`r`: 15 min, 15 min, 60 días, 12:00/19:00, 30/20/15); las
+/// pruebas del final cambian esos valores y miran que el cálculo los siga.
 void main() {
+  final r = reglasDePrueba();
+
   const lunesAViernes = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 
   MedicoPortal medico({
@@ -106,9 +113,9 @@ void main() {
         config: const ConfigAgenda(duraciones: {'PRESENCIAL': 45}),
       );
 
-      expect(duracionDe(propio, TipoCita.presencial), 45);
-      expect(duracionDe(propio, TipoCita.telemedicina), 20);
-      expect(duracionDe(null, TipoCita.asincrona), 15);
+      expect(duracionDe(propio, TipoCita.presencial, r), 45);
+      expect(duracionDe(propio, TipoCita.telemedicina, r), 20);
+      expect(duracionDe(null, TipoCita.asincrona, r), 15);
     });
 
     test('margen nunca negativo', () {
@@ -142,6 +149,7 @@ void main() {
         duracion: 30,
         citas: const [],
         ahora: antes,
+        reglas: r,
       );
 
       expect(huecos.map((h) => h.hora), ['08:00', '08:15', '08:30']);
@@ -155,6 +163,7 @@ void main() {
         duracion: 30,
         citas: const [],
         ahora: DateTime(2026, 9, 28, 8, 40),
+        reglas: r,
       );
 
       expect(huecos.first.hora, '08:45');
@@ -174,6 +183,7 @@ void main() {
         margen: 10,
         citas: [cita],
         ahora: antes,
+        reglas: r,
       );
 
       Hueco a(String hora) => huecos.firstWhere((h) => h.hora == hora);
@@ -203,6 +213,7 @@ void main() {
           ),
         ],
         ahora: antes,
+        reglas: r,
       );
 
       expect(huecos.firstWhere((h) => h.hora == '09:30').ocupado, isFalse);
@@ -222,6 +233,7 @@ void main() {
         citas: [original],
         excluirId: 'mia',
         ahora: antes,
+        reglas: r,
       );
 
       expect(huecos.every((h) => !h.ocupado), isTrue);
@@ -247,6 +259,7 @@ void main() {
           ),
         ],
         ahora: antes,
+        reglas: r,
       );
 
       expect(huecos.every((h) => !h.ocupado), isTrue);
@@ -262,6 +275,7 @@ void main() {
         duracion: 15,
         citas: const [],
         ahora: antes,
+        reglas: r,
       );
 
       Periodo p(String hora) =>
@@ -287,6 +301,7 @@ void main() {
         duracion: 30,
         citas: const [],
         ahora: antes,
+        reglas: r,
       );
 
       final horas = huecos.map((h) => h.hora).toList();
@@ -335,7 +350,7 @@ void main() {
       // Desde el viernes 2 de octubre: sábado y domingo no atiende, el
       // lunes 5 está bloqueado → martes 6.
       expect(
-        siguienteDiaConAtencion(m, DateTime(2026, 10, 2, 15)),
+        siguienteDiaConAtencion(m, DateTime(2026, 10, 2, 15), reglas: r),
         DateTime(2026, 10, 6),
       );
     });
@@ -345,14 +360,14 @@ void main() {
       final martes = DateTime(2026, 9, 29);
 
       expect(
-        siguienteDiaConAtencion(m, lunes, citas: [cita(martes, 8)]),
+        siguienteDiaConAtencion(m, lunes, reglas: r, citas: [cita(martes, 8)]),
         DateTime(2026, 9, 30),
       );
     });
 
     test('sin días de atención en 60 días devuelve null', () {
       expect(
-        siguienteDiaConAtencion(medico(horarios: const []), lunes),
+        siguienteDiaConAtencion(medico(horarios: const []), lunes, reglas: r),
         isNull,
       );
     });
@@ -362,8 +377,11 @@ void main() {
     test('hoy, si todavía cabe una cita con la anticipación', () {
       final m = medico();
 
-      expect(primerDiaConAtencion(m, 30, DateTime(2026, 9, 28, 17, 0)), lunes);
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17, 0)), isTrue);
+      expect(
+        primerDiaConAtencion(m, 30, DateTime(2026, 9, 28, 17, 0), r),
+        lunes,
+      );
+      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17, 0), r), isTrue);
     });
 
     test('mañana, si hoy ya no cabe ninguna', () {
@@ -371,9 +389,9 @@ void main() {
 
       // 17:20 + 15 de anticipación = 17:35; la última cita de 30 min
       // empieza a las 17:30: ya no cabe.
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17, 20)), isFalse);
+      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17, 20), r), isFalse);
       expect(
-        primerDiaConAtencion(m, 30, DateTime(2026, 9, 28, 17, 20)),
+        primerDiaConAtencion(m, 30, DateTime(2026, 9, 28, 17, 20), r),
         DateTime(2026, 9, 29),
       );
     });
@@ -385,16 +403,16 @@ void main() {
         ],
       );
 
-      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 8)), isFalse);
+      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 8), r), isFalse);
     });
 
     test('la etiqueta de la tarjeta del médico', () {
       final m = medico();
 
-      expect(proximaFecha(m, 30, DateTime(2026, 9, 28, 9)), 'Hoy');
-      expect(proximaFecha(m, 30, DateTime(2026, 9, 26, 9)), 'Lun 28 sep');
+      expect(proximaFecha(m, 30, DateTime(2026, 9, 28, 9), r), 'Hoy');
+      expect(proximaFecha(m, 30, DateTime(2026, 9, 26, 9), r), 'Lun 28 sep');
       expect(
-        proximaFecha(medico(horarios: const []), 30, lunes),
+        proximaFecha(medico(horarios: const []), 30, lunes, r),
         'Sin fechas próximas',
       );
     });
@@ -403,6 +421,7 @@ void main() {
       final dias = diasConAtencion(
         medico(),
         DateTime(2026, 10, 2),
+        reglas: r,
         cantidad: 3,
       );
 
@@ -411,6 +430,145 @@ void main() {
         DateTime(2026, 10, 5),
         DateTime(2026, 10, 6),
       ]);
+    });
+  });
+
+  group('La rejilla sigue la configuración de la clínica', () {
+    final antes = DateTime(2026, 9, 27, 20);
+
+    test('pasoMinutos: con 30, un horario cada media hora', () {
+      final huecos = calcularHuecos(
+        fecha: lunes,
+        rangos: const [HorarioRango(inicio: '08:00', fin: '10:00')],
+        duracion: 30,
+        citas: const [],
+        ahora: antes,
+        reglas: reglasDePrueba(agenda: {'pasoMinutos': 30}),
+      );
+
+      expect(huecos.map((h) => h.hora), ['08:00', '08:30', '09:00', '09:30']);
+    });
+
+    test('minutosAnticipacionReserva: con 60, hoy no se ofrece lo de la '
+        'próxima hora', () {
+      final reglas = reglasDePrueba(agenda: {'minutosAnticipacionReserva': 60});
+      final ahora = DateTime(2026, 9, 28, 8, 40);
+
+      final huecos = calcularHuecos(
+        fecha: lunes,
+        rangos: const [HorarioRango(inicio: '08:00', fin: '11:00')],
+        duracion: 30,
+        citas: const [],
+        ahora: ahoraConAnticipacion(ahora, reglas),
+        reglas: reglas,
+      );
+
+      expect(huecos.first.hora, '09:45');
+      // Con 15 minutos (la de prueba) el primero era 09:00.
+      expect(
+        calcularHuecos(
+          fecha: lunes,
+          rangos: const [HorarioRango(inicio: '08:00', fin: '11:00')],
+          duracion: 30,
+          citas: const [],
+          ahora: ahoraConAnticipacion(ahora, r),
+          reglas: r,
+        ).first.hora,
+        '09:00',
+      );
+    });
+
+    test('la anticipación también decide si hoy todavía cabe una cita', () {
+      final m = medico();
+      final reglas = reglasDePrueba(agenda: {'minutosAnticipacionReserva': 60});
+
+      // 17:00 + 60 = 18:00: ya no empieza ninguna de 30 min antes de las 18.
+      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17), r), isTrue);
+      expect(quedaHoy(m, 30, DateTime(2026, 9, 28, 17), reglas), isFalse);
+    });
+
+    test('diasHorizonteReserva: no se busca ni se ofrece más allá', () {
+      final soloLunes = medico(
+        horarios: const [
+          HorarioDia(
+            dia: 'Lunes',
+            activo: true,
+            rangos: [HorarioRango(inicio: '08:00', fin: '12:00')],
+          ),
+        ],
+      );
+      final cincoDias = reglasDePrueba(agenda: {'diasHorizonteReserva': 5});
+
+      // Desde el martes, el próximo lunes está a 6 días: fuera de 5.
+      expect(
+        siguienteDiaConAtencion(
+          soloLunes,
+          DateTime(2026, 9, 29),
+          reglas: cincoDias,
+        ),
+        isNull,
+      );
+      expect(
+        siguienteDiaConAtencion(soloLunes, DateTime(2026, 9, 29), reglas: r),
+        DateTime(2026, 10, 5),
+      );
+
+      // La tira no pasa del horizonte aunque haya días después.
+      final dias = diasConAtencion(
+        medico(),
+        lunes,
+        reglas: r,
+        hasta: DateTime(2026, 10, 1),
+      );
+      expect(dias.last, DateTime(2026, 10, 1));
+    });
+
+    test('horaInicioTarde y horaInicioNoche mueven los cortes', () {
+      final huecos = calcularHuecos(
+        fecha: lunes,
+        rangos: const [HorarioRango(inicio: '12:00', fin: '21:00')],
+        duracion: 60,
+        citas: const [],
+        ahora: antes,
+        reglas: reglasDePrueba(
+          agenda: {
+            'pasoMinutos': 60,
+            'horaInicioTarde': '13:00',
+            'horaInicioNoche': '18:00',
+          },
+        ),
+      );
+
+      Periodo p(String hora) =>
+          huecos.firstWhere((h) => h.hora == hora).periodo;
+
+      expect(p('12:00'), Periodo.manana);
+      expect(p('13:00'), Periodo.tarde);
+      expect(p('17:00'), Periodo.tarde);
+      expect(p('18:00'), Periodo.noche);
+    });
+
+    test('las duraciones por defecto son las de la configuración', () {
+      final reglas = reglasDePrueba(
+        agenda: {
+          'duracionPresencial': 40,
+          'duracionTelemedicina': 25,
+          'duracionAsincrona': 10,
+        },
+      );
+
+      expect(duracionDe(null, TipoCita.presencial, reglas), 40);
+      expect(duracionDe(null, TipoCita.telemedicina, reglas), 25);
+      expect(duracionDe(null, TipoCita.asincrona, reglas), 10);
+      // La del médico sigue mandando si la configuró.
+      expect(
+        duracionDe(
+          medico(config: const ConfigAgenda(duraciones: {'PRESENCIAL': 45})),
+          TipoCita.presencial,
+          reglas,
+        ),
+        45,
+      );
     });
   });
 }

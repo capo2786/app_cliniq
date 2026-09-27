@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/fechas/fecha_local.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
@@ -27,16 +28,22 @@ class TarjetaProximaCita extends StatelessWidget {
     required this.ahora,
   });
 
-  bool get _salaALaVista => switch (estadoDeSala(cita, ahora)) {
-    EstadoSala.abierta => true,
-    EstadoSala.porAbrir => mismoDia(cita.inicio, ahora),
-    _ => false,
-  };
+  bool _salaALaVista(VentanaDeSala ventana) =>
+      switch (estadoDeSala(cita, ahora, ventana)) {
+        EstadoSala.abierta => true,
+        EstadoSala.porAbrir => mismoDia(cita.inicio, ahora),
+        _ => false,
+      };
 
   @override
   Widget build(BuildContext context) {
+    final modalidad = context.modalidad(cita.tipo);
+    final consejos = consejosPara(context.catalogos, cita.tipo);
+    final medico = cita.medicoVisible;
+    final ventana = VentanaDeSala.de(context.config.telemedicina);
+
     return TarjetaTranslucida(
-      tinte: cita.tipo.color,
+      tinte: modalidad.color,
       onTap: () => mostrarDetalleCita(context, cita),
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -68,17 +75,19 @@ class TarjetaProximaCita extends StatelessWidget {
                         fontWeight: FontWeight.w900,
                       ),
                     ),
-                    const SizedBox(height: 5),
-                    Text(
-                      cita.medicoVisible,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.texto,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                    if (medico != null) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        medico,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.texto,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
+                    ],
                     if (cita.especialidad != null)
                       Text(
                         cita.especialidad!,
@@ -103,9 +112,9 @@ class TarjetaProximaCita extends StatelessWidget {
                 icono: Icons.hourglass_bottom_rounded,
               ),
               Pastilla(
-                texto: cita.tipo.nombre,
-                color: cita.tipo.color,
-                icono: cita.tipo.icono,
+                texto: modalidad.nombre,
+                color: modalidad.color,
+                icono: modalidad.icono,
               ),
               if (cita.paraDependiente)
                 Pastilla(
@@ -115,14 +124,13 @@ class TarjetaProximaCita extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 14),
-          ConsejosDePreparacion(
-            consejos: consejosPara(cita.tipo),
-            color: cita.tipo.color,
-          ),
+          if (consejos.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            ConsejosDePreparacion(consejos: consejos, color: modalidad.color),
+          ],
           // El botón de la sala va aquí mismo el día de la cita: es lo que
           // se busca al abrir la aplicación diez minutos antes.
-          if (_salaALaVista) ...[
+          if (_salaALaVista(ventana)) ...[
             const SizedBox(height: 14),
             BotonVideoconsulta(cita: cita, compacto: true),
           ],

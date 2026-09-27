@@ -68,7 +68,7 @@ void main() {
       expect(detalle.horasRestantes, isNull);
       expect(detalle.puedeEscribir, isTrue);
       expect(detalle.respuestaPorLeer, isTrue);
-      expect(detalle.medicoVisible, 'Dr(a). Luis Mora');
+      expect(detalle.medicoVisible, 'Luis Mora');
       expect(detalle.respuestas.map((r) => r.valor), [
         true,
         2.5,

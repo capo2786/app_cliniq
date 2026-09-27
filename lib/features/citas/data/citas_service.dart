@@ -66,9 +66,8 @@ class CitasService {
       return ResultadoCitas(
         citas: interpretarCitas(datos['citas']),
         desdeCache: true,
-        guardadasEn: DateTime.tryParse(
-          datos['guardadasEn']?.toString() ?? '',
-        )?.toLocal(),
+        guardadasEn: DateTime.tryParse(datos['guardadasEn']?.toString() ?? '')
+            ?.toLocal(),
       );
     } catch (_) {
       return null;

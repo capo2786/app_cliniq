@@ -3,27 +3,20 @@ import 'package:equatable/equatable.dart';
 import '../../../../core/fechas/fecha_local.dart';
 
 /// Las tres maneras de atender una cita.
+///
+/// Solo los códigos, que usa el sistema y no cambian (el catálogo
+/// `MODALIDAD_CITA` tiene los códigos fijos). El nombre, la descripción, el
+/// color y el icono de cada una los edita el administrador en ese catálogo, y
+/// la duración por defecto sale de la configuración (`agenda.duracion*`).
 enum TipoCita {
-  presencial('PRESENCIAL', 'Presencial', 'En consultorio', 30),
-  telemedicina('TELEMEDICINA', 'Telemedicina', 'Videollamada en vivo', 20),
-  asincrona('ASINCRONA', 'Asíncrona', 'Revisión de exámenes o mensajes', 15);
+  presencial('PRESENCIAL'),
+  telemedicina('TELEMEDICINA'),
+  asincrona('ASINCRONA');
 
   /// Como lo escribe la API.
   final String codigo;
 
-  final String nombre;
-  final String descripcion;
-
-  /// Minutos que ocupa en la agenda si el médico no configuró los suyos
-  /// (los mismos valores de la clínica que usa el panel web).
-  final int duracionPorDefecto;
-
-  const TipoCita(
-    this.codigo,
-    this.nombre,
-    this.descripcion,
-    this.duracionPorDefecto,
-  );
+  const TipoCita(this.codigo);
 
   static TipoCita desdeCodigo(Object? codigo) {
     final texto = codigo?.toString().toUpperCase().trim();
@@ -36,17 +29,20 @@ enum TipoCita {
 }
 
 /// En qué quedó una cita.
+///
+/// Solo los códigos y su lógica (qué estado se puede mover): la etiqueta, el
+/// color, el icono y la descripción de cada uno están en el catálogo
+/// `ESTADO_CITA`, que edita el administrador.
 enum EstadoCita {
-  programada('PROGRAMADA', 'Programada'),
-  reagendada('REAGENDADA', 'Reagendada'),
-  atendida('ATENDIDA', 'Atendida'),
-  noAsistio('NO_ASISTIO', 'No asistió'),
-  cancelada('CANCELADA', 'Cancelada');
+  programada('PROGRAMADA'),
+  reagendada('REAGENDADA'),
+  atendida('ATENDIDA'),
+  noAsistio('NO_ASISTIO'),
+  cancelada('CANCELADA');
 
   final String codigo;
-  final String nombre;
 
-  const EstadoCita(this.codigo, this.nombre);
+  const EstadoCita(this.codigo);
 
   /// Programada o reagendada: todavía va a ocurrir y se puede mover.
   bool get pendiente =>
@@ -108,10 +104,11 @@ class Cita extends Equatable {
 
   Duration get duracion => fin.difference(inicio);
 
-  /// «Dr(a). Ana Pérez», como en el panel web.
-  String get medicoVisible {
+  /// El nombre del médico tal como llega, o `null` si no llegó: no se le
+  /// antepone ningún título ni se inventa uno.
+  String? get medicoVisible {
     final nombre = medico?.trim() ?? '';
-    return nombre.isEmpty ? 'Médico por confirmar' : 'Dr(a). $nombre';
+    return nombre.isEmpty ? null : nombre;
   }
 
   static String? _texto(Object? valor) {

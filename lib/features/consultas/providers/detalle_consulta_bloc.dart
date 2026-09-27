@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/archivos/archivo_local.dart';
+import '../../../core/configuracion/config_publica.dart';
 import '../../../core/network/errores.dart';
 import '../data/consultas_service.dart';
 import '../dominio/reglas_consultas.dart';
@@ -34,6 +35,10 @@ class DetalleConsultaBloc
   final String _id;
   final Stream<void> Function() _latidos;
 
+  /// Qué archivos se aceptan y hasta qué tamaño (configuración de la
+  /// clínica).
+  final ReglasArchivos _archivos;
+
   StreamSubscription<void>? _sondeo;
   int _secuencia = 0;
 
@@ -46,6 +51,7 @@ class DetalleConsultaBloc
     required this._servicio,
     required this._uid,
     required this._id,
+    required this._archivos,
     Stream<void> Function()? latidos,
   }) : _latidos = latidos ?? _latidosCada30Segundos,
        super(const DetalleConsultaState()) {
@@ -244,7 +250,7 @@ class DetalleConsultaBloc
 
     // Un mensaje lleva un solo archivo: se toma el primero.
     final archivo = seleccion.archivos.first;
-    final problema = problemaDelArchivo(archivo);
+    final problema = problemaDelArchivo(archivo, _archivos);
 
     if (problema != null) {
       emit(state.copiarCon(aviso: _aviso(problema)));

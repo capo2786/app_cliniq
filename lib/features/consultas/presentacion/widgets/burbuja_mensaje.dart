@@ -19,11 +19,11 @@ class BurbujaMensaje extends StatelessWidget {
     final adjunto = mensaje.adjunto;
     final fecha = mensaje.fecha;
 
-    final autor = medico
-        ? (mensaje.autorNombre.isEmpty
-              ? 'Médico'
-              : 'Dr(a). ${mensaje.autorNombre}')
-        : (mensaje.autorNombre.isEmpty ? 'Tú' : mensaje.autorNombre);
+    // El nombre tal como llega, sin anteponerle un título. Sin nombre, el
+    // papel de quien escribió.
+    final autor = mensaje.autorNombre.isNotEmpty
+        ? mensaje.autorNombre
+        : (medico ? 'Médico' : 'Tú');
 
     return Align(
       alignment: medico ? Alignment.centerLeft : Alignment.centerRight,

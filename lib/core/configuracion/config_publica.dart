@@ -1,0 +1,409 @@
+// lib/core/configuracion/config_publica.dart
+
+import 'package:equatable/equatable.dart';
+
+/// La configuración pública de la clínica: `GET /configuracion/publica`.
+///
+/// Es lo que el administrador ajusta en Administración › Configuración y la
+/// aplicación necesita para funcionar como la clínica decidió: el nombre y el
+/// logotipo, las horas para cambiar una cita, la ventana de la sala de video,
+/// los recordatorios, la rejilla de horarios, los topes de archivos, los
+/// tiempos de seguridad… Nada de eso está escrito en la aplicación.
+///
+/// La lectura es **estricta** con lo que la aplicación usa: si falta un campo
+/// o no tiene la forma esperada, la respuesta entera se descarta
+/// ([FormatException]) y se sigue con la última copia buena. Un campo que
+/// falta no se rellena con un valor inventado. Lo que la aplicación no usa
+/// (el RUC, las edades, las reglas del panel) no se lee.
+class ConfigPublica extends Equatable {
+  final DatosClinica clinica;
+  final ReglasAgenda agenda;
+  final ReglasTelemedicina telemedicina;
+  final ReglasArchivos archivos;
+  final ReglasSeguridad seguridad;
+  final ReglasGenerales general;
+
+  /// La respuesta tal como llegó, para guardarla y volver a leerla igual.
+  final Map<String, dynamic> datos;
+
+  const ConfigPublica({
+    required this.clinica,
+    required this.agenda,
+    required this.telemedicina,
+    required this.archivos,
+    required this.seguridad,
+    required this.general,
+    this.datos = const {},
+  });
+
+  factory ConfigPublica.desdeJson(Object? json) {
+    if (json is! Map) {
+      throw const FormatException('La configuración pública no es un objeto');
+    }
+
+    final lector = _Lector(Map<String, dynamic>.from(json), '');
+
+    return ConfigPublica(
+      clinica: DatosClinica._leer(lector.seccion('clinica')),
+      agenda: ReglasAgenda._leer(lector.seccion('agenda')),
+      telemedicina: ReglasTelemedicina._leer(lector.seccion('telemedicina')),
+      archivos: ReglasArchivos._leer(lector.seccion('archivos')),
+      seguridad: ReglasSeguridad._leer(lector.seccion('seguridad')),
+      general: ReglasGenerales._leer(lector.seccion('general')),
+      datos: Map<String, dynamic>.from(json),
+    );
+  }
+
+  Map<String, dynamic> aJson() => datos;
+
+  @override
+  List<Object?> get props => [
+    clinica,
+    agenda,
+    telemedicina,
+    archivos,
+    seguridad,
+    general,
+  ];
+}
+
+/// `clinica`: quién es la clínica y cómo se la contacta.
+class DatosClinica extends Equatable {
+  final String nombre;
+  final String telefono;
+  final String correoContacto;
+  final String telefonoEmergencia;
+  final String eslogan;
+
+  /// Data URL (PNG, JPG o SVG) o `null`: sin logotipo propio se enseña el de
+  /// la marca, que la aplicación ya trae dibujado.
+  final String? logo;
+
+  /// Nombre IANA (`America/Guayaquil`).
+  final String zonaHoraria;
+
+  /// Los dos colores de la marca de la clínica (`#RRGGBB`), o `null` si no
+  /// llegan o no son un color: entonces el tema usa los de siempre (así lo
+  /// dice el contrato).
+  final String? colorPrimario;
+  final String? colorAcento;
+
+  const DatosClinica({
+    required this.nombre,
+    required this.telefono,
+    required this.correoContacto,
+    required this.telefonoEmergencia,
+    required this.eslogan,
+    required this.logo,
+    required this.zonaHoraria,
+    this.colorPrimario,
+    this.colorAcento,
+  });
+
+  factory DatosClinica._leer(_Lector l) => DatosClinica(
+    nombre: l.texto('nombre'),
+    telefono: l.texto('telefono'),
+    correoContacto: l.texto('correoContacto'),
+    telefonoEmergencia: l.texto('telefonoEmergencia'),
+    eslogan: l.texto('eslogan'),
+    logo: l.textoOpcional('logo'),
+    zonaHoraria: l.texto('zonaHoraria'),
+    colorPrimario: l.colorOpcional('colorPrimario'),
+    colorAcento: l.colorOpcional('colorAcento'),
+  );
+
+  @override
+  List<Object?> get props => [
+    nombre,
+    telefono,
+    correoContacto,
+    telefonoEmergencia,
+    eslogan,
+    logo,
+    zonaHoraria,
+    colorPrimario,
+    colorAcento,
+  ];
+}
+
+/// `agenda`: citas, recordatorios y rejilla de horarios.
+class ReglasAgenda extends Equatable {
+  final int horasMinimasCambio;
+
+  final bool recordatoriosActivos;
+  final bool recordatorio24h;
+  final bool recordatorio1h;
+  final bool recordatorioInicio;
+
+  /// Minutos por modalidad cuando el médico no configuró los suyos.
+  final int duracionPresencial;
+  final int duracionTelemedicina;
+  final int duracionAsincrona;
+
+  final int pasoMinutos;
+  final int minutosAnticipacionReserva;
+  final int diasHorizonteReserva;
+
+  /// «HH:mm»: desde cuándo un horario cuenta como de la tarde o de la noche.
+  final String horaInicioTarde;
+  final String horaInicioNoche;
+
+  const ReglasAgenda({
+    required this.horasMinimasCambio,
+    required this.recordatoriosActivos,
+    required this.recordatorio24h,
+    required this.recordatorio1h,
+    required this.recordatorioInicio,
+    required this.duracionPresencial,
+    required this.duracionTelemedicina,
+    required this.duracionAsincrona,
+    required this.pasoMinutos,
+    required this.minutosAnticipacionReserva,
+    required this.diasHorizonteReserva,
+    required this.horaInicioTarde,
+    required this.horaInicioNoche,
+  });
+
+  factory ReglasAgenda._leer(_Lector l) => ReglasAgenda(
+    horasMinimasCambio: l.entero('horasMinimasCambio'),
+    recordatoriosActivos: l.booleano('recordatoriosActivos'),
+    recordatorio24h: l.booleano('recordatorio24h'),
+    recordatorio1h: l.booleano('recordatorio1h'),
+    recordatorioInicio: l.booleano('recordatorioInicio'),
+    duracionPresencial: l.entero('duracionPresencial', minimo: 1),
+    duracionTelemedicina: l.entero('duracionTelemedicina', minimo: 1),
+    duracionAsincrona: l.entero('duracionAsincrona', minimo: 1),
+    pasoMinutos: l.entero('pasoMinutos', minimo: 1),
+    minutosAnticipacionReserva: l.entero('minutosAnticipacionReserva'),
+    diasHorizonteReserva: l.entero('diasHorizonteReserva', minimo: 1),
+    horaInicioTarde: l.hora('horaInicioTarde'),
+    horaInicioNoche: l.hora('horaInicioNoche'),
+  );
+
+  @override
+  List<Object?> get props => [
+    horasMinimasCambio,
+    recordatoriosActivos,
+    recordatorio24h,
+    recordatorio1h,
+    recordatorioInicio,
+    duracionPresencial,
+    duracionTelemedicina,
+    duracionAsincrona,
+    pasoMinutos,
+    minutosAnticipacionReserva,
+    diasHorizonteReserva,
+    horaInicioTarde,
+    horaInicioNoche,
+  ];
+}
+
+/// `telemedicina`: la sala de video y las consultas en línea.
+class ReglasTelemedicina extends Equatable {
+  /// Cuántos minutos antes del inicio abre la sala y cuántos después del fin
+  /// la cierra.
+  final int minutosAntes;
+  final int minutosDespues;
+
+  final int horasRespuesta;
+  final int diasSeguimiento;
+  final int maxArchivosConsulta;
+
+  const ReglasTelemedicina({
+    required this.minutosAntes,
+    required this.minutosDespues,
+    required this.horasRespuesta,
+    required this.diasSeguimiento,
+    required this.maxArchivosConsulta,
+  });
+
+  factory ReglasTelemedicina._leer(_Lector l) => ReglasTelemedicina(
+    minutosAntes: l.entero('minutosAntes'),
+    minutosDespues: l.entero('minutosDespues'),
+    horasRespuesta: l.entero('horasRespuesta', minimo: 1),
+    diasSeguimiento: l.entero('diasSeguimiento'),
+    maxArchivosConsulta: l.entero('maxArchivosConsulta'),
+  );
+
+  @override
+  List<Object?> get props => [
+    minutosAntes,
+    minutosDespues,
+    horasRespuesta,
+    diasSeguimiento,
+    maxArchivosConsulta,
+  ];
+}
+
+/// `archivos`: el tope de cada archivo que se sube y los tipos que la
+/// clínica acepta.
+class ReglasArchivos extends Equatable {
+  final int tamanoMaximoMb;
+
+  /// Tipos MIME aceptados (`application/pdf`, `image/jpeg`…), elegidos por
+  /// el administrador entre los que el servidor sabe verificar por su
+  /// contenido.
+  final List<String> tipos;
+
+  const ReglasArchivos({required this.tamanoMaximoMb, required this.tipos});
+
+  /// El tope en bytes, como lo mide el servidor (1 MB = 1024 × 1024).
+  int get tamanoMaximoBytes => tamanoMaximoMb * 1024 * 1024;
+
+  factory ReglasArchivos._leer(_Lector l) => ReglasArchivos(
+    tamanoMaximoMb: l.entero('tamanoMaximoMb', minimo: 1),
+    tipos: [for (final t in l.textos('tipos')) t.toLowerCase()],
+  );
+
+  @override
+  List<Object?> get props => [tamanoMaximoMb, tipos];
+}
+
+/// `seguridad`: contraseñas, bloqueos y códigos.
+class ReglasSeguridad extends Equatable {
+  final int passwordMinimo;
+  final int bloqueoMinutos;
+  final int otpMinutos;
+  final int resetMinutos;
+  final int reenvioSegundos;
+
+  const ReglasSeguridad({
+    required this.passwordMinimo,
+    required this.bloqueoMinutos,
+    required this.otpMinutos,
+    required this.resetMinutos,
+    required this.reenvioSegundos,
+  });
+
+  factory ReglasSeguridad._leer(_Lector l) => ReglasSeguridad(
+    passwordMinimo: l.entero('passwordMinimo', minimo: 1),
+    bloqueoMinutos: l.entero('bloqueoMinutos'),
+    otpMinutos: l.entero('otpMinutos'),
+    resetMinutos: l.entero('resetMinutos'),
+    reenvioSegundos: l.entero('reenvioSegundos'),
+  );
+
+  @override
+  List<Object?> get props => [
+    passwordMinimo,
+    bloqueoMinutos,
+    otpMinutos,
+    resetMinutos,
+    reenvioSegundos,
+  ];
+}
+
+/// `general`: lo que queda de la sección general que la aplicación usa.
+class ReglasGenerales extends Equatable {
+  /// Si la cédula ecuatoriana se valida con su dígito verificador (módulo
+  /// 10). Apagado, basta con que tenga diez dígitos.
+  final bool validarCedula;
+
+  const ReglasGenerales({required this.validarCedula});
+
+  factory ReglasGenerales._leer(_Lector l) =>
+      ReglasGenerales(validarCedula: l.booleano('validarCedula'));
+
+  @override
+  List<Object?> get props => [validarCedula];
+}
+
+/// Lee campos obligatorios de una sección y dice cuál falta si falta uno.
+class _Lector {
+  final Map<String, dynamic> _datos;
+  final String _ruta;
+
+  const _Lector(this._datos, this._ruta);
+
+  String _nombre(String campo) => _ruta.isEmpty ? campo : '$_ruta.$campo';
+
+  Never _falta(String campo, Object? valor) => throw FormatException(
+    'Campo de la configuración ausente o no válido: ${_nombre(campo)}',
+    valor?.toString(),
+  );
+
+  _Lector seccion(String campo) {
+    final valor = _datos[campo];
+    if (valor is! Map) _falta(campo, valor);
+
+    return _Lector(Map<String, dynamic>.from(valor), _nombre(campo));
+  }
+
+  String texto(String campo) {
+    final valor = _datos[campo];
+    if (valor is! String) _falta(campo, valor);
+
+    return valor.trim();
+  }
+
+  /// Un color `#RRGGBB` (o `#RGB`), o `null` si no llegó o no es un color.
+  /// Es de los pocos campos opcionales: sin él se usan los tokens del tema.
+  String? colorOpcional(String campo) {
+    final valor = _datos[campo];
+    if (valor is! String) return null;
+
+    final texto = valor.trim();
+    return RegExp(r'^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$').hasMatch(texto)
+        ? texto
+        : null;
+  }
+
+  /// Una lista de textos (puede venir vacía).
+  List<String> textos(String campo) {
+    final valor = _datos[campo];
+    if (valor is! List || valor.any((x) => x is! String)) _falta(campo, valor);
+
+    return [
+      for (final x in valor)
+        if ((x as String).trim().isNotEmpty) x.trim(),
+    ];
+  }
+
+  String? textoOpcional(String campo) {
+    final valor = _datos[campo];
+    if (valor == null) return null;
+    if (valor is! String) _falta(campo, valor);
+
+    final texto = valor.trim();
+    return texto.isEmpty ? null : texto;
+  }
+
+  /// Un entero; se acepta también un número escrito como texto («12»), que
+  /// es como a veces lo guarda un formulario.
+  int entero(String campo, {int minimo = 0}) {
+    final valor = _datos[campo];
+    final numero = switch (valor) {
+      int() => valor,
+      num() when valor == valor.roundToDouble() => valor.toInt(),
+      String() => int.tryParse(valor.trim()),
+      _ => null,
+    };
+
+    if (numero == null || numero < minimo) _falta(campo, valor);
+
+    return numero;
+  }
+
+  bool booleano(String campo) {
+    final valor = _datos[campo];
+
+    return switch (valor) {
+      bool() => valor,
+      'true' => true,
+      'false' => false,
+      _ => _falta(campo, valor),
+    };
+  }
+
+  /// «HH:mm» de 00:00 a 23:59.
+  String hora(String campo) {
+    final valor = _datos[campo];
+    final coincide = valor is String
+        ? RegExp(r'^([01]\d|2[0-3]):[0-5]\d$').firstMatch(valor.trim())
+        : null;
+
+    if (coincide == null) _falta(campo, valor);
+
+    return coincide.group(0)!;
+  }
+}

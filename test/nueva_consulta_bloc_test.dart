@@ -16,6 +16,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/consultas.dart';
 import 'dobles/dobles.dart';
+import 'dobles/clinica.dart';
 
 /// La consulta nueva paso a paso: para quién, especialidad, motivo, médico,
 /// formulario, resumen y envío (borrador → archivos → enviar).
@@ -33,13 +34,30 @@ void main() {
     ]);
   });
 
-  NuevaConsultaBloc crear({bool puedeDependientes = true}) => NuevaConsultaBloc(
-    consultas: servicio,
-    dependientes: dependientes,
-    uid: 'u1',
-    nombreTitular: 'Ana María Pérez',
-    puedeDependientes: puedeDependientes,
-  );
+  // Los topes de la configuración de prueba: 30 archivos de hasta 20 MB.
+  final config = configDePrueba();
+  final maximoAdjuntos = config.telemedicina.maxArchivosConsulta;
+
+  NuevaConsultaBloc crear({
+    bool puedeDependientes = true,
+    Map<String, dynamic>? telemedicina,
+    Map<String, dynamic>? archivos,
+  }) {
+    final config = configDePrueba(
+      telemedicina: telemedicina,
+      archivos: archivos,
+    );
+
+    return NuevaConsultaBloc(
+      consultas: servicio,
+      dependientes: dependientes,
+      uid: 'u1',
+      nombreTitular: 'Ana María Pérez',
+      maximoAdjuntos: config.telemedicina.maxArchivosConsulta,
+      archivos: config.archivos,
+      puedeDependientes: puedeDependientes,
+    );
+  }
 
   Future<NuevaConsultaState> esperar(
     NuevaConsultaBloc bloc,
@@ -303,6 +321,70 @@ void main() {
       verify: (bloc) {
         expect(bloc.state.adjuntos, hasLength(maximoAdjuntos));
         expect(bloc.state.aviso?.mensaje, contains('hasta $maximoAdjuntos'));
+      },
+    );
+
+    blocTest<NuevaConsultaBloc, NuevaConsultaState>(
+      'el tope de archivos es el de la configuración (maxArchivosConsulta)',
+      build: () => crear(telemedicina: {'maxArchivosConsulta': 2}),
+      act: (bloc) async {
+        await hastaElFormulario(bloc);
+        bloc.add(
+          NuevaConsultaArchivosElegidos(
+            SeleccionDeArchivos(
+              archivos: [for (var i = 0; i < 4; i++) fotoLocal('f$i.jpg')],
+            ),
+          ),
+        );
+        await esperar(bloc, (s) => s.adjuntos.isNotEmpty);
+      },
+      verify: (bloc) {
+        expect(bloc.state.maximoAdjuntos, 2);
+        expect(bloc.state.adjuntos, hasLength(2));
+        expect(bloc.state.cabeOtroAdjunto, isFalse);
+        expect(bloc.state.aviso?.mensaje, 'Puedes adjuntar hasta 2 archivos.');
+      },
+    );
+
+    blocTest<NuevaConsultaBloc, NuevaConsultaState>(
+      'el tamaño máximo y los tipos son los de la configuración',
+      build: () => crear(
+        archivos: {
+          'tamanoMaximoMb': 1,
+          'tipos': ['application/pdf'],
+        },
+      ),
+      act: (bloc) async {
+        await hastaElFormulario(bloc);
+        bloc.add(
+          NuevaConsultaArchivosElegidos(
+            SeleccionDeArchivos(
+              archivos: [
+                // Una foto JPG: la clínica solo acepta PDF.
+                fotoLocal(),
+                // Un PDF de más de 1 MB.
+                ArchivoLocal(
+                  nombre: 'grande.pdf',
+                  bytes: Uint8List.fromList([
+                    ...'%PDF-'.codeUnits,
+                    ...List.filled(1024 * 1024, 0),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        );
+        await esperar(bloc, (s) => s.aviso != null);
+      },
+      verify: (bloc) {
+        expect(bloc.state.adjuntos, isEmpty);
+        expect(
+          bloc.state.aviso?.mensaje,
+          allOf(
+            contains('no es un PDF.'),
+            contains('«grande.pdf» pesa 1,0 MB y el máximo es 1 MB.'),
+          ),
+        );
       },
     );
 

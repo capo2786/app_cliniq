@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../../core/presentacion/widgets/botones.dart';
+import '../../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/servicios.dart';
@@ -33,9 +35,10 @@ Future<void> mostrarDetalleCita(BuildContext context, Cita cita) {
 
 /// Todo lo de una cita, y lo que se puede hacer con ella.
 ///
-/// «Reprogramar» y «Cancelar» solo aparecen en una cita pendiente con al
-/// menos 12 horas por delante; si faltan menos, se explica por qué no están
-/// en vez de esconderlos sin decir nada.
+/// «Reprogramar» y «Cancelar» solo aparecen en una cita pendiente con las
+/// horas de anticipación que pide la clínica (`agenda.horasMinimasCambio`);
+/// si faltan menos, se explica por qué no están —con el teléfono y el correo
+/// de la clínica— en vez de esconderlos sin decir nada.
 class DetalleCita extends StatelessWidget {
   final Cita cita;
 
@@ -67,8 +70,18 @@ class DetalleCita extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ahora = Servicios.reloj.ahora();
-    final cambiable = puedeCambiar(cita, ahora);
-    final sinCambios = motivoSinCambios(cita, ahora);
+    final config = context.config;
+    final horasMinimas = config.agenda.horasMinimasCambio;
+    final cambiable = puedeCambiar(cita, ahora, horasMinimas);
+    final sinCambios = motivoSinCambios(cita, ahora, horasMinimas);
+    final modalidad = context.modalidad(cita.tipo);
+    final estado = context.estadoCita(cita.estado);
+    final consejos = consejosPara(context.catalogos, cita.tipo);
+    final sala = estadoDeSala(
+      cita,
+      ahora,
+      VentanaDeSala.de(config.telemedicina),
+    );
 
     return DraggableScrollableSheet(
       expand: false,
@@ -126,9 +139,9 @@ class DetalleCita extends StatelessWidget {
                       runSpacing: 6,
                       children: [
                         Pastilla(
-                          texto: cita.estado.nombre,
-                          color: cita.estado.color,
-                          icono: cita.estado.icono,
+                          texto: estado.nombre,
+                          color: estado.color,
+                          icono: estado.icono,
                         ),
                         if (cita.pendiente)
                           Pastilla(
@@ -158,15 +171,12 @@ class DetalleCita extends StatelessWidget {
                 FilaDato(
                   icono: Icons.medical_information_outlined,
                   rotulo: 'Médico',
-                  valor: [
-                    cita.medicoVisible,
-                    if (cita.especialidad != null) cita.especialidad!,
-                  ].join(' · '),
+                  valor: [?cita.medicoVisible, ?cita.especialidad].join(' · '),
                 ),
                 FilaDato(
-                  icono: cita.tipo.icono,
+                  icono: modalidad.icono,
                   rotulo: 'Modalidad',
-                  valor: '${cita.tipo.nombre} · ${cita.tipo.descripcion}',
+                  valor: modalidad.conDescripcion,
                 ),
                 FilaDato(
                   icono: Icons.notes_rounded,
@@ -182,15 +192,14 @@ class DetalleCita extends StatelessWidget {
               ],
             ),
           ),
-          if (cita.pendiente) ...[
+          if (cita.pendiente && consejos.isNotEmpty) ...[
             const SizedBox(height: 16),
-            ConsejosDePreparacion(consejos: consejosPara(cita.tipo)),
+            ConsejosDePreparacion(consejos: consejos),
           ],
-          // La sala puede seguir abierta un rato después del fin (hasta
-          // cuatro horas, según la clínica), así que también se ofrece desde
-          // el historial mientras tanto.
-          if (estadoDeSala(cita, ahora)
-              case EstadoSala.porAbrir || EstadoSala.abierta) ...[
+          // La sala puede seguir abierta un rato después del fin (los minutos
+          // que diga la clínica), así que también se ofrece desde el
+          // historial mientras tanto.
+          if (sala case EstadoSala.porAbrir || EstadoSala.abierta) ...[
             const SizedBox(height: 16),
             const EtiquetaSeccion('Videoconsulta'),
             BotonVideoconsulta(cita: cita),
@@ -222,7 +231,7 @@ class DetalleCita extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Puedes cambiarla hasta $horasMinimasCambio horas antes.',
+                    'Puedes cambiarla hasta ${horas(horasMinimas)} antes.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.textoTenue,
@@ -232,8 +241,11 @@ class DetalleCita extends StatelessWidget {
                 ],
               ),
             )
-          else if (sinCambios != null)
+          else if (sinCambios != null) ...[
             RecuadroAviso.alerta(sinCambios, icono: Icons.lock_clock_outlined),
+            const SizedBox(height: 8),
+            const ContactoClinica(),
+          ],
         ],
       ),
     );

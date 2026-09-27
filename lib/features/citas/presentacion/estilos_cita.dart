@@ -1,41 +1,40 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
 
-import '../../../core/tema/tokens.dart';
+import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/catalogos/catalogos_cubit.dart';
+import '../../../core/configuracion/en_contexto.dart';
+import '../../../core/presentacion/estilo_de_catalogo.dart';
 import '../data/models/cita.dart';
 
-/// El color y el icono de cada modalidad y de cada estado.
-///
-/// El color es información, no adorno: de un vistazo se distingue una
-/// videollamada de una consulta en persona. Por eso cada uno lleva además su
-/// icono —el color solo no basta para quien no distingue colores—.
-extension EstiloTipoCita on TipoCita {
-  Color get color => switch (this) {
-    TipoCita.presencial => AppColors.primarioClaro,
-    TipoCita.telemedicina => AppColors.violeta,
-    TipoCita.asincrona => AppColors.menta,
-  };
+/*
+ * Cómo se ven las modalidades (catálogo `MODALIDAD_CITA`) y los estados
+ * (`ESTADO_CITA`): nombre, descripción, color e icono salen del catálogo, ver
+ * `EstiloDeCatalogo`. Aquí no queda ningún mapa de colores ni de nombres.
+ */
 
-  IconData get icono => switch (this) {
-    TipoCita.presencial => Icons.medical_services_outlined,
-    TipoCita.telemedicina => Icons.videocam_outlined,
-    TipoCita.asincrona => Icons.description_outlined,
-  };
-}
+/// Las modalidades que la clínica tiene activas en `MODALIDAD_CITA`, en el
+/// orden del panel. Las que el catálogo no trae no se ofrecen como filtro.
+List<TipoCita> modalidadesDelCatalogo(CatalogosState catalogos) => [
+  for (final item in catalogos.items(Catalogos.modalidadCita))
+    for (final tipo in TipoCita.values)
+      if (tipo.codigo == item.codigo.toUpperCase()) tipo,
+];
 
-extension EstiloEstadoCita on EstadoCita {
-  Color get color => switch (this) {
-    EstadoCita.programada => AppColors.celeste,
-    EstadoCita.reagendada => AppColors.ambar,
-    EstadoCita.atendida => AppColors.exito,
-    EstadoCita.noAsistio => AppColors.peligroSuave,
-    EstadoCita.cancelada => AppColors.textoSecundario,
-  };
+/// El estilo de una modalidad según el catálogo.
+EstiloDeCatalogo estiloDeModalidad(CatalogosState catalogos, TipoCita tipo) =>
+    EstiloDeCatalogo.de(catalogos, Catalogos.modalidadCita, tipo.codigo);
 
-  IconData get icono => switch (this) {
-    EstadoCita.programada => Icons.schedule_rounded,
-    EstadoCita.reagendada => Icons.update_rounded,
-    EstadoCita.atendida => Icons.check_circle_outline_rounded,
-    EstadoCita.noAsistio => Icons.block_rounded,
-    EstadoCita.cancelada => Icons.cancel_outlined,
-  };
+/// El estilo de un estado de cita según el catálogo.
+EstiloDeCatalogo estiloDeEstadoCita(
+  CatalogosState catalogos,
+  EstadoCita estado,
+) => EstiloDeCatalogo.de(catalogos, Catalogos.estadoCita, estado.codigo);
+
+/// Los estilos desde una pantalla (escuchan los catálogos).
+extension EstilosDeCitaEnContexto on BuildContext {
+  EstiloDeCatalogo modalidad(TipoCita tipo) =>
+      estiloDeModalidad(catalogos, tipo);
+
+  EstiloDeCatalogo estadoCita(EstadoCita estado) =>
+      estiloDeEstadoCita(catalogos, estado);
 }

@@ -2,6 +2,7 @@
 
 import 'package:app_cliniq/core/app/version_instalada.dart';
 import 'package:app_cliniq/core/archivos/selector_de_archivos.dart';
+import 'package:app_cliniq/core/configuracion/config_publica.dart';
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/network/api_client.dart';
 import 'package:app_cliniq/core/red/estado_de_la_red.dart';
@@ -19,7 +20,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'dobles/adaptador_http.dart';
+import 'dobles/clinica.dart';
 import 'dobles/consultas.dart';
+
+import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 
 /// Las consultas en línea y la videoconsulta, de punta a punta, con la
 /// aplicación entera contra una API de mentira: entrar, ver la sala de la
@@ -27,6 +31,10 @@ import 'dobles/consultas.dart';
 /// médico y retomar un borrador. Si una pantalla lanza o se desborda al
 /// pintarse, falla aquí.
 void main() {
+  // Las horas de la prueba se arman en la zona de la clínica, la misma que
+  // la aplicación toma de su configuración.
+  ZonaClinica.aplicar('America/Guayaquil');
+
   late AdaptadorHttpFalso api;
   late List<String> camposMultipart;
   late List<Object?> cuerposDeMensajes;
@@ -113,7 +121,7 @@ void main() {
         },
       ),
       'GET /portal/dependientes': (_) => (estado: 200, cuerpo: []),
-      'GET /catalogos/lote': (_) => (estado: 200, cuerpo: {}),
+      ...rutasDeLaClinica(),
       'GET /portal/consultas': (_) => (
         estado: 200,
         cuerpo: [
@@ -236,6 +244,16 @@ void main() {
     await esperar(tester, 6);
     expect(find.byType(ConsultasPage), findsOneWidget);
     expect(find.text('BORRADORES'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('EN CURSO'),
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(ConsultasPage),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     expect(find.text('EN CURSO'), findsOneWidget);
     expect(find.text('Respuesta del médico'), findsOneWidget);
 
@@ -251,7 +269,7 @@ void main() {
     expect(find.text('¿Cuál es el motivo?'), findsOneWidget);
     await tocar(tester, find.text('Fiebre'));
     expect(find.text('Elige al médico'), findsOneWidget);
-    await tocar(tester, find.text('Dr(a). Rosa Vega'));
+    await tocar(tester, find.text('Rosa Vega'));
     expect(find.text('Cuéntale al médico'), findsOneWidget);
 
     // Seguir sin responder marca lo que falta.
@@ -370,11 +388,12 @@ class _SelectorFalso implements SelectorDeArchivos {
       SeleccionDeArchivos(archivos: [fotoLocal('garganta.jpg')]);
 
   @override
-  Future<SeleccionDeArchivos> tomarFoto() async => _foto;
+  Future<SeleccionDeArchivos> tomarFoto(ReglasArchivos reglas) async => _foto;
 
   @override
-  Future<SeleccionDeArchivos> elegirFotos() async => _foto;
+  Future<SeleccionDeArchivos> elegirFotos(ReglasArchivos reglas) async => _foto;
 
   @override
-  Future<SeleccionDeArchivos> elegirDocumentos() async => _foto;
+  Future<SeleccionDeArchivos> elegirDocumentos(ReglasArchivos reglas) async =>
+      _foto;
 }

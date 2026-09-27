@@ -16,16 +16,15 @@ library;
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/formato/fechas.dart';
 import 'horarios.dart';
+import 'reglas_agendamiento.dart';
 
-/// Cada cuánto empieza un horario posible al agendar.
-const int pasoMinutos = 15;
+export 'reglas_agendamiento.dart';
 
-/// Con cuánta anticipación mínima se puede tomar un horario de hoy: una cita
-/// que empieza en cinco minutos no le sirve a nadie.
-const int minutosAnticipacion = 15;
-
-/// Hasta cuántos días adelante se busca el siguiente día con atención.
-const int diasBusqueda = 60;
+/*
+ * El paso de la rejilla, la anticipación mínima, el horizonte de días y los
+ * cortes de mañana, tarde y noche son los de la configuración de la clínica
+ * (ver `ReglasAgendamiento`): llegan como parámetro, nunca escritos aquí.
+ */
 
 /// Mañana, tarde o noche: los horarios se agrupan así en la pantalla.
 enum Periodo {
@@ -111,9 +110,9 @@ DateTime _conMinutos(DateTime dia, int minutos) =>
 /// Los turnos de atención de ese día de la semana, válidos y en orden.
 List<HorarioRango> rangosDelDia(List<HorarioDia>? horarios, DateTime fecha) {
   final nombre = nombreDelDia(fecha);
-  final dia = normalizarHorarios(
-    horarios,
-  ).where((d) => d.dia == nombre).firstOrNull;
+  final dia = normalizarHorarios(horarios)
+      .where((d) => d.dia == nombre)
+      .firstOrNull;
 
   if (dia == null || !dia.activo) return const [];
 
@@ -160,16 +159,18 @@ bool limiteAlcanzado(
   return limite > 0 && _citasActivasDelDia(citas, fecha, excluirId) >= limite;
 }
 
-/// El próximo día (después de `desde`) en que se le puede dar cita al
-/// médico: trabaja ese día de la semana, no está bloqueado y, si se pasan
-/// sus citas, no llegó a su límite diario.
+/// El próximo día (después de `desde`, y como mucho el horizonte de la
+/// clínica más allá) en que se le puede dar cita al médico: trabaja ese día
+/// de la semana, no está bloqueado y, si se pasan sus citas, no llegó a su
+/// límite diario.
 DateTime? siguienteDiaConAtencion(
   MedicoConAgenda? medico,
   DateTime desde, {
+  required ReglasAgendamiento reglas,
   List<IntervaloOcupado>? citas,
   String? excluirId,
 }) {
-  for (var i = 1; i <= diasBusqueda; i++) {
+  for (var i = 1; i <= reglas.diasHorizonte; i++) {
     final dia = sumarDias(inicioDelDia(desde), i);
 
     if (rangosDelDia(medico?.horariosAtencion, dia).isNotEmpty &&
@@ -199,6 +200,7 @@ List<Hueco> calcularHuecos({
   required List<IntervaloOcupado> citas,
   String? excluirId,
   required DateTime ahora,
+  required ReglasAgendamiento reglas,
 }) {
   final margenDuracion = Duration(minutes: margen < 0 ? 0 : margen);
   final ocupan = citas
@@ -215,7 +217,7 @@ List<Hueco> calcularHuecos({
     for (
       var m = aMinutos(rango.inicio);
       m + duracion <= finRango;
-      m += pasoMinutos
+      m += reglas.pasoMinutos
     ) {
       final hora = aHora(m);
       final inicio = _conMinutos(fecha, m);
@@ -233,11 +235,7 @@ List<Hueco> calcularHuecos({
                 inicio.isBefore(c.fin.add(margenDuracion)) &&
                 c.inicio.subtract(margenDuracion).isBefore(fin),
           ),
-          periodo: m < 12 * 60
-              ? Periodo.manana
-              : m < 19 * 60
-              ? Periodo.tarde
-              : Periodo.noche,
+          periodo: periodoDe(m, reglas),
         ),
       );
     }
@@ -246,6 +244,14 @@ List<Hueco> calcularHuecos({
   return huecos..sort((a, b) => a.inicio.compareTo(b.inicio));
 }
 
+/// Mañana, tarde o noche según los cortes de la clínica.
+Periodo periodoDe(int minutoDelDia, ReglasAgendamiento reglas) =>
+    minutoDelDia < reglas.minutoInicioTarde
+    ? Periodo.manana
+    : minutoDelDia < reglas.minutoInicioNoche
+    ? Periodo.tarde
+    : Periodo.noche;
+
 /// Los huecos agrupados por periodo, en orden: mañana, tarde, noche.
 Map<Periodo, List<Hueco>> agruparPorPeriodo(List<Hueco> huecos) => {
   for (final periodo in Periodo.values)
@@ -253,18 +259,23 @@ Map<Periodo, List<Hueco>> agruparPorPeriodo(List<Hueco> huecos) => {
 };
 
 /// El «ahora» contra el que se ofrecen horarios: la hora actual más la
-/// anticipación mínima.
-DateTime ahoraConAnticipacion(DateTime ahora) =>
-    ahora.add(const Duration(minutes: minutosAnticipacion));
+/// anticipación mínima de la clínica.
+DateTime ahoraConAnticipacion(DateTime ahora, ReglasAgendamiento reglas) =>
+    ahora.add(Duration(minutes: reglas.minutosAnticipacion));
 
 /// Si hoy todavía cabe una cita de `duracion` minutos con el médico.
 ///
 /// Igual que en el web: hoy vale si no está bloqueado y algún turno termina
 /// lo bastante tarde como para que quepa una cita después de «ahora» (con la
 /// anticipación ya sumada).
-bool quedaHoy(MedicoConAgenda medico, int duracion, DateTime ahora) {
+bool quedaHoy(
+  MedicoConAgenda medico,
+  int duracion,
+  DateTime ahora,
+  ReglasAgendamiento reglas,
+) {
   final hoy = inicioDelDia(ahora);
-  final limite = ahoraConAnticipacion(ahora);
+  final limite = ahoraConAnticipacion(ahora, reglas);
 
   return bloqueoEn(medico, hoy) == null &&
       rangosDelDia(medico.horariosAtencion, hoy).any(
@@ -280,44 +291,57 @@ DateTime? primerDiaConAtencion(
   MedicoConAgenda medico,
   int duracion,
   DateTime ahora,
+  ReglasAgendamiento reglas,
 ) {
   final hoy = inicioDelDia(ahora);
 
-  return quedaHoy(medico, duracion, ahora)
+  return quedaHoy(medico, duracion, ahora, reglas)
       ? hoy
-      : siguienteDiaConAtencion(medico, hoy);
+      : siguienteDiaConAtencion(medico, hoy, reglas: reglas);
 }
 
 /// «Hoy», «Lun 28 sep» o «Sin fechas próximas», para la tarjeta del médico.
-String proximaFecha(MedicoConAgenda medico, int duracion, DateTime ahora) {
+String proximaFecha(
+  MedicoConAgenda medico,
+  int duracion,
+  DateTime ahora,
+  ReglasAgendamiento reglas,
+) {
   final hoy = inicioDelDia(ahora);
 
-  if (quedaHoy(medico, duracion, ahora)) return 'Hoy';
+  if (quedaHoy(medico, duracion, ahora, reglas)) return 'Hoy';
 
-  final dia = siguienteDiaConAtencion(medico, hoy);
+  final dia = siguienteDiaConAtencion(medico, hoy, reglas: reglas);
 
   return dia == null ? 'Sin fechas próximas' : FormatoFecha.diaMedio(dia);
 }
 
 /// Los próximos días con atención a partir de `desde` (incluido si atiende),
-/// para la tira de fechas. Salta los días que no trabaja y los bloqueados.
+/// para la tira de fechas. Salta los días que no trabaja y los bloqueados, y
+/// no pasa de [hasta] (el horizonte de la clínica).
 List<DateTime> diasConAtencion(
   MedicoConAgenda medico,
   DateTime desde, {
+  required ReglasAgendamiento reglas,
+  DateTime? hasta,
   int cantidad = 21,
 }) {
   final dias = <DateTime>[];
   final inicio = inicioDelDia(desde);
+  final limite = hasta == null ? null : inicioDelDia(hasta);
 
   if (rangosDelDia(medico.horariosAtencion, inicio).isNotEmpty &&
-      bloqueoEn(medico, inicio) == null) {
+      bloqueoEn(medico, inicio) == null &&
+      (limite == null || !inicio.isAfter(limite))) {
     dias.add(inicio);
   }
 
   var cursor = inicio;
   while (dias.length < cantidad) {
-    final siguiente = siguienteDiaConAtencion(medico, cursor);
-    if (siguiente == null) break;
+    final siguiente = siguienteDiaConAtencion(medico, cursor, reglas: reglas);
+    if (siguiente == null || (limite != null && siguiente.isAfter(limite))) {
+      break;
+    }
 
     dias.add(siguiente);
     cursor = siguiente;

@@ -17,7 +17,7 @@
 /// parezca funcionar en un teléfono configurado en UTC.
 library;
 
-import '../config/entorno.dart';
+import 'zona_clinica.dart';
 
 final RegExp _fechaConHora = RegExp(
   r'^(\d{4})-(\d{2})-(\d{2})'
@@ -121,11 +121,12 @@ DateTime sumarDias(DateTime fecha, int dias) =>
 
 /// La hora de la clínica, con el mismo criterio que las fechas de la API.
 ///
-/// Las reglas que dependen del reloj —las 12 horas para cambiar una cita,
-/// qué horarios ya pasaron, cuánto falta— se comparan contra la hora de la
-/// clínica, no contra la del teléfono: alguien de viaje con el teléfono en
-/// otra zona vería citas «en el pasado» que todavía no ocurrieron. Ecuador
-/// continental está en UTC−5 todo el año, así que basta con restar.
+/// Las reglas que dependen del reloj —las horas mínimas para cambiar una
+/// cita, qué horarios ya pasaron, cuánto falta— se comparan contra la hora de
+/// la clínica, no contra la del teléfono: alguien de viaje con el teléfono en
+/// otra zona vería citas «en el pasado» que todavía no ocurrieron. La zona es
+/// la de la configuración pública (`clinica.zonaHoraria`, ver
+/// [ZonaClinica]).
 ///
 /// Se inyecta para que las pruebas fijen el «ahora».
 class RelojClinica {
@@ -139,18 +140,29 @@ class RelojClinica {
       RelojClinica._fijo(horaLocal);
 
   RelojClinica._fijo(DateTime horaLocal)
-    : _fuente = (() => DateTime.utc(
-        horaLocal.year,
-        horaLocal.month,
-        horaLocal.day,
-        horaLocal.hour,
-        horaLocal.minute,
-        horaLocal.second,
-      ).subtract(Entorno.desfaseClinica));
+    : _fuente = (() => _instanteDe(horaLocal));
+
+  /// El instante UTC que en la clínica se lee como [horaLocal].
+  static DateTime _instanteDe(DateTime horaLocal) {
+    final comoUtc = DateTime.utc(
+      horaLocal.year,
+      horaLocal.month,
+      horaLocal.day,
+      horaLocal.hour,
+      horaLocal.minute,
+      horaLocal.second,
+    );
+
+    // Dos pasadas: el desfase de una zona con horario de verano depende del
+    // instante, y la primera aproximación puede caer al otro lado del cambio.
+    final aproximado = comoUtc.subtract(ZonaClinica.desfaseEn(comoUtc));
+    return comoUtc.subtract(ZonaClinica.desfaseEn(aproximado));
+  }
 
   /// La hora de la clínica ahora mismo, como fecha local sin zona.
   DateTime ahora() {
-    final enClinica = _fuente().toUtc().add(Entorno.desfaseClinica);
+    final instante = _fuente().toUtc();
+    final enClinica = instante.add(ZonaClinica.desfaseEn(instante));
 
     return DateTime(
       enClinica.year,

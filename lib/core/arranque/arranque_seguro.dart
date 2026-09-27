@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../configuracion/en_contexto.dart';
 import '../tema/tokens.dart';
 
 /// Que un fallo al arrancar se vea, en lugar de dejar la pantalla en negro.
@@ -66,6 +67,16 @@ class PantallaDeFallo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // El contacto de la clínica, si ya se conoce. Va como texto y no como
+    // botón: esta pantalla se pinta cuando algo ya se rompió, sin tema ni
+    // Material alrededor, y no puede arriesgarse a romperse ella también.
+    final clinica = context.configSiHay?.clinica;
+    final contacto = [
+      if (clinica != null && clinica.telefono.isNotEmpty) clinica.telefono,
+      if (clinica != null && clinica.correoContacto.isNotEmpty)
+        clinica.correoContacto,
+    ].join(' · ');
+
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Container(
@@ -100,6 +111,18 @@ class PantallaDeFallo extends StatelessWidget {
                   fontSize: 13,
                 ),
               ),
+              if (contacto.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                SelectableText(
+                  contacto,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textoSuave,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               SelectableText(
                 mensaje,

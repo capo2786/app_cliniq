@@ -28,9 +28,8 @@ class AdaptadorHttpFalso implements HttpClientAdapter {
     Stream<Uint8List>? requestStream,
     Future<void>? cancelFuture,
   ) async {
-    final ruta = Uri.parse(
-      options.uri.toString(),
-    ).path.replaceFirst('/api', '');
+    final ruta = Uri.parse(options.uri.toString()).path
+        .replaceFirst('/api', '');
     final clave = '${options.method} ${ruta.isEmpty ? '/' : ruta}';
     pedidas.add(clave);
 

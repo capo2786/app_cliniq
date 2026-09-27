@@ -34,9 +34,11 @@ class Entorno {
   /// ese formulario (cédula, términos, confirmación por correo), lo abre.
   static String get urlRegistro => '$webUrl/registro';
 
-  /// La zona de la clínica. Ecuador continental no aplica horario de verano.
-  static const String zonaHoraria = 'America/Guayaquil';
-
-  /// Diferencia fija de la clínica con UTC (Ecuador continental: UTC−5).
-  static const Duration desfaseClinica = Duration(hours: -5);
+  /// Una ruta del panel web, para lo que la aplicación no tiene pantalla
+  /// propia (un enlace del menú que no conoce): `/mi-salud` →
+  /// `https://<web>/mi-salud`.
+  static String urlWeb(String ruta) {
+    final limpia = ruta.trim();
+    return '$webUrl${limpia.startsWith('/') ? '' : '/'}$limpia';
+  }
 }

@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../../core/archivos/archivo_local.dart';
 import '../../../../core/archivos/archivo_meta.dart';
 import '../../../../core/archivos/archivos_service.dart';
 import '../../../../core/archivos/selector_de_archivos.dart';
+import '../../../../core/configuracion/config_publica.dart';
+import '../../../../core/configuracion/config_publica_cubit.dart';
 import '../../../../core/network/errores.dart';
 import '../../../../core/presentacion/avisos.dart';
 import '../../../../core/servicios.dart';
@@ -16,12 +20,15 @@ enum OrigenDeArchivo { camara, galeria, archivos }
 /// Pregunta de dónde sacar el archivo y lo trae: la cámara, la galería o los
 /// archivos del teléfono. `null` si la persona cerró la hoja sin elegir.
 ///
-/// Con [varios], la galería y los archivos dejan elegir más de uno.
+/// Con [varios], la galería y los archivos dejan elegir más de uno. Los tipos
+/// y el tamaño que se aceptan son los de la configuración de la clínica.
 Future<SeleccionDeArchivos?> elegirArchivos(
   BuildContext context, {
   bool varios = true,
   SelectorDeArchivos? selector,
 }) async {
+  final reglas = context.read<ConfigPublicaCubit>().config.archivos;
+
   final origen = await showModalBottomSheet<OrigenDeArchivo>(
     context: context,
     isScrollControlled: true,
@@ -30,7 +37,7 @@ Future<SeleccionDeArchivos?> elegirArchivos(
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
     ),
-    builder: (contexto) => _HojaDeOrigen(varios: varios),
+    builder: (contexto) => _HojaDeOrigen(varios: varios, reglas: reglas),
   );
 
   if (origen == null) return null;
@@ -39,9 +46,9 @@ Future<SeleccionDeArchivos?> elegirArchivos(
 
   try {
     return switch (origen) {
-      OrigenDeArchivo.camara => await elegir.tomarFoto(),
-      OrigenDeArchivo.galeria => await elegir.elegirFotos(),
-      OrigenDeArchivo.archivos => await elegir.elegirDocumentos(),
+      OrigenDeArchivo.camara => await elegir.tomarFoto(reglas),
+      OrigenDeArchivo.galeria => await elegir.elegirFotos(reglas),
+      OrigenDeArchivo.archivos => await elegir.elegirDocumentos(reglas),
     };
   } on PlatformException catch (error) {
     // Sin permiso de cámara, sin cámara, o el selector no abrió.
@@ -52,13 +59,13 @@ Future<SeleccionDeArchivos?> elegirArchivos(
         switch (origen) {
           OrigenDeArchivo.camara =>
             permiso
-                ? 'Cliniq no tiene permiso para usar la cámara. Actívalo en los '
-                      'ajustes del teléfono.'
+                ? 'La aplicación no tiene permiso para usar la cámara. Actívalo '
+                      'en los ajustes del teléfono.'
                 : 'No pudimos abrir la cámara.',
           OrigenDeArchivo.galeria =>
             permiso
-                ? 'Cliniq no tiene permiso para ver tus fotos. Actívalo en los '
-                      'ajustes del teléfono.'
+                ? 'La aplicación no tiene permiso para ver tus fotos. Actívalo '
+                      'en los ajustes del teléfono.'
                 : 'No pudimos abrir la galería.',
           OrigenDeArchivo.archivos => 'No pudimos abrir tus archivos.',
         },
@@ -73,8 +80,9 @@ Future<SeleccionDeArchivos?> elegirArchivos(
 
 class _HojaDeOrigen extends StatelessWidget {
   final bool varios;
+  final ReglasArchivos reglas;
 
-  const _HojaDeOrigen({required this.varios});
+  const _HojaDeOrigen({required this.varios, required this.reglas});
 
   @override
   Widget build(BuildContext context) {
@@ -143,12 +151,12 @@ class _HojaDeOrigen extends StatelessWidget {
               ),
             ),
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(22, 0, 22, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
             child: Text(
-              'PDF, JPG o PNG de hasta 20 MB. Las fotos se reducen para que '
+              '${loQueSePuedeAdjuntar(reglas)}. Las fotos se reducen para que '
               'suban rápido sin perder lo que se lee.',
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.textoSecundario,
                 fontSize: 12.5,
                 height: 1.4,
@@ -171,7 +179,7 @@ class _HojaDeOrigen extends StatelessWidget {
             OrigenDeArchivo.archivos,
             Icons.picture_as_pdf_outlined,
             varios ? 'Elegir archivos' : 'Elegir un archivo',
-            'Un PDF o una imagen guardada',
+            'Un documento o una imagen guardada',
           ),
         ],
       ),

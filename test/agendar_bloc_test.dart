@@ -12,6 +12,7 @@ import 'package:app_cliniq/features/dependientes/data/models/dependiente.dart';
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dobles/clinica.dart';
 import 'dobles/dobles.dart';
 
 /// El agendamiento paso a paso, con un portal falso.
@@ -80,12 +81,14 @@ void main() {
     );
   });
 
-  AgendarBloc crear() => AgendarBloc(
+  AgendarBloc crear({Map<String, dynamic>? agenda}) => AgendarBloc(
     portal: portal,
     dependientes: DependientesFalso(const [tomas]),
-    catalogos: CatalogosFalso(),
     uid: 'u1',
     nombreTitular: 'Ana María Pérez',
+    reglas: reglasDePrueba(agenda: agenda),
+    especialidades: catalogosDePrueba().especialidades,
+    ciudades: catalogosDePrueba().ciudades,
     reloj: reloj,
   );
 
@@ -115,8 +118,10 @@ void main() {
       expect(s.paso, PasoAgendar.paciente);
       expect(s.medicos, hasLength(2));
       expect(s.dependientes, [tomas]);
+      // En el orden de los catálogos; lo que no está en el catálogo, al
+      // final.
       expect(s.especialidadesConMedicos, ['Pediatría', 'Cardiología']);
-      expect(s.ciudades, ['Guayaquil', 'Quito']);
+      expect(s.ciudades, ['Quito', 'Guayaquil']);
     },
   );
 
@@ -142,6 +147,31 @@ void main() {
       expect(s.tipo, TipoCita.presencial);
       expect(s.ocupados, hasLength(1));
       expect(portal.consultasDeOcupados, 1);
+    },
+  );
+
+  test(
+    'los horarios siguen la rejilla y las duraciones de la clínica',
+    () async {
+      final bloc = crear(agenda: {'pasoMinutos': 60, 'duracionPresencial': 45})
+        ..add(const AgendarIniciado());
+      await hasta(bloc, (s) => !s.cargando);
+
+      bloc.add(const AgendarMedicoElegido('ped'));
+      await hasta(
+        bloc,
+        (s) =>
+            s.medicoId == 'ped' && !s.cargandoOcupados && s.ocupados.isNotEmpty,
+      );
+
+      final s = bloc.state;
+      expect(s.duracion, 45, reason: 'el médico no configuró la suya');
+      // Turno 08:00–12:00 cada 60 minutos, con citas de 45: la de las 11:00
+      // todavía cabe entera. 09:00 choca con lo ocupado (09:00–09:30).
+      expect(s.huecos.map((h) => h.hora), ['08:00', '09:00', '10:00', '11:00']);
+      expect(s.huecos[1].ocupado, isTrue);
+
+      await bloc.close();
     },
   );
 

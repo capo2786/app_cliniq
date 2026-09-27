@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
+import '../../../core/configuracion/config_publica_cubit.dart';
 import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
@@ -43,6 +44,7 @@ class NuevaConsultaPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final usuario = context.read<AuthBloc>().usuario;
+    final config = context.read<ConfigPublicaCubit>().config;
 
     return BlocProvider(
       create: (_) => NuevaConsultaBloc(
@@ -50,6 +52,8 @@ class NuevaConsultaPage extends StatelessWidget {
         dependientes: Servicios.dependientes,
         uid: usuario?.uid ?? '',
         nombreTitular: usuario?.nombre ?? '',
+        maximoAdjuntos: config.telemedicina.maxArchivosConsulta,
+        archivos: config.archivos,
         puedeDependientes: usuario?.puede(Permisos.dependientes) ?? false,
       )..add(NuevaConsultaIniciada(borradorId: borradorId, para: para)),
       child: _VistaNuevaConsulta(borradorId: borradorId, para: para),

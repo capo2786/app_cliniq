@@ -7,9 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/consultas.dart';
 
+import 'package:app_cliniq/core/fechas/zona_clinica.dart';
+
 /// Las reglas puras de las consultas en línea: el plazo, el formulario y
 /// cómo se enseñan las respuestas.
 void main() {
+  // La zona de la clínica llega de su configuración (`clinica.zonaHoraria`).
+  setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
+
   ConsultaResumen resumen(Map<String, dynamic> json) =>
       ConsultaResumen.desdeJson(json);
 

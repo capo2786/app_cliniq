@@ -2,10 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/fechas/fecha_local.dart';
 import '../../../../core/integraciones/costuras.dart';
 import '../../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../../core/presentacion/widgets/botones.dart';
+import '../../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
@@ -15,15 +17,15 @@ import '../../dominio/videoconsulta.dart';
 
 /// «Entrar a la videoconsulta», para una cita de telemedicina.
 ///
-/// Se enciende 120 minutos antes del inicio y se apaga 240 minutos después
-/// del fin: la ventana más amplia que la clínica puede configurar (ver
-/// `maximoMinutosAntesDeLaSala`). Antes se ve apagado y dice desde cuándo se
-/// podrá entrar; después ya no se ve. Se vuelve a mirar el reloj cada 30
-/// segundos, así el botón se enciende solo con la pantalla abierta. Al
-/// tocarlo se pide la sala al servidor y se abre en el navegador; si el
-/// servidor dice que no —la sala todavía no abre o ya cerró con la
-/// configuración de la clínica (409), o no está configurada (503)—, se
-/// enseña su explicación.
+/// Se enciende los minutos antes del inicio y se apaga los minutos después
+/// del fin que dice la configuración de la clínica
+/// (`telemedicina.minutosAntes` y `minutosDespues`). Antes se ve apagado y
+/// dice a qué hora abre la sala; después ya no se ve. Se vuelve a mirar el
+/// reloj cada 30 segundos, así el botón se enciende solo con la pantalla
+/// abierta. Al tocarlo se pide la sala al servidor y se abre en el
+/// navegador; si el servidor dice que no (409, o 503 si la videoconsulta no
+/// está configurada), se enseña su explicación con el contacto de la
+/// clínica.
 class BotonVideoconsulta extends StatefulWidget {
   final Cita cita;
 
@@ -90,7 +92,8 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
   @override
   Widget build(BuildContext context) {
     final ahora = _reloj.ahora();
-    final estado = estadoDeSala(widget.cita, ahora);
+    final ventana = VentanaDeSala.de(context.config.telemedicina);
+    final estado = estadoDeSala(widget.cita, ahora, ventana);
 
     if (estado == EstadoSala.noAplica || estado == EstadoSala.cerrada) {
       return const SizedBox.shrink();
@@ -136,12 +139,14 @@ class _BotonVideoconsultaState extends State<BotonVideoconsulta> {
                       'Internet.'
                 : abierta
                 ? avisoPermisosDeVideo
-                : '${cuandoAbreLaSala(widget.cita, ahora)} '
+                : '${cuandoAbreLaSala(widget.cita, ahora, ventana)} '
                       '$avisoPermisosDeVideo',
           ),
           if (_error != null) ...[
             const SizedBox(height: 10),
             RecuadroAviso.error(_error!),
+            const SizedBox(height: 4),
+            const ContactoClinica(),
           ],
         ],
       ),

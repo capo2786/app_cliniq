@@ -2,8 +2,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../configuracion/config_publica.dart';
 import 'archivo_local.dart';
-import 'archivo_meta.dart';
 
 /// Lo que se eligió: los archivos que se pudieron leer y, de los que no, por
 /// qué.
@@ -23,15 +23,25 @@ class SeleccionDeArchivos {
 
 /// De dónde salen los adjuntos: la cámara, la galería o los archivos.
 ///
-/// Es una interfaz para que las pruebas elijan «archivos» sin cámara ni
-/// selector del sistema.
+/// Las [reglas] son las de la configuración de la clínica: qué tipos se
+/// pueden elegir y hasta qué tamaño. Es una interfaz para que las pruebas
+/// elijan «archivos» sin cámara ni selector del sistema.
 abstract class SelectorDeArchivos {
-  Future<SeleccionDeArchivos> tomarFoto();
+  Future<SeleccionDeArchivos> tomarFoto(ReglasArchivos reglas);
 
-  Future<SeleccionDeArchivos> elegirFotos();
+  Future<SeleccionDeArchivos> elegirFotos(ReglasArchivos reglas);
 
-  Future<SeleccionDeArchivos> elegirDocumentos();
+  Future<SeleccionDeArchivos> elegirDocumentos(ReglasArchivos reglas);
 }
+
+/// El identificador de tipo de iOS de cada tipo MIME que se sabe reconocer.
+const Map<String, String> _identificadoresDeTipo = {
+  'application/pdf': 'com.adobe.pdf',
+  'image/jpeg': 'public.jpeg',
+  'image/png': 'public.png',
+  'image/webp': 'org.webmproject.webp',
+  'image/heic': 'public.heic',
+};
 
 /// Los selectores del teléfono.
 ///
@@ -49,7 +59,7 @@ class SelectorDelSistema implements SelectorDeArchivos {
   SelectorDelSistema([ImagePicker? fotos]) : _fotos = fotos ?? ImagePicker();
 
   @override
-  Future<SeleccionDeArchivos> tomarFoto() async {
+  Future<SeleccionDeArchivos> tomarFoto(ReglasArchivos reglas) async {
     final foto = await _fotos.pickImage(
       source: ImageSource.camera,
       imageQuality: calidadFotos,
@@ -58,11 +68,11 @@ class SelectorDelSistema implements SelectorDeArchivos {
       requestFullMetadata: false,
     );
 
-    return foto == null ? SeleccionDeArchivos.nada : _leer([foto]);
+    return foto == null ? SeleccionDeArchivos.nada : _leer([foto], reglas);
   }
 
   @override
-  Future<SeleccionDeArchivos> elegirFotos() async {
+  Future<SeleccionDeArchivos> elegirFotos(ReglasArchivos reglas) async {
     final fotos = await _fotos.pickMultiImage(
       imageQuality: calidadFotos,
       maxWidth: ladoMaximoFotos,
@@ -72,26 +82,36 @@ class SelectorDelSistema implements SelectorDeArchivos {
       requestFullMetadata: false,
     );
 
-    return _leer(fotos);
+    return _leer(fotos, reglas);
   }
 
   @override
-  Future<SeleccionDeArchivos> elegirDocumentos() async {
-    const tipos = XTypeGroup(
-      label: 'PDF, JPG o PNG',
-      extensions: ['pdf', 'jpg', 'jpeg', 'png'],
-      mimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
-      uniformTypeIdentifiers: ['com.adobe.pdf', 'public.jpeg', 'public.png'],
+  Future<SeleccionDeArchivos> elegirDocumentos(ReglasArchivos reglas) async {
+    final conocidos = [
+      for (final tipo in reglas.tipos)
+        if (extensionesPorTipo.containsKey(tipo)) tipo,
+    ];
+
+    final tipos = XTypeGroup(
+      label: formatosLegibles(conocidos),
+      extensions: [for (final t in conocidos) ...extensionesPorTipo[t]!],
+      mimeTypes: conocidos,
+      uniformTypeIdentifiers: [
+        for (final t in conocidos) ?_identificadoresDeTipo[t],
+      ],
     );
 
-    final archivos = await openFiles(acceptedTypeGroups: const [tipos]);
+    final archivos = await openFiles(acceptedTypeGroups: [tipos]);
 
-    return _leer(archivos);
+    return _leer(archivos, reglas);
   }
 
-  /// Lee los bytes de lo elegido. Lo que pasa de 20 MB ni se lee: no se va a
-  /// poder subir y cargarlo en memoria solo gastaría batería.
-  Future<SeleccionDeArchivos> _leer(List<XFile> elegidos) async {
+  /// Lee los bytes de lo elegido. Lo que pasa del tope de la clínica ni se
+  /// lee: no se va a poder subir y cargarlo en memoria solo gastaría batería.
+  Future<SeleccionDeArchivos> _leer(
+    List<XFile> elegidos,
+    ReglasArchivos reglas,
+  ) async {
     final archivos = <ArchivoLocal>[];
     final problemas = <String>[];
 
@@ -99,11 +119,8 @@ class SelectorDelSistema implements SelectorDeArchivos {
       try {
         final tamano = await elegido.length();
 
-        if (tamano > tamanoMaximoArchivo) {
-          problemas.add(
-            '«${elegido.name}» pesa ${tamanoLegible(tamano)} y el máximo es '
-            '20 MB.',
-          );
+        if (tamano > reglas.tamanoMaximoBytes) {
+          problemas.add(demasiadoGrande(elegido.name, tamano, reglas));
           continue;
         }
 

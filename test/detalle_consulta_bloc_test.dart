@@ -15,6 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/consultas.dart';
 import 'dobles/dobles.dart';
+import 'dobles/clinica.dart';
 
 /// El detalle de una consulta: cargar, el sondeo cada 30 segundos, escribir
 /// con o sin archivo y cancelar.
@@ -66,6 +67,7 @@ void main() {
     servicio: servicio,
     uid: 'u1',
     id: 'c1',
+    archivos: configDePrueba().archivos,
     latidos: () => latidos.stream,
   );
 
@@ -332,11 +334,10 @@ void main() {
         await esperar(bloc, (s) => s.carga == CargaDetalle.cargando);
         await esperar(bloc, (s) => s.carga == CargaDetalle.lista);
       },
-      verify: (_) => expect(
-        servicio.llamadas,
-        ['detalle:c1', 'detalle:c1'],
-        reason: 'el latido silencioso no preguntó; la carga a mano sí',
-      ),
+      verify: (_) => expect(servicio.llamadas, [
+        'detalle:c1',
+        'detalle:c1',
+      ], reason: 'el latido silencioso no preguntó; la carga a mano sí'),
     );
 
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(

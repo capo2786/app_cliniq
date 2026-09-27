@@ -1,5 +1,6 @@
 // test/citas_bloc_test.dart
 
+import 'package:app_cliniq/core/configuracion/config_publica.dart';
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/citas/data/citas_service.dart';
@@ -11,6 +12,7 @@ import 'package:bloc_test/bloc_test.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'dobles/clinica.dart';
 import 'dobles/dobles.dart';
 
 /// Un Dio que contesta desde una función, para probar el servicio real con
@@ -52,11 +54,13 @@ void main() {
     late CacheLocal cache;
     late bool hayRed;
     late ProgramadorFalso programador;
+    late ConfigPublica? config;
 
     setUp(() {
       cache = CacheEnMemoria();
       hayRed = true;
       programador = ProgramadorFalso();
+      config = configDePrueba();
     });
 
     CitasBloc crear() {
@@ -82,6 +86,8 @@ void main() {
         portal: PortalFalso(),
         recordatorios: programador,
         reloj: reloj,
+        config: () => config,
+        catalogos: catalogosDePrueba,
       );
     }
 
@@ -97,7 +103,12 @@ void main() {
 
         expect(s.citas, hasLength(2));
         expect(s.desdeCache, isFalse);
-        expect(programador.programados.single, hasLength(2));
+        // La cita pendiente, 24 h y 1 h antes (lo que la clínica tiene
+        // encendido); la atendida, ninguno.
+        expect(programador.programados.single.map((r) => r.momento), [
+          DateTime(2026, 9, 30, 9),
+          DateTime(2026, 10, 1, 8),
+        ]);
         expect(await cache.leer('citas:u1'), isNotNull);
 
         await bloc.close();
@@ -139,6 +150,67 @@ void main() {
       await bloc.close();
     });
 
+    test('la clínica apagó los recordatorios: se cancelan todos', () async {
+      config = configDePrueba(agenda: {'recordatoriosActivos': false});
+
+      final bloc = crear()..add(const CitasSolicitadas('u1'));
+      await bloc.stream.firstWhere((s) => s.carga == CargaCitas.lista);
+
+      expect(
+        programador.programados.single,
+        isEmpty,
+        reason: 'programar una lista vacía cancela lo que hubiera',
+      );
+
+      await bloc.close();
+    });
+
+    test('solo suenan los que la clínica tiene encendidos', () async {
+      config = configDePrueba(
+        agenda: {
+          'recordatorio24h': false,
+          'recordatorio1h': false,
+          'recordatorioInicio': true,
+        },
+      );
+
+      final bloc = crear()..add(const CitasSolicitadas('u1'));
+      await bloc.stream.firstWhere((s) => s.carga == CargaCitas.lista);
+
+      final recordatorio = programador.programados.single.single;
+      expect(recordatorio.momento, DateTime(2026, 10, 1, 9));
+      expect(recordatorio.titulo, 'La cita empieza ahora');
+
+      await bloc.close();
+    });
+
+    test('si la configuración cambia, se reprograman con la nueva (y se '
+        'cancelan si la apagaron)', () async {
+      final bloc = crear()..add(const CitasSolicitadas('u1'));
+      await bloc.stream.firstWhere((s) => s.carga == CargaCitas.lista);
+      expect(programador.programados.single, hasLength(2));
+
+      config = configDePrueba(agenda: {'recordatoriosActivos': false});
+      bloc.add(const CitasRecordatoriosRevisados());
+      await pumpEventQueue();
+
+      expect(programador.programados, hasLength(2));
+      expect(programador.programados.last, isEmpty);
+
+      await bloc.close();
+    });
+
+    test('sin configuración todavía no se programa nada', () async {
+      config = null;
+
+      final bloc = crear()..add(const CitasSolicitadas('u1'));
+      await bloc.stream.firstWhere((s) => s.carga == CargaCitas.lista);
+
+      expect(programador.programados, isEmpty);
+
+      await bloc.close();
+    });
+
     blocTest<CitasBloc, CitasState>(
       'al cerrar sesión se vacía',
       build: crear,
@@ -173,6 +245,8 @@ void main() {
         portal: PortalFalso(),
         recordatorios: ProgramadorFalso(),
         reloj: reloj,
+        config: configDePrueba,
+        catalogos: catalogosDePrueba,
       )..emit(CitasState(carga: CargaCitas.lista, citas: [cita]));
 
       bloc.add(

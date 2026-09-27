@@ -43,6 +43,7 @@ class PasoMedico extends StatelessWidget {
           _TarjetaMedico(
             medico: medico,
             ahora: state.ahora,
+            reglas: state.reglas,
             elegido: state.medicoId == medico.uid,
             onTap: () => bloc.add(AgendarMedicoElegido(medico.uid)),
           ),
@@ -56,12 +57,14 @@ class PasoMedico extends StatelessWidget {
 class _TarjetaMedico extends StatelessWidget {
   final MedicoPortal medico;
   final DateTime ahora;
+  final ReglasAgendamiento reglas;
   final bool elegido;
   final VoidCallback onTap;
 
   const _TarjetaMedico({
     required this.medico,
     required this.ahora,
+    required this.reglas,
     required this.elegido,
     required this.onTap,
   });
@@ -81,8 +84,9 @@ class _TarjetaMedico extends StatelessWidget {
     final modalidades = medico.modalidadesOfrecidas;
     final proxima = proximaFecha(
       medico,
-      duracionDe(medico, modalidades.first),
+      duracionDe(medico, modalidades.first, reglas),
       ahora,
+      reglas,
     );
     final sinFechas = proxima == 'Sin fechas próximas';
 
@@ -118,7 +122,7 @@ class _TarjetaMedico extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      medico.nombreVisible,
+                      medico.nombre,
                       style: const TextStyle(
                         color: AppColors.texto,
                         fontSize: 15.5,
@@ -126,16 +130,14 @@ class _TarjetaMedico extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      [
-                        medico.especialidad ?? 'Medicina',
-                        if (medico.ciudad != null) medico.ciudad!,
-                      ].join(' · '),
-                      style: const TextStyle(
-                        color: AppColors.textoSecundario,
-                        fontSize: 12.5,
+                    if (medico.especialidad != null || medico.ciudad != null)
+                      Text(
+                        [?medico.especialidad, ?medico.ciudad].join(' · '),
+                        style: const TextStyle(
+                          color: AppColors.textoSecundario,
+                          fontSize: 12.5,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -151,10 +153,16 @@ class _TarjetaMedico extends StatelessWidget {
             runSpacing: 6,
             children: [
               for (final tipo in modalidades)
-                Pastilla(
-                  texto: tipo.nombre,
-                  color: tipo.color,
-                  icono: tipo.icono,
+                Builder(
+                  builder: (context) {
+                    final estilo = context.modalidad(tipo);
+
+                    return Pastilla(
+                      texto: estilo.nombre,
+                      color: estilo.color,
+                      icono: estilo.icono,
+                    );
+                  },
                 ),
             ],
           ),

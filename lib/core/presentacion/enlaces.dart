@@ -33,3 +33,39 @@ Future<void> abrirEnlace(
     );
   }
 }
+
+/// Un teléfono como dirección `tel:`, sin espacios ni guiones (el marcador
+/// del teléfono los ignora, pero algunos no aceptan la dirección con ellos).
+Uri direccionDeTelefono(String numero) =>
+    Uri(scheme: 'tel', path: numero.replaceAll(RegExp(r'[^0-9+*#]'), ''));
+
+/// Un correo como dirección `mailto:`.
+Uri direccionDeCorreo(String correo) =>
+    Uri(scheme: 'mailto', path: correo.trim());
+
+/// Abre el marcador del teléfono con ese número. Si no se puede (una tableta
+/// sin línea), se dice con el número a la vista.
+Future<void> llamar(BuildContext context, String numero) =>
+    _abrirFuera(context, direccionDeTelefono(numero), 'Llama al $numero.');
+
+/// Abre la aplicación de correo con esa dirección.
+Future<void> escribirCorreo(BuildContext context, String correo) =>
+    _abrirFuera(context, direccionDeCorreo(correo), 'Escribe a $correo.');
+
+Future<void> _abrirFuera(
+  BuildContext context,
+  Uri direccion,
+  String siNoAbre,
+) async {
+  var abierto = false;
+
+  try {
+    abierto = await launchUrl(direccion, mode: LaunchMode.externalApplication);
+  } catch (_) {
+    abierto = false;
+  }
+
+  if (!abierto && context.mounted) {
+    mostrarAviso(context, 'No pudimos abrirlo desde aquí. $siNoAbre');
+  }
+}

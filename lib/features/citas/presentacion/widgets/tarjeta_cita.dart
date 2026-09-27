@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/servicios.dart';
@@ -24,10 +25,18 @@ class TarjetaCita extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final apagada = !cita.pendiente;
+    final modalidad = context.modalidad(cita.tipo);
+    final estado = context.estadoCita(cita.estado);
+    final medico = cita.medicoVisible;
+    final sala = estadoDeSala(
+      cita,
+      ahora ?? Servicios.reloj.ahora(),
+      VentanaDeSala.de(context.config.telemedicina),
+    );
 
     return TarjetaTranslucida(
       onTap: onTap,
-      tinte: apagada ? null : cita.tipo.color,
+      tinte: apagada ? null : modalidad.color,
       padding: const EdgeInsets.all(14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -51,17 +60,19 @@ class TarjetaCita extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  cita.medicoVisible,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textoSuave,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
+                if (medico != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    medico,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textoSuave,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
+                ],
                 if (cita.especialidad != null)
                   Text(
                     cita.especialidad!,
@@ -78,14 +89,14 @@ class TarjetaCita extends StatelessWidget {
                   runSpacing: 6,
                   children: [
                     Pastilla(
-                      texto: cita.tipo.nombre,
-                      color: cita.tipo.color,
-                      icono: cita.tipo.icono,
+                      texto: modalidad.nombre,
+                      color: modalidad.color,
+                      icono: modalidad.icono,
                     ),
                     Pastilla(
-                      texto: cita.estado.nombre,
-                      color: cita.estado.color,
-                      icono: cita.estado.icono,
+                      texto: estado.nombre,
+                      color: estado.color,
+                      icono: estado.icono,
                     ),
                     if (cita.paraDependiente)
                       Pastilla(
@@ -94,8 +105,7 @@ class TarjetaCita extends StatelessWidget {
                         color: AppColors.acentoClaro,
                         icono: Icons.family_restroom_rounded,
                       ),
-                    if (estadoDeSala(cita, ahora ?? Servicios.reloj.ahora()) ==
-                        EstadoSala.abierta)
+                    if (sala == EstadoSala.abierta)
                       const Pastilla(
                         texto: 'Sala abierta',
                         color: AppColors.exito,

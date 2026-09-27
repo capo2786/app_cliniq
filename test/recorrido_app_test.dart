@@ -17,6 +17,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import 'dobles/adaptador_http.dart';
+import 'dobles/clinica.dart';
+
+import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 
 /// La aplicación entera, de punta a punta, contra una API de mentira.
 ///
@@ -25,6 +28,10 @@ import 'dobles/adaptador_http.dart';
 /// pestañas y camina el agendamiento. Si una pantalla lanza al pintarse o se
 /// desborda, falla aquí.
 void main() {
+  // Las horas de la prueba se arman en la zona de la clínica, la misma que
+  // la aplicación toma de su configuración.
+  ZonaClinica.aplicar('America/Guayaquil');
+
   late AdaptadorHttpFalso api;
   late bool legalesAceptados;
 
@@ -195,20 +202,7 @@ void main() {
           },
         ],
       ),
-      'GET /catalogos/lote': (_) => (
-        estado: 200,
-        cuerpo: {
-          'MOTIVO_CANCELACION': [
-            {'nombre': 'Otro motivo'},
-          ],
-          'ESPECIALIDAD': [
-            {'nombre': 'Pediatría'},
-          ],
-          'PARENTESCO': [
-            {'nombre': 'Hijo/a'},
-          ],
-        },
-      ),
+      ...rutasDeLaClinica(),
       'GET /portal/medicos': (_) => (estado: 200, cuerpo: [medico()]),
       'GET /portal/disponibilidad/doc1': (_) => (estado: 200, cuerpo: []),
       'POST /portal/citas': (o) {
@@ -310,14 +304,14 @@ void main() {
     // 3. El inicio, con la próxima cita y los accesos rápidos.
     expect(find.byType(DashboardPage), findsOneWidget);
     expect(find.text('Hola, Ana'), findsOneWidget);
-    expect(find.text('Dr(a). Luis Mora'), findsWidgets);
+    expect(find.text('Luis Mora'), findsWidgets);
     expect(find.text('Cómo prepararte'), findsOneWidget);
     expect(find.textContaining('Llega 10 minutos antes'), findsOneWidget);
 
     // 4. Citas: próximas e historial, con el detalle.
     await tocar(tester, find.text('Citas').last);
     expect(find.text('Tus citas'), findsOneWidget);
-    await tocar(tester, find.text('Dr(a). Luis Mora').last);
+    await tocar(tester, find.text('Luis Mora').last);
     await bajarEnLaHoja(tester, find.text('Cancelar cita'));
     expect(find.text('Reprogramar'), findsOneWidget);
     expect(find.text('Cancelar cita'), findsOneWidget);
@@ -359,7 +353,7 @@ void main() {
     await tocar(tester, find.text('Continuar'));
     expect(find.text('Elige al médico'), findsOneWidget);
 
-    await tocar(tester, find.text('Dr(a). Luis Mora'));
+    await tocar(tester, find.text('Luis Mora'));
     expect(find.text('¿Cómo quieres la consulta?'), findsOneWidget);
 
     await tocar(tester, find.text('Telemedicina'));
@@ -401,7 +395,7 @@ void main() {
     // Cancelar: la hoja pide un motivo del catálogo.
     await tocar(tester, find.text('Citas').last);
     await tocar(tester, find.text('Próximas'));
-    await tocar(tester, find.text('Dr(a). Luis Mora').last);
+    await tocar(tester, find.text('Luis Mora').last);
     await bajarEnLaHoja(tester, find.text('Cancelar cita'));
     await tocar(tester, find.text('Cancelar cita'));
     expect(find.text('¿Cancelar la cita?'), findsOneWidget);

@@ -1,33 +1,42 @@
+import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/catalogos/catalogos_cubit.dart';
 import '../data/models/cita.dart';
 
-/// Horas de anticipación que exige la clínica para cancelar o reprogramar.
-///
-/// Es la misma regla del servidor (`HORAS_MINIMAS_CAMBIO`, 12 por defecto) y
-/// del panel web. La aplicación la aplica antes para no ofrecer un botón que
-/// solo llevaría a un error: el servidor la vuelve a comprobar igual.
-const int horasMinimasCambio = 12;
+/*
+ * Las horas de anticipación para cancelar o reprogramar son las de la
+ * configuración de la clínica (`agenda.horasMinimasCambio`), las mismas que
+ * aplica el servidor. La aplicación las aplica antes para no ofrecer un botón
+ * que solo llevaría a un error: el servidor las vuelve a comprobar igual.
+ */
 
-/// La explicación que se da cuando ya no se puede cambiar una cita.
-const String explicacionCambioTardio =
-    'Faltan menos de $horasMinimasCambio horas para esta cita, así que ya no '
-    'se puede cancelar ni reprogramar desde la aplicación. Si no puedes '
-    'asistir, llama a la clínica.';
+/// La explicación que se da cuando ya no se puede cambiar una cita. El
+/// teléfono y el correo de la clínica se enseñan al lado (ver
+/// `ContactoClinica`).
+String explicacionCambioTardio(int horasMinimasCambio) =>
+    'Faltan menos de ${horas(horasMinimasCambio)} para esta cita, así que ya '
+    'no se puede cancelar ni reprogramar desde la aplicación. Si no puedes '
+    'asistir, comunícate con la clínica.';
 
-/// ¿Todavía se puede pedir el cambio? Faltan al menos 12 horas.
-bool aTiempoDeCambiar(Cita cita, DateTime ahora) =>
-    cita.inicio.difference(ahora) >= const Duration(hours: horasMinimasCambio);
+/// «1 hora», «12 horas».
+String horas(int cantidad) => cantidad == 1 ? '1 hora' : '$cantidad horas';
+
+/// ¿Todavía se puede pedir el cambio? Faltan al menos las horas mínimas.
+bool aTiempoDeCambiar(Cita cita, DateTime ahora, int horasMinimasCambio) =>
+    cita.inicio.difference(ahora) >= Duration(hours: horasMinimasCambio);
 
 /// Si se ofrecen «Reprogramar» y «Cancelar» para esta cita.
 ///
 /// Solo en citas pendientes —una atendida o cancelada ya no se mueve— y con
-/// las 12 horas de anticipación.
-bool puedeCambiar(Cita cita, DateTime ahora) =>
-    cita.pendiente && aTiempoDeCambiar(cita, ahora);
+/// las horas mínimas de anticipación.
+bool puedeCambiar(Cita cita, DateTime ahora, int horasMinimasCambio) =>
+    cita.pendiente && aTiempoDeCambiar(cita, ahora, horasMinimasCambio);
 
 /// Por qué no se ofrecen los cambios, o `null` si se ofrecen.
-String? motivoSinCambios(Cita cita, DateTime ahora) {
+String? motivoSinCambios(Cita cita, DateTime ahora, int horasMinimasCambio) {
   if (!cita.pendiente) return null;
-  if (!aTiempoDeCambiar(cita, ahora)) return explicacionCambioTardio;
+  if (!aTiempoDeCambiar(cita, ahora, horasMinimasCambio)) {
+    return explicacionCambioTardio(horasMinimasCambio);
+  }
 
   return null;
 }
@@ -74,20 +83,15 @@ String cuentaRegresiva(Cita cita, DateTime ahora) {
   return 'Empieza en $enMinutos min';
 }
 
-/// Cómo prepararse, según la modalidad.
-List<String> consejosPara(TipoCita tipo) {
-  return switch (tipo) {
-    TipoCita.presencial => const [
-      'Llega 10 minutos antes.',
-      'Trae tu cédula y tus exámenes recientes.',
-    ],
-    TipoCita.telemedicina => const [
-      'Conéctate 5 minutos antes.',
-      'Busca un lugar privado, con buena luz y buena señal.',
-    ],
-    TipoCita.asincrona => const [
-      'Ten tus exámenes a mano, en foto o PDF.',
-      'El médico los revisará y te responderá.',
-    ],
-  };
+/// Cómo prepararse, según la modalidad: los consejos del catálogo
+/// `PREPARACION_CITA` cuyo código empieza por el de la modalidad
+/// (`PRESENCIAL_1`, `PRESENCIAL_2`…), en el orden del panel. Sin consejos
+/// configurados, ninguno.
+List<String> consejosPara(CatalogosState catalogos, TipoCita tipo) {
+  final prefijo = '${tipo.codigo}_';
+
+  return [
+    for (final item in catalogos.items(Catalogos.preparacionCita))
+      if (item.codigo.toUpperCase().startsWith(prefijo)) item.nombre,
+  ];
 }
