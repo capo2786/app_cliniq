@@ -12,6 +12,7 @@ import 'core/configuracion/config_publica_cubit.dart';
 import 'core/fechas/zona_clinica.dart';
 import 'core/network/api_client.dart';
 import 'core/presentacion/rutas.dart';
+import 'core/presentacion/widgets/barra_de_accion.dart';
 import 'core/servicios.dart';
 import 'core/tema/paleta_marca.dart';
 import 'core/tema/tema_app.dart';
@@ -192,6 +193,8 @@ class CliniqApp extends StatelessWidget {
                   GlobalCupertinoLocalizations.delegate,
                 ],
                 navigatorObservers: [observadorDeRutas],
+                builder: (context, hijo) =>
+                    CerrarTecladoAlTocarFuera(child: hijo ?? const SizedBox()),
                 home: const EsperaDatosDeLaClinica(child: PuertaDeEntrada()),
               ),
             ),
