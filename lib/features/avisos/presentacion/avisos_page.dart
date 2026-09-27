@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
+import '../../../core/presentacion/proveedores.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/fondo_app.dart';
@@ -31,21 +32,13 @@ class AvisosPage extends StatelessWidget {
 
   const AvisosPage({super.key, this.titulo, this.servicio});
 
-  static CampanaCubit? _campana(BuildContext context) {
-    try {
-      return context.read<CampanaCubit>();
-    } on ProviderNotFoundException {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (_) => AvisosCubit(
         servicio ?? Servicios.avisos,
         uid: context.read<AuthBloc>().usuario?.uid ?? '',
-        campana: _campana(context),
+        campana: context.leerSiHay<CampanaCubit>(),
       )..cargar(),
       child: _VistaAvisos(titulo: titulo ?? 'Avisos'),
     );

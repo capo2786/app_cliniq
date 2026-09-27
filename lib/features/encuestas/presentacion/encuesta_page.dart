@@ -6,6 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/margenes.dart';
+import '../../../core/presentacion/proveedores.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/barra_de_accion.dart';
 import '../../../core/presentacion/widgets/botones.dart';
@@ -34,14 +35,6 @@ class EncuestaPage extends StatelessWidget {
 
   const EncuestaPage({super.key, required this.citaId, this.servicio});
 
-  static EncuestasCubit? _pendientes(BuildContext context) {
-    try {
-      return context.read<EncuestasCubit>();
-    } on ProviderNotFoundException {
-      return null;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
@@ -49,7 +42,7 @@ class EncuestaPage extends StatelessWidget {
         servicio ?? Servicios.encuestas,
         citaId: citaId,
         uid: context.read<AuthBloc>().usuario?.uid ?? '',
-        pendientes: _pendientes(context),
+        pendientes: context.leerSiHay<EncuestasCubit>(),
       )..cargar(),
       child: const _VistaEncuesta(),
     );
