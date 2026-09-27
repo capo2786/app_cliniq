@@ -56,6 +56,7 @@ void main() {
           adjuntos: [archivoJson('a1')],
           mensajes: [mensajeJson('m1', adjunto: archivoJson('a2'))],
           campos: camposLesion,
+          requiereAdjunto: true,
         ),
       );
 
@@ -82,6 +83,12 @@ void main() {
       expect(detalle.campos, hasLength(camposLesion.length));
       expect(detalle.campos![3].unidad, 'cm');
       expect(detalle.campos![1].opciones, ['Cara', 'Brazos', 'Piernas']);
+      expect(detalle.requiereAdjunto, isTrue);
+    });
+
+    test('sin requiereAdjunto, el envío no exige archivo', () {
+      final json = consultaJson()..remove('requiereAdjunto');
+      expect(ConsultaDetalle.desdeJson(json).requiereAdjunto, isFalse);
     });
 
     test('la copia guardada se vuelve a leer igual', () {
@@ -90,6 +97,7 @@ void main() {
           adjuntos: [archivoJson('a1')],
           mensajes: [mensajeJson('m1')],
           campos: camposLesion,
+          requiereAdjunto: true,
           respuestas: [
             {
               'clave': 'zona',

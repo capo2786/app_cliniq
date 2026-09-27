@@ -6,6 +6,7 @@ import '../../../../core/presentacion/widgets/campos.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/consulta.dart';
+import '../../dominio/reglas_consultas.dart';
 import '../../providers/detalle_consulta_bloc.dart';
 import '../../providers/detalle_consulta_event.dart';
 import '../../providers/detalle_consulta_state.dart';
@@ -27,7 +28,8 @@ Future<bool?> mostrarCancelarConsulta(BuildContext context) {
   );
 }
 
-/// Cancelar con un motivo: el médico lo recibe en su aviso.
+/// Cancelar con un motivo de hasta 500 caracteres, con su contador: el
+/// médico lo recibe en su aviso.
 ///
 /// Solo se puede mientras la consulta está ENVIADA, es decir, antes de que
 /// el médico la abra.
@@ -132,17 +134,19 @@ class _CancelarConsultaState extends State<_CancelarConsulta> {
                   ],
                   const SizedBox(height: 18),
                   const EtiquetaCampo('Motivo'),
+                  // El contador y el tope son los del servidor
+                  // (`MOTIVO_CANCELACION_MAX`); la validación además mide como
+                  // él, sin los espacios de los extremos.
                   CampoCliniq(
                     key: const Key('campo-motivo-cancelacion'),
                     controller: _motivo,
                     pista: 'Ej.: Ya me siento mejor',
                     lineas: 3,
-                    maximo: 500,
+                    maximo: maximoMotivoCancelacion,
                     habilitado: !state.cancelando,
                     mayusculas: TextCapitalization.sentences,
-                    validator: (valor) => (valor ?? '').trim().isEmpty
-                        ? 'Cuéntanos por qué la cancelas.'
-                        : null,
+                    validator: (valor) =>
+                        errorDelMotivoDeCancelacion(valor ?? ''),
                   ),
                   const SizedBox(height: 18),
                   BotonPrincipal(

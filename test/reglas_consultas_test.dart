@@ -159,6 +159,28 @@ void main() {
     });
   });
 
+  group('El motivo de una cancelación', () {
+    test('obligatorio y de hasta 500 caracteres, sin contar los espacios de '
+        'los extremos', () {
+      expect(maximoMotivoCancelacion, 500);
+      expect(
+        errorDelMotivoDeCancelacion('   '),
+        'Cuéntanos por qué la cancelas.',
+      );
+      expect(errorDelMotivoDeCancelacion('Ya me siento mejor'), isNull);
+      expect(errorDelMotivoDeCancelacion('  ${'a' * 500}  '), isNull);
+      expect(
+        errorDelMotivoDeCancelacion('a' * 501),
+        'El motivo admite hasta 500 caracteres.',
+      );
+    });
+
+    test('se cuenta como el servidor: un emoji vale por dos', () {
+      expect(errorDelMotivoDeCancelacion('🙂' * 250), isNull);
+      expect(errorDelMotivoDeCancelacion('🙂' * 251), isNotNull);
+    });
+  });
+
   group('La lista', () {
     final consultas = [
       resumen(consultaJson(id: 'b', estado: 'BORRADOR')),

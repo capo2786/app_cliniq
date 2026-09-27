@@ -614,6 +614,27 @@ void main() {
     );
 
     blocTest<DetalleConsultaBloc, DetalleConsultaState>(
+      'un motivo de más de 500 caracteres no se manda',
+      setUp: () => servicio.detalles = [enviada],
+      build: crear,
+      act: (bloc) async {
+        await abrir(bloc);
+        bloc.add(DetalleConsultaCancelada('a' * 501));
+        await esperar(bloc, (s) => s.aviso != null);
+      },
+      verify: (bloc) {
+        expect(
+          bloc.state.aviso?.mensaje,
+          'El motivo admite hasta 500 caracteres.',
+        );
+        expect(
+          servicio.llamadas.where((l) => l.startsWith('cancelar')),
+          isEmpty,
+        );
+      },
+    );
+
+    blocTest<DetalleConsultaBloc, DetalleConsultaState>(
       'en revisión ya no se puede cancelar',
       setUp: () =>
           servicio.detalles = [detalle(consultaJson(estado: 'EN_REVISION'))],

@@ -437,14 +437,18 @@ las rutas del paciente de `/portal/consultas`
   subido. También se puede guardar como borrador y retomarlo (el paciente,
   el motivo y el médico quedan fijos: el servidor solo deja cambiar las
   respuestas, la descripción y los archivos) o descartarlo; al salir con
-  cambios se ofrece guardarlos.
+  cambios se ofrece guardarlos. Al retomarlo, las preguntas y si hace falta
+  un archivo salen de la copia que el borrador tomó del motivo al crearse
+  (`campos` y `requiereAdjunto` del detalle, lo que valida el envío), no del
+  motivo de `/opciones`, que el administrador pudo editar después.
 - **Detalle**: estado y plazo (o «tu consulta está demorada, la clínica ya
   fue avisada»), lo que se contó, los archivos —las imágenes en un visor con
   zoom, bajadas con la sesión y sin copiarlas al teléfono; los PDF con el
   visor del sistema—, la conversación en burbujas y, cuando `puedeEscribir`,
   el redactor con un archivo opcional. Mientras está ENVIADA se puede
-  cancelar con un motivo. Se desliza para refrescar (vuelve a pedir el
-  detalle) y, **solo mientras la pantalla se ve**, pregunta por novedades
+  cancelar con un motivo (obligatorio, hasta 500 caracteres con su
+  contador, el tope del servidor). Se desliza para refrescar (vuelve a pedir
+  el detalle) y, **solo mientras la pantalla se ve**, pregunta por novedades
   cada 30 segundos: se apaga con otra pantalla encima (`observadorDeRutas`),
   con la aplicación en segundo plano o con la consulta CERRADA o CANCELADA,
   y al volver pregunta enseguida. El sondeo pide la lista de resúmenes
@@ -552,10 +556,11 @@ fvm flutter test
 | `instante_test.dart` | Los instantes reales y la hora de la clínica |
 | `archivos_test.dart` | La validación de adjuntos, los nombres y la descarga para abrir un PDF |
 | `consultas_servicio_test.dart` | Cada ruta de `/portal/consultas`: método, ruta, cuerpo, el multipart `archivo` y la copia sin red |
-| `reglas_consultas_test.dart` | El plazo del médico, qué novedades despiertan al sondeo, el formulario dinámico y cómo se leen las respuestas |
+| `reglas_consultas_test.dart` | El plazo del médico, qué novedades despiertan al sondeo, el motivo de una cancelación, el formulario dinámico y cómo se leen las respuestas |
 | `consultas_bloc_test.dart` | La lista, los borradores y lo que cambia en otras pantallas |
-| `nueva_consulta_bloc_test.dart` | Los pasos y su validación, enviar (borrador → archivos → enviar), reintentar y retomar un borrador |
+| `nueva_consulta_bloc_test.dart` | Los pasos y su validación, enviar (borrador → archivos → enviar), reintentar y retomar un borrador con su copia del motivo |
 | `detalle_consulta_bloc_test.dart` | Cargar, el sondeo con latidos inyectados (la lista primero, el detalle solo si cambió), escribir con archivo y cancelar |
+| `cancelar_consulta_test.dart` | La hoja para cancelar: motivo obligatorio, contador y tope de 500 caracteres |
 | `campo_dinamico_test.dart` | Cada tipo de pregunta y el visor de imágenes |
 | `videoconsulta_test.dart` | La ventana de la sala, pedirla, abrirla fuera y los 409/503 |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |

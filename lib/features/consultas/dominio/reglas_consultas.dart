@@ -9,6 +9,10 @@ import '../data/models/consulta.dart';
 const int maximoDescripcion = 4000;
 const int maximoMensaje = 4000;
 
+/// Hasta cuántos caracteres admite el motivo de una cancelación (el mismo
+/// tope del servidor, `MOTIVO_CANCELACION_MAX`).
+const int maximoMotivoCancelacion = 500;
+
 /// Cuántos archivos se pueden adjuntar a una consulta desde la aplicación.
 const int maximoAdjuntos = 10;
 
@@ -109,6 +113,23 @@ bool hayNovedades(ConsultaResumen vista, ConsultaResumen nueva) {
   return nueva.estado != vista.estado ||
       nueva.totalMensajes != vista.totalMensajes ||
       !mismoUltimo;
+}
+
+// ── Cancelar ─────────────────────────────────────────────────────────
+
+/// Por qué no vale el motivo de una cancelación, o `null` si vale.
+///
+/// Se mide como el servidor: sin los espacios de los extremos y contando
+/// caracteres como los cuenta él (un emoji puede valer por dos).
+String? errorDelMotivoDeCancelacion(String motivo) {
+  final texto = motivo.trim();
+
+  if (texto.isEmpty) return 'Cuéntanos por qué la cancelas.';
+  if (texto.length > maximoMotivoCancelacion) {
+    return 'El motivo admite hasta $maximoMotivoCancelacion caracteres.';
+  }
+
+  return null;
 }
 
 // ── Formulario ───────────────────────────────────────────────────────

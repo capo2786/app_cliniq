@@ -168,6 +168,8 @@ void main() {
           id: 'b1',
           estado: 'BORRADOR',
           descripcion: 'Empecé a escribir…',
+          campos: camposLesion,
+          requiereAdjunto: true,
           respuestas: [
             {
               'clave': 'zona',

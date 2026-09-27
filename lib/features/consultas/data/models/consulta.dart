@@ -328,8 +328,14 @@ class ConsultaDetalle extends ConsultaResumen {
   /// Si quien la pidió puede escribir ahora.
   final bool puedeEscribir;
 
-  /// Las preguntas del motivo, si la API las manda.
+  /// Las preguntas del motivo, copiadas al crear la consulta, si la API las
+  /// manda. Son las que valida el envío, aunque el motivo cambie después.
   final List<CampoFormulario>? campos;
+
+  /// Si el envío exige al menos un archivo. También se copia del motivo al
+  /// crear la consulta y es lo que valida el servidor al enviarla; `false` si
+  /// no viene.
+  final bool requiereAdjunto;
 
   const ConsultaDetalle({
     required super.id,
@@ -364,6 +370,7 @@ class ConsultaDetalle extends ConsultaResumen {
     this.motivoCancelacion,
     this.puedeEscribir = false,
     this.campos,
+    this.requiereAdjunto = false,
   });
 
   factory ConsultaDetalle.desdeJson(Map<dynamic, dynamic> json) {
@@ -408,6 +415,7 @@ class ConsultaDetalle extends ConsultaResumen {
       motivoCancelacion: _texto(json['motivoCancelacion']),
       puedeEscribir: json['puedeEscribir'] == true,
       campos: json['campos'] is List ? interpretarCampos(json['campos']) : null,
+      requiereAdjunto: json['requiereAdjunto'] == true,
     );
   }
 
@@ -450,6 +458,7 @@ class ConsultaDetalle extends ConsultaResumen {
     'motivoCancelacion': motivoCancelacion,
     'puedeEscribir': puedeEscribir,
     if (campos != null) 'campos': [for (final c in campos!) c.aJson()],
+    'requiereAdjunto': requiereAdjunto,
   };
 
   @override
@@ -466,5 +475,6 @@ class ConsultaDetalle extends ConsultaResumen {
     motivoCancelacion,
     puedeEscribir,
     campos,
+    requiereAdjunto,
   ];
 }

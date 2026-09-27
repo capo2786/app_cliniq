@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:app_cliniq/core/archivos/archivo_local.dart';
 import 'package:app_cliniq/core/archivos/selector_de_archivos.dart';
 import 'package:app_cliniq/features/consultas/data/models/consulta.dart';
+import 'package:app_cliniq/features/consultas/data/models/opciones_consulta.dart';
 import 'package:app_cliniq/features/consultas/dominio/reglas_consultas.dart';
 import 'package:app_cliniq/features/consultas/providers/nueva_consulta_bloc.dart';
 import 'package:app_cliniq/features/consultas/providers/nueva_consulta_event.dart';
@@ -453,32 +454,40 @@ void main() {
   });
 
   group('Retomar un borrador', () {
-    ConsultaDetalle borrador({String estado = 'BORRADOR'}) =>
-        ConsultaDetalle.desdeJson(
-          consultaJson(
-            id: 'b1',
-            estado: estado,
-            paraDependiente: true,
-            pacienteId: 'dep1',
-            pacienteNombre: 'Tomás Pérez',
-            descripcion: 'Borrador a medias',
-            adjuntos: [archivoJson('a1')],
-            respuestas: [
-              {
-                'clave': 'tamano',
-                'etiqueta': 'Tamaño aproximado',
-                'tipo': 'numero',
-                'valor': 2.5,
-              },
-              {
-                'clave': 'zona',
-                'etiqueta': 'Zona del cuerpo',
-                'tipo': 'seleccion',
-                'valor': 'Cara',
-              },
-            ],
-          ),
-        );
+    // Como lo manda la API: con la copia de las preguntas y de si pide un
+    // archivo que el borrador tomó del motivo al crearse.
+    ConsultaDetalle borrador({
+      String estado = 'BORRADOR',
+      List<Map<String, dynamic>> campos = camposLesion,
+      bool requiereAdjunto = true,
+      List<Map<String, dynamic>>? adjuntos,
+    }) => ConsultaDetalle.desdeJson(
+      consultaJson(
+        id: 'b1',
+        estado: estado,
+        paraDependiente: true,
+        pacienteId: 'dep1',
+        pacienteNombre: 'Tomás Pérez',
+        descripcion: 'Borrador a medias',
+        adjuntos: adjuntos ?? [archivoJson('a1')],
+        campos: campos,
+        requiereAdjunto: requiereAdjunto,
+        respuestas: [
+          {
+            'clave': 'tamano',
+            'etiqueta': 'Tamaño aproximado',
+            'tipo': 'numero',
+            'valor': 2.5,
+          },
+          {
+            'clave': 'zona',
+            'etiqueta': 'Zona del cuerpo',
+            'tipo': 'seleccion',
+            'valor': 'Cara',
+          },
+        ],
+      ),
+    );
 
     blocTest<NuevaConsultaBloc, NuevaConsultaState>(
       'abre en el formulario con todo lo guardado, y lo fijo no se cambia',
@@ -500,13 +509,93 @@ void main() {
           PasoConsulta.resumen,
         ]);
         expect(s.especialidad, 'Dermatología');
-        expect(s.motivo?.requiereAdjunto, isTrue, reason: 'de las opciones');
+        expect(
+          s.motivo?.requiereAdjunto,
+          isTrue,
+          reason: 'la copia del borrador',
+        );
+        expect(
+          s.motivo?.descripcion,
+          'Manchas, granos o heridas que no sanan.',
+          reason: 'lo que se enseña sale de las opciones',
+        );
         expect(s.medico?.uid, 'doc1');
         expect(s.para, 'dep1');
         expect(s.pacienteNombre, 'Tomás Pérez');
         expect(s.respuestas, {'tamano': '2,5', 'zona': 'Cara'});
         expect(s.descripcion, 'Borrador a medias');
         expect(s.adjuntos.single, isA<AdjuntoSubido>());
+      },
+    );
+
+    /// «Lesión en la piel» después de que el administrador la editó: otras
+    /// preguntas, sin archivo obligatorio y otra descripción.
+    List<EspecialidadConsulta> opcionesEditadas({
+      bool requiereAdjunto = false,
+    }) {
+      final datos = opcionesJson();
+      final dermatologia = (datos['especialidades'] as List).first as Map;
+      final lesion = (dermatologia['motivos'] as List)
+          .cast<Map<String, dynamic>>()
+          .firstWhere((m) => m['_id'] == 'm-lesion');
+
+      lesion
+        ..['descripcion'] = 'Descripción nueva del motivo.'
+        ..['requiereAdjunto'] = requiereAdjunto
+        ..['campos'] = [
+          {
+            'clave': 'color',
+            'etiqueta': 'Color de la lesión',
+            'tipo': 'texto',
+            'requerido': true,
+          },
+        ];
+
+      return interpretarOpciones(datos);
+    }
+
+    blocTest<NuevaConsultaBloc, NuevaConsultaState>(
+      'las preguntas y el archivo obligatorio salen de la copia del '
+      'borrador, no del motivo que el administrador editó después',
+      setUp: () {
+        servicio
+          ..especialidades = opcionesEditadas()
+          ..detalles = [borrador(adjuntos: const [])];
+      },
+      build: crear,
+      act: (bloc) async {
+        bloc.add(const NuevaConsultaIniciada(borradorId: 'b1'));
+        await esperar(bloc, (s) => !s.cargando);
+      },
+      verify: (bloc) {
+        final s = bloc.state;
+        expect(s.campos.map((c) => c.clave), [
+          for (final c in camposLesion) c['clave'],
+        ]);
+        expect(s.motivo?.requiereAdjunto, isTrue);
+        expect(s.motivo?.descripcion, 'Descripción nueva del motivo.');
+        expect(s.errores.keys, contains(claveAdjuntos));
+        expect(s.errores.keys, isNot(contains('color')));
+        expect(s.errores['desde'], 'Responde esta pregunta.');
+      },
+    );
+
+    blocTest<NuevaConsultaBloc, NuevaConsultaState>(
+      'si el borrador no pedía archivo, no se exige aunque el motivo ahora '
+      'lo pida',
+      setUp: () {
+        servicio
+          ..especialidades = opcionesEditadas(requiereAdjunto: true)
+          ..detalles = [borrador(requiereAdjunto: false, adjuntos: const [])];
+      },
+      build: crear,
+      act: (bloc) async {
+        bloc.add(const NuevaConsultaIniciada(borradorId: 'b1'));
+        await esperar(bloc, (s) => !s.cargando);
+      },
+      verify: (bloc) {
+        expect(bloc.state.motivo?.requiereAdjunto, isFalse);
+        expect(bloc.state.errores.keys, isNot(contains(claveAdjuntos)));
       },
     );
 

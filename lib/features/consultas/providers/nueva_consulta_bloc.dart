@@ -134,32 +134,42 @@ class NuevaConsultaBloc extends Bloc<NuevaConsultaEvent, NuevaConsultaState> {
 
   /// Arma el estado desde un borrador guardado.
   ///
-  /// El motivo y el médico se buscan en las opciones para tener su
-  /// descripción y si piden un archivo; si ya no están (el motivo se
-  /// desactivó), el borrador trae lo suficiente para seguir: el nombre y las
-  /// preguntas.
+  /// Las preguntas y si hace falta un archivo salen de la copia que el
+  /// borrador tomó del motivo al crearse (`campos`, `requiereAdjunto`): es lo
+  /// que el servidor valida al enviar, aunque después el administrador haya
+  /// editado el motivo. De las opciones solo se toma lo que se enseña (el
+  /// nombre y la descripción) y el médico; si ya no están (el motivo se
+  /// desactivó), el borrador trae lo suficiente para seguir.
   NuevaConsultaState _retomar(NuevaConsultaState base, ConsultaDetalle d) {
     final especialidad = base.especialidades
         .where((e) => e.nombre == d.especialidad)
         .firstOrNull;
 
-    final motivo =
-        _buscarMotivo(base.especialidades, d.motivoId) ??
-        MotivoPublico(
-          id: d.motivoId,
-          nombre: d.motivoNombre.isEmpty ? 'Motivo' : d.motivoNombre,
-          especialidad: d.especialidad,
-          campos:
-              d.campos ??
-              [
-                for (final r in d.respuestas)
-                  CampoFormulario(
-                    clave: r.clave,
-                    etiqueta: r.etiqueta,
-                    tipo: r.tipo,
-                  ),
-              ],
-        );
+    final delCatalogo = _buscarMotivo(base.especialidades, d.motivoId);
+
+    final motivo = MotivoPublico(
+      id: d.motivoId,
+      nombre:
+          delCatalogo?.nombre ??
+          (d.motivoNombre.isEmpty ? 'Motivo' : d.motivoNombre),
+      especialidad: delCatalogo?.especialidad ?? d.especialidad,
+      descripcion: delCatalogo?.descripcion ?? '',
+      campos:
+          d.campos ??
+          delCatalogo?.campos ??
+          [
+            for (final r in d.respuestas)
+              CampoFormulario(
+                clave: r.clave,
+                etiqueta: r.etiqueta,
+                tipo: r.tipo,
+              ),
+          ],
+      requiereAdjunto: d.requiereAdjunto,
+      activo: delCatalogo?.activo ?? true,
+      orden: delCatalogo?.orden ?? 0,
+      isSystem: delCatalogo?.isSystem ?? false,
+    );
 
     final medico =
         especialidad?.medicos.where((m) => m.uid == d.medicoId).firstOrNull ??

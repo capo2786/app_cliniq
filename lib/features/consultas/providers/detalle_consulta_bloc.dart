@@ -360,8 +360,9 @@ class DetalleConsultaBloc
     if (detalle == null || !state.puedeCancelar || state.cancelando) return;
 
     final motivo = event.motivo.trim();
-    if (motivo.isEmpty) {
-      emit(state.copiarCon(aviso: _aviso('Cuéntanos por qué la cancelas.')));
+    final problema = errorDelMotivoDeCancelacion(motivo);
+    if (problema != null) {
+      emit(state.copiarCon(aviso: _aviso(problema)));
       return;
     }
 

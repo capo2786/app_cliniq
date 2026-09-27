@@ -29,6 +29,7 @@ Map<String, dynamic> consultaJson({
   String pacienteNombre = 'Ana María Pérez',
   bool? ultimoEsMedico,
   List<Map<String, dynamic>>? campos,
+  bool requiereAdjunto = false,
 }) => {
   '_id': id,
   'codigo': 'CA-000123',
@@ -55,6 +56,7 @@ Map<String, dynamic> consultaJson({
   'mensajes': mensajes,
   'puedeEscribir': puedeEscribir,
   'campos': ?campos,
+  'requiereAdjunto': requiereAdjunto,
 };
 
 Map<String, dynamic> archivoJson(String id, {String nombre = 'foto.jpg'}) => {
