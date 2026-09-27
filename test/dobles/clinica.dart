@@ -36,6 +36,7 @@ Map<String, dynamic> configJson({
   Map<String, dynamic>? archivos,
   Map<String, dynamic>? seguridad,
   Map<String, dynamic>? general,
+  Map<String, dynamic>? clinico,
 }) => {
   'clinica': _mezclar({
     'nombre': 'Clínica Andina',
@@ -104,6 +105,14 @@ Map<String, dynamic> configJson({
     'soporteHorasAviso': 2,
     'validarCedula': true,
   }, general),
+  'clinico': _mezclar({
+    'diasGestacion': 280,
+    'imc': [
+      {'hasta': 18.5, 'etiqueta': 'Bajo peso', 'color': '#C77700'},
+      {'hasta': 25, 'etiqueta': 'Normal', 'color': '#00996A'},
+      {'hasta': null, 'etiqueta': 'Sobrepeso', 'color': '#C77700'},
+    ],
+  }, clinico),
 };
 
 ConfigPublica configDePrueba({
@@ -113,6 +122,7 @@ ConfigPublica configDePrueba({
   Map<String, dynamic>? archivos,
   Map<String, dynamic>? seguridad,
   Map<String, dynamic>? general,
+  Map<String, dynamic>? clinico,
 }) => ConfigPublica.desdeJson(
   configJson(
     clinica: clinica,
@@ -121,6 +131,7 @@ ConfigPublica configDePrueba({
     archivos: archivos,
     seguridad: seguridad,
     general: general,
+    clinico: clinico,
   ),
 );
 
@@ -253,6 +264,70 @@ Map<String, List<Map<String, dynamic>>> catalogosJson() => {
     _item('RESPONDIDA', 'Respondida', icono: 'check-circulo'),
     _item('CERRADA', 'Cerrada', icono: 'candado'),
     _item('CANCELADA', 'Cancelada', icono: 'close'),
+  ],
+  Catalogos.categoriaTicket: [
+    _item(
+      'CITAS',
+      'Citas',
+      descripcion: 'Agendar, cambiar o cancelar',
+      color: '#0a7fb5',
+      icono: 'calendario',
+    ),
+    _item(
+      'TECNICO',
+      'Problema técnico',
+      descripcion: 'Algo no carga o da error',
+      color: '#7a5cc7',
+      icono: 'alerta',
+      orden: 1,
+    ),
+    _item(
+      'MEDICO',
+      'Consulta médica',
+      descripcion: 'Sobre tu atención o tus resultados',
+      color: '#d16f4b',
+      icono: 'estetoscopio',
+      orden: 2,
+    ),
+  ],
+  Catalogos.severidadTicket: [
+    _item(
+      'CRITICA',
+      'Crítica',
+      descripcion: 'Nada funciona',
+      color: '#d12e4c',
+      icono: 'alerta',
+    ),
+    _item(
+      'ALTA',
+      'Alta',
+      descripcion: 'No puedo hacer algo importante',
+      color: '#c77700',
+      icono: 'alerta',
+      orden: 1,
+    ),
+    _item(
+      'MEDIA',
+      'Media',
+      descripcion: 'Me complica, pero puedo seguir',
+      color: '#0a7fb5',
+      icono: 'reloj',
+      orden: 2,
+    ),
+    _item(
+      'BAJA',
+      'Baja',
+      descripcion: 'Una duda o una mejora',
+      color: '#5a6e73',
+      icono: 'info',
+      orden: 3,
+    ),
+  ],
+  Catalogos.estadoTicket: [
+    _item('ABIERTO', 'Abierto', color: '#0a7fb5', icono: 'correo'),
+    _item('EN_PROCESO', 'En proceso', color: '#c77700', icono: 'reloj'),
+    _item('RESUELTO', 'Resuelto', color: '#00996a', icono: 'check-circulo'),
+    _item('CERRADO', 'Cerrado', color: '#5a6e73', icono: 'candado'),
   ],
 };
 
