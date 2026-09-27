@@ -18,6 +18,8 @@ const String idiomaDeLaSala = 'es';
 const List<String> botonesDeLaSala = [
   'microphone',
   'camera',
+  // Cámara trasera: para mostrarle al médico una herida o una lesión
+  'toggle-camera',
   'chat',
   'raisehand',
   'tileview',

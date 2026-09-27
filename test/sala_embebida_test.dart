@@ -88,6 +88,7 @@ void main() {
         'config.toolbarButtons': [
           'microphone',
           'camera',
+          'toggle-camera',
           'chat',
           'raisehand',
           'tileview',
