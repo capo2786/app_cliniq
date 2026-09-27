@@ -13,8 +13,8 @@ la aplicación salen del mismo cálculo, portado línea a línea.
 
 | Herramienta | Versión |
 | --- | --- |
-| Flutter | 3.44.1 (fijada en `.fvmrc`) |
-| Dart SDK | ^3.12.1 |
+| Flutter | 3.47.5 (fijada en `.fvmrc`) |
+| Dart SDK | ^3.13.4 |
 | Java | 17 (compilación de Android) |
 | Xcode | Solo para compilar iOS |
 
@@ -105,7 +105,7 @@ incompatible y `pub get` no resuelve.
 **Android** (`android/app/src/main/AndroidManifest.xml`): `INTERNET`,
 `USE_BIOMETRIC`, `POST_NOTIFICATIONS` y `RECEIVE_BOOT_COMPLETED`, más el
 receptor que reprograma los recordatorios tras reiniciar el teléfono. El
-identificador es `ec.cliniq.app` y el nombre visible, «Cliniq».
+identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
 
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
@@ -123,7 +123,7 @@ identificador es `ec.cliniq.app` y el nombre visible, «Cliniq».
 
 **iOS** (`ios/Runner/Info.plist`): descripción de uso de Face ID, la
 excepción de ATS de arriba y solo orientación vertical en teléfono. El
-identificador es `ec.cliniq.app`. El `AppDelegate` se registra como delegado
+identificador es `ec.cliniq.sage.app`. El `AppDelegate` se registra como delegado
 del centro de notificaciones para que los recordatorios se vean también con
 la aplicación abierta.
 

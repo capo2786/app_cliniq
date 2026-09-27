@@ -82,7 +82,7 @@ void main() {
     FlutterSecureStorage.setMockInitialValues({});
     PackageInfo.setMockInitialValues(
       appName: 'Cliniq',
-      packageName: 'ec.cliniq.app',
+      packageName: 'ec.cliniq.sage.app',
       version: '1.0.0',
       buildNumber: '1',
       buildSignature: '',
