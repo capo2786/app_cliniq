@@ -1,13 +1,14 @@
 // lib/core/integraciones/costuras.dart
 
-/// Las costuras para lo que todavía no está: avisos push, videollamada y
+/// Las costuras de lo que depende de un tercero: avisos push, videollamada y
 /// pagos.
 ///
-/// Ninguno de los tres entra en esta versión porque dependen de un tercero
-/// (Firebase, un proveedor de video, una pasarela de pago). Pero el día que
-/// entren no deberían obligar a tocar las pantallas: cada uno tiene aquí su
-/// interfaz y una implementación «apagada», y `Servicios` decide cuál se usa.
-/// Enchufar el de verdad es cambiar una línea en `lib/core/servicios.dart`.
+/// Cada uno tiene aquí su interfaz y una implementación «apagada», y
+/// `Servicios` decide cuál se usa: enchufar el de verdad es cambiar una línea
+/// en `lib/core/servicios.dart`, sin tocar las pantallas. La videollamada ya
+/// está enchufada (`VideollamadaEnNavegador`, en
+/// `features/citas/data/videollamada_service.dart`); los avisos push y los
+/// pagos siguen apagados.
 library;
 
 /// Avisos al teléfono enviados por la clínica (Firebase Cloud Messaging).
@@ -38,6 +39,8 @@ abstract class ServicioVideollamada {
   /// explica que el enlace llega por correo.
   bool get disponible;
 
+  /// Entra a la sala de la cita. Si no se puede, lanza una excepción cuyo
+  /// texto es lo que hay que decirle a la persona.
   Future<void> unirse(String citaId);
 }
 

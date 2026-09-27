@@ -10,10 +10,12 @@ import '../../../../core/tema/tokens.dart';
 import '../../../agendar/presentacion/agendar_page.dart';
 import '../../data/models/cita.dart';
 import '../../dominio/reglas_citas.dart';
+import '../../dominio/videoconsulta.dart';
 import '../estilos_cita.dart';
 import 'cancelar_cita.dart';
 import 'hoja_calendario.dart';
 import 'tarjeta_cita.dart';
+import 'videoconsulta.dart';
 
 /// Abre el detalle de una cita en una hoja inferior.
 Future<void> mostrarDetalleCita(BuildContext context, Cita cita) {
@@ -183,10 +185,14 @@ class DetalleCita extends StatelessWidget {
           if (cita.pendiente) ...[
             const SizedBox(height: 16),
             ConsejosDePreparacion(consejos: consejosPara(cita.tipo)),
-            if (cita.tipo == TipoCita.telemedicina) ...[
-              const SizedBox(height: 12),
-              _Videollamada(cita: cita),
-            ],
+          ],
+          // La sala sigue abierta una hora después del fin, así que también
+          // se ofrece desde el historial mientras tanto.
+          if (estadoDeSala(cita, ahora)
+              case EstadoSala.porAbrir || EstadoSala.abierta) ...[
+            const SizedBox(height: 16),
+            const EtiquetaSeccion('Videoconsulta'),
+            BotonVideoconsulta(cita: cita),
           ],
           const SizedBox(height: 22),
           if (cambiable)
@@ -229,32 +235,6 @@ class DetalleCita extends StatelessWidget {
             RecuadroAviso.alerta(sinCambios, icono: Icons.lock_clock_outlined),
         ],
       ),
-    );
-  }
-}
-
-/// La videollamada todavía no se hace desde la aplicación: la costura
-/// `ServicioVideollamada` está lista para cuando se elija el proveedor.
-class _Videollamada extends StatelessWidget {
-  final Cita cita;
-
-  const _Videollamada({required this.cita});
-
-  @override
-  Widget build(BuildContext context) {
-    final video = Servicios.videollamada;
-
-    if (!video.disponible) {
-      return const RecuadroAviso.informacion(
-        'El enlace de la videollamada te llega por correo antes de la cita.',
-        icono: Icons.videocam_outlined,
-      );
-    }
-
-    return BotonSecundario(
-      texto: 'Entrar a la videollamada',
-      icono: Icons.videocam_rounded,
-      onPressed: () => video.unirse(cita.id),
     );
   }
 }
