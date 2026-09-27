@@ -14,16 +14,20 @@ import '../features/dependientes/data/dependientes_service.dart';
 import '../features/encuestas/data/encuestas_service.dart';
 import '../features/legal/data/legal_service.dart';
 import '../features/privacidad/data/arco_service.dart';
+import '../features/mi_salud/data/documentos_pdf_service.dart';
 import '../features/mi_salud/data/mi_salud_service.dart';
 import '../features/soporte/data/soporte_service.dart';
 import 'archivos/archivos_service.dart';
+import 'archivos/salida_de_archivos.dart';
 import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
 import 'configuracion/config_publica_service.dart';
+import 'configuracion/logo_clinica_service.dart';
 import 'fechas/fecha_local.dart';
 import 'integraciones/costuras.dart';
 import 'network/api_client.dart';
 import 'notificaciones/recordatorios_citas.dart';
+import 'presentacion/widgets/lienzo_pdf.dart';
 import 'red/estado_de_la_red.dart';
 import 'service/biometria_service.dart';
 import 'storage/almacen_claves.dart';
@@ -102,6 +106,15 @@ class Servicios {
     cache,
   );
 
+  static LogoClinicaService _logo = LogoClinicaService(ApiClient().dio, cache);
+
+  /// El logotipo de la clínica desde su dirección (`clinica.logo`), con
+  /// copia en el teléfono.
+  static LogoClinicaService get logoClinica => _logo;
+
+  @visibleForTesting
+  static set logoParaPruebas(LogoClinicaService otro) => _logo = otro;
+
   static final CatalogoService catalogos = CatalogoService(
     ApiClient().dio,
     cache,
@@ -139,8 +152,38 @@ class Servicios {
   static final ArchivosService archivos = ArchivosService(ApiClient().dio);
 
   // ── Mi salud, centro de ayuda y soporte ────────────────────────────
-  /// La historia clínica que ve el paciente, sus recetas y sus órdenes.
+  /// La historia clínica que ve el paciente: recetas, órdenes y
+  /// certificados de reposo.
   static final MiSaludService miSalud = MiSaludService(ApiClient().dio, cache);
+
+  static DocumentosPdfService _documentosPdf = DocumentosPdfService(
+    ApiClient().dio,
+  );
+
+  /// Los PDF firmados de recetas y certificados, con su copia en el
+  /// teléfono.
+  static DocumentosPdfService get documentosPdf => _documentosPdf;
+
+  @visibleForTesting
+  static set documentosPdfParaPruebas(DocumentosPdfService otro) =>
+      _documentosPdf = otro;
+
+  static SalidaDeArchivos _salida = const SalidaDelSistema();
+
+  /// «Guardar en el teléfono» y «Compartir» un archivo guardado.
+  static SalidaDeArchivos get salidaDeArchivos => _salida;
+
+  @visibleForTesting
+  static set salidaParaPruebas(SalidaDeArchivos otra) => _salida = otra;
+
+  static PintorDePdf _pintorDePdf = const PintorPdfx();
+
+  /// Cómo se pinta un PDF dentro de la aplicación (`pdfx`).
+  static PintorDePdf get pintorDePdf => _pintorDePdf;
+
+  /// En el anfitrión de pruebas no hay lector de PDF del sistema.
+  @visibleForTesting
+  static set pintorParaPruebas(PintorDePdf otro) => _pintorDePdf = otro;
 
   /// Los artículos del centro de ayuda.
   static final AyudaService ayuda = AyudaService(ApiClient().dio, cache);
@@ -160,14 +203,16 @@ class Servicios {
 
   /// Lo que se borra del teléfono al cerrar sesión o al vencer la sesión.
   ///
-  /// Las citas, las consultas, los dependientes, los archivos descargados y
-  /// los recordatorios son de quien estaba dentro: en un teléfono compartido,
-  /// la siguiente persona no tiene por qué verlos ni oírlos. La configuración,
-  /// los catálogos y los documentos legales se quedan: son de la clínica.
+  /// Las citas, las consultas, los dependientes, los archivos descargados,
+  /// los PDF firmados guardados y los recordatorios son de quien estaba
+  /// dentro: en un teléfono compartido, la siguiente persona no tiene por qué
+  /// verlos ni oírlos. La configuración, los catálogos, los documentos
+  /// legales y el logotipo se quedan: son de la clínica.
   static Future<void> limpiarDatosLocales() async {
     await recordatorios.cancelarTodo();
     await cache.vaciarDatosPersonales();
     await archivos.borrarDescargas();
+    await documentosPdf.borrarTodo();
     await push.olvidarEsteTelefono();
   }
 }

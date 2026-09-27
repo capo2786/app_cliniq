@@ -24,7 +24,11 @@ IconData iconoDeAviso(String tipo) {
     return Icons.shield_outlined;
   }
   if (t.contains('ENCUESTA')) return Icons.star_outline_rounded;
-  if (t.contains('DOCUMENTO') || t.contains('RECETA') || t.contains('ORDEN')) {
+  if (t.contains('DOCUMENTO') ||
+      t.contains('RECETA') ||
+      t.contains('ORDEN') ||
+      t.contains('CERTIFICADO') ||
+      t.contains('FIRMA')) {
     return Icons.description_outlined;
   }
   if (t.contains('ALERTA') || t.contains('SEGURIDAD')) {

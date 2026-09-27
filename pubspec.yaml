@@ -30,8 +30,8 @@ dependencies:
   package_info_plus: ^10.1.0
   url_launcher: ^6.3.2
 
-  # El logotipo de la clínica llega de la configuración como data URL, y
-  # puede ser SVG además de PNG o JPG.
+  # El logotipo de la clínica (su dirección en la configuración; de un
+  # servidor anterior, un data URL) puede ser SVG además de PNG o JPG.
   flutter_svg: ^2.3.0
 
   # Fechas y recordatorios. La versión de flutter_local_notifications importa:
@@ -50,6 +50,17 @@ dependencies:
   # de abrirla (ver «Videoconsulta» y «Configuración nativa» en el README).
   flutter_inappwebview: ^6.1.5
   permission_handler: ^13.0.2
+
+  # Las recetas y los certificados firmados en PDF, dentro de la aplicación:
+  # pdfx los pinta con el lector del propio sistema (nunca otra aplicación ni
+  # el navegador), flutter_file_dialog abre el diálogo del sistema para
+  # «Guardar en el teléfono», share_plus la hoja de «Compartir» y crypto
+  # calcula la huella sha256 con que se guarda y se comprueba cada copia
+  # (ver «Recetas y certificados firmados» en el README).
+  pdfx: ^2.11.0
+  flutter_file_dialog: ^3.3.3
+  share_plus: ^13.3.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

@@ -1,6 +1,8 @@
 // lib/features/mi_salud/dominio/reglas_mi_salud.dart
 
 import '../../../core/fechas/fecha_local.dart';
+import '../../../core/fechas/instante.dart';
+import '../../../core/formato/fechas.dart';
 import '../data/models/mi_salud.dart';
 
 /// Semanas y días de embarazo y la fecha probable de parto.
@@ -69,4 +71,72 @@ String? presionLegible(num? sistolica, num? diastolica) {
   }
 
   return '${numeroLegible(sistolica)}/${numeroLegible(diastolica)}';
+}
+
+/*
+ * Certificados de reposo. Los códigos son del sistema (los mismos del
+ * panel y del PDF), no listas de la clínica: aquí solo se nombran. Un
+ * código que esta versión no conoce se enseña tal como llega.
+ */
+
+/// «Absoluto» o «Relativo».
+String nombreDelTipoDeReposo(String codigo) => switch (codigo.toUpperCase()) {
+  'ABSOLUTO' => 'Absoluto',
+  'RELATIVO' => 'Relativo',
+  _ => codigo,
+};
+
+/// «Enfermedad general», «Accidente de trabajo»…
+String nombreDeLaContingencia(String codigo) => switch (codigo.toUpperCase()) {
+  'ENFERMEDAD_GENERAL' => 'Enfermedad general',
+  'ACCIDENTE_TRABAJO' => 'Accidente de trabajo',
+  'ENFERMEDAD_PROFESIONAL' => 'Enfermedad profesional',
+  'MATERNIDAD' => 'Maternidad',
+  'OTRA' => 'Otra',
+  _ => codigo,
+};
+
+/// «Empleador», «Institución educativa» u «Otro».
+String nombreDelDestinatario(String codigo) => switch (codigo.toUpperCase()) {
+  'EMPLEADOR' => 'Empleador',
+  'INSTITUCION_EDUCATIVA' => 'Institución educativa',
+  'OTRO' => 'Otro',
+  _ => codigo,
+};
+
+/// «1 día», «3 días».
+String diasDeReposo(int dias) => dias == 1 ? '1 día' : '$dias días';
+
+/// «Reposo absoluto · 3 días»: el certificado en una línea.
+String resumenDelReposo(CertificadoReposo certificado) {
+  final tipo = certificado.tipoReposo.isEmpty
+      ? 'Reposo'
+      : 'Reposo ${nombreDelTipoDeReposo(certificado.tipoReposo).toLowerCase()}';
+
+  return certificado.dias > 0
+      ? '$tipo · ${diasDeReposo(certificado.dias)}'
+      : tipo;
+}
+
+/// «Firmado electrónicamente por Luis Mora el lunes 28 de septiembre de 2026
+/// a las 10:15»: la firma en palabras, con la hora de la clínica. Sin
+/// nombre o sin fecha, lo que se sepa.
+String textoDeLaFirma(FirmaElectronica? firma) {
+  final nombre = firma?.firmadoPor;
+  final instante = firma?.firmadoEn;
+
+  final partes = [
+    'Firmado electrónicamente',
+    if (nombre != null) 'por $nombre',
+    if (instante != null) 'el ${_momentoDeLaFirma(instante)}',
+  ];
+
+  return partes.join(' ');
+}
+
+String _momentoDeLaFirma(DateTime instante) {
+  final local = enHoraDeLaClinica(instante);
+
+  return '${FormatoFecha.diaLargoConAnio(local).toLowerCase()} a las '
+      '${FormatoFecha.hora(local)}';
 }

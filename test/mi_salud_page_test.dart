@@ -7,9 +7,12 @@ import 'package:app_cliniq/core/servicios.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/dependientes/data/models/dependiente.dart';
 import 'package:app_cliniq/features/mi_salud/data/mi_salud_service.dart';
+import 'package:app_cliniq/features/mi_salud/data/models/mi_salud.dart';
+import 'package:app_cliniq/features/mi_salud/presentacion/certificado_page.dart';
 import 'package:app_cliniq/features/mi_salud/presentacion/mi_salud_page.dart';
 import 'package:app_cliniq/features/mi_salud/presentacion/orden_page.dart';
 import 'package:app_cliniq/features/mi_salud/presentacion/receta_page.dart';
+import 'package:app_cliniq/features/mi_salud/presentacion/visor_pdf_page.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -18,6 +21,7 @@ import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/mi_salud.dart';
 import 'dobles/pantalla.dart';
+import 'dobles/pdf.dart';
 
 /// La pantalla de Mi salud y el detalle de una receta y de una orden, con
 /// la configuración y los catálogos de la clínica.
@@ -28,9 +32,15 @@ void main() {
   late CacheLocal cache;
   late bool hayRed;
   late Map<String, dynamic> respuesta;
+  late PdfFalso pdf;
 
   setUp(() {
     sondeoConRed();
+    // El visor de PDF, sin el lector del sistema ni el disco del teléfono.
+    pdf = PdfFalso();
+    Servicios.documentosPdfParaPruebas = pdf;
+    Servicios.salidaParaPruebas = SalidaFalsa();
+    Servicios.pintorParaPruebas = const PintorFalso();
     cache = CacheEnMemoria();
     hayRed = true;
     respuesta = miSaludJson();
@@ -49,6 +59,7 @@ void main() {
       'GET /portal/recetas/r1': (_) => recetaJson(),
       'GET /portal/ordenes/o1': (_) =>
           ordenJson(tipo: 'IMAGEN', prioridad: 'URGENTE'),
+      'GET /portal/certificados/c1': (_) => certificadoJson(),
     });
   });
 
@@ -270,5 +281,234 @@ void main() {
 
     expect(find.text('Anulada'), findsOneWidget);
     expect(find.textContaining('Motivo: Dosis equivocada'), findsOneWidget);
+  });
+
+  group('Recetas y certificados firmados', () {
+    setUp(() {
+      respuesta = miSaludJson(
+        atenciones: [
+          atencionJson(
+            recetas: [recetaJson(firmada: true, pdfDisponible: true)],
+            certificados: [certificadoJson()],
+          ),
+        ],
+      );
+      api.rutas['GET /portal/recetas/r1'] = (_) =>
+          recetaJson(firmada: true, pdfDisponible: true);
+    });
+
+    testWidgets('el certificado de reposo en la consulta, con su firma y «Ver '
+        'PDF»', (tester) async {
+      await montar(tester);
+      await bajarHasta(tester, find.byKey(const Key('pdf-certificado-c1')));
+
+      expect(find.text('CERTIFICADOS DE REPOSO'), findsOneWidget);
+      expect(find.text('Reposo absoluto · 3 días'), findsOneWidget);
+      expect(
+        find.text(
+          'Del sábado 26 de septiembre al lunes 28 de septiembre de 2026',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Firmado electrónicamente'), findsOneWidget);
+      expect(find.text('Firmada electrónicamente'), findsOneWidget);
+      expect(find.byKey(const Key('pdf-receta-r1')), findsOneWidget);
+    });
+
+    testWidgets('el certificado se abre con los días, las fechas, las '
+        'recomendaciones y el sello de la firma', (tester) async {
+      await montar(tester);
+      await tocar(tester, find.byKey(const Key('certificado-c1')));
+
+      expect(find.byType(CertificadoPage), findsOneWidget);
+      expect(api.claves, contains('GET /portal/certificados/c1'));
+      expect(find.text('Certificado médico de reposo'), findsOneWidget);
+      expect(
+        find.text('Emitido el viernes 25 de septiembre de 2026'),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'Firmado electrónicamente por LUIS ALBERTO MORA SALAZAR el sábado '
+          '26 de septiembre de 2026 a las 10:15',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Emisor del certificado: Security Data'),
+        findsOneWidget,
+      );
+      expect(find.text('3 días'), findsOneWidget);
+      expect(find.text('(tres)'), findsOneWidget);
+      expect(find.text('Reposo absoluto'), findsOneWidget);
+      expect(find.text('Sábado 26 de septiembre de 2026'), findsOneWidget);
+      expect(find.text('Lunes 28 de septiembre de 2026'), findsOneWidget);
+      expect(find.text('Enfermedad general'), findsOneWidget);
+      // La modalidad con el nombre de su catálogo.
+      expect(find.text('Telemedicina'), findsOneWidget);
+      expect(find.text('Empleador'), findsOneWidget);
+
+      await bajarHasta(tester, find.byKey(const Key('codigo-verificacion')));
+      expect(
+        find.text('Hidratación abundante y evitar el frío.'),
+        findsOneWidget,
+      );
+      // El paciente no autorizó el diagnóstico: no aparece, como en el PDF.
+      expect(
+        find.text('Diagnóstico reservado: no aparece en el certificado.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Amigdalitis'), findsNothing);
+      expect(find.text('CR7Q2MXK9P'), findsOneWidget);
+      expect(find.byKey(const Key('boton-ver-pdf')), findsOneWidget);
+    });
+
+    testWidgets('«Ver PDF» abre el visor de la aplicación con la huella '
+        'firmada', (tester) async {
+      await montar(tester);
+      await tocar(tester, find.byKey(const Key('certificado-c1')));
+      await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VisorPdfPage), findsOneWidget);
+      expect(pdf.pedidos.single, (
+        tipo: TipoDocumentoFirmado.certificado,
+        id: 'c1',
+        sha256: huellaDePrueba,
+      ));
+      expect(find.text('PDF: /documentos/certificado_c1.pdf'), findsOneWidget);
+      expect(find.text('Guardar en el teléfono'), findsOneWidget);
+    });
+
+    testWidgets('«Ver PDF» también desde la fila de la receta', (tester) async {
+      await montar(tester);
+      await tocar(tester, find.byKey(const Key('pdf-receta-r1')));
+
+      expect(find.byType(VisorPdfPage), findsOneWidget);
+      expect(find.byType(RecetaPage), findsNothing);
+      expect(pdf.pedidos.single.tipo, TipoDocumentoFirmado.receta);
+      expect(find.text('Receta'), findsOneWidget);
+    });
+
+    testWidgets('la receta firmada lo dice y ofrece «Ver PDF»', (tester) async {
+      await montar(tester);
+      await tocar(tester, find.byKey(const Key('receta-r1')));
+
+      expect(find.byType(RecetaPage), findsOneWidget);
+      expect(find.byKey(const Key('sello-firma')), findsOneWidget);
+      expect(
+        find.textContaining('Firmado electrónicamente por LUIS ALBERTO'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+      await tester.pumpAndSettle();
+      expect(pdf.pedidos.single, (
+        tipo: TipoDocumentoFirmado.receta,
+        id: 'r1',
+        sha256: huellaDePrueba,
+      ));
+    });
+
+    testWidgets('sin firma o sin PDF disponible no hay sello ni «Ver PDF»', (
+      tester,
+    ) async {
+      respuesta = miSaludJson(
+        atenciones: [
+          atencionJson(
+            recetas: [recetaJson()],
+            certificados: [
+              certificadoJson(firmado: true, pdfDisponible: false),
+            ],
+          ),
+        ],
+      );
+      api.rutas['GET /portal/recetas/r1'] = (_) => recetaJson();
+
+      await montar(tester);
+      await bajarHasta(tester, find.byKey(const Key('certificado-c1')));
+      expect(find.byKey(const Key('pdf-receta-r1')), findsNothing);
+      expect(find.byKey(const Key('pdf-certificado-c1')), findsNothing);
+      expect(find.text('Firmada electrónicamente'), findsNothing);
+
+      await tocar(tester, find.byKey(const Key('receta-r1')));
+      expect(find.byKey(const Key('sello-firma')), findsNothing);
+      expect(find.byKey(const Key('boton-ver-pdf')), findsNothing);
+    });
+
+    testWidgets('una consulta todavía abierta enseña solo lo firmado', (
+      tester,
+    ) async {
+      respuesta = miSaludJson(
+        atenciones: [
+          atencionEnCursoJson(certificados: [certificadoJson()]),
+          atencionJson(),
+        ],
+      );
+
+      await montar(tester);
+      await bajarHasta(tester, find.byKey(const Key('certificado-c1')));
+
+      expect(find.text('En curso'), findsOneWidget);
+      expect(find.textContaining('La consulta sigue abierta'), findsOneWidget);
+      expect(find.text('Reposo absoluto · 3 días'), findsOneWidget);
+      expect(find.byKey(const Key('pdf-certificado-c1')), findsOneWidget);
+    });
+
+    testWidgets('con el diagnóstico autorizado, el certificado lo enseña', (
+      tester,
+    ) async {
+      await montarPantalla(
+        tester,
+        CertificadoPage(
+          id: 'c2',
+          servicio: MiSaludService(
+            DioGrabador({
+              'GET /portal/certificados/c2': (_) => certificadoJson(
+                id: 'c2',
+                mostrarDiagnostico: true,
+                tipoReposo: 'RELATIVO',
+              ),
+            }).dio,
+            cache,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reposo relativo'), findsOneWidget);
+      await bajarHasta(tester, find.textContaining('Amigdalitis aguda'));
+      expect(find.text('DIAGNÓSTICO'), findsOneWidget);
+      expect(find.textContaining('Diagnóstico reservado'), findsNothing);
+    });
+
+    testWidgets('un certificado anulado se marca y ya no ofrece el PDF', (
+      tester,
+    ) async {
+      await montarPantalla(
+        tester,
+        CertificadoPage(
+          id: 'c3',
+          servicio: MiSaludService(
+            DioGrabador({
+              'GET /portal/certificados/c3': (_) => certificadoJson(
+                id: 'c3',
+                estado: 'ANULADA',
+                anuladoMotivo: 'Fechas equivocadas',
+              ),
+            }).dio,
+            cache,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Anulado'), findsOneWidget);
+      expect(
+        find.textContaining('ya no es válido. Motivo: Fechas equivocadas'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('boton-ver-pdf')), findsNothing);
+    });
   });
 }
