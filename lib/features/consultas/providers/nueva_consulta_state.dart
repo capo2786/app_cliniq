@@ -199,6 +199,29 @@ class NuevaConsultaState extends Equatable {
 
   int get pendientesDeSubir => adjuntos.whereType<AdjuntoPendiente>().length;
 
+  /// Hay algo escrito o elegido que se perdería al salir: sin borrador,
+  /// cualquier cosa; con borrador, lo que difiere de lo guardado.
+  bool get cambiosSinGuardar {
+    if (paso == PasoConsulta.enviada || eliminada) return false;
+    if (pendientesDeSubir > 0) return true;
+
+    final respondidas = respuestasParaApi(campos, respuestas);
+    final b = borrador;
+
+    if (b == null) {
+      return descripcionLimpia.isNotEmpty || respondidas.isNotEmpty;
+    }
+
+    final guardadas = respuestasParaApi(
+      campos,
+      respuestasEditables(b.respuestas),
+    );
+
+    return descripcionLimpia != b.descripcion.trim() ||
+        respondidas.length != guardadas.length ||
+        respondidas.entries.any((e) => guardadas[e.key] != e.value);
+  }
+
   /// Todo listo para enviar.
   bool get lista =>
       motivo != null && medico != null && errores.isEmpty && !guardando;

@@ -199,6 +199,19 @@ void main() {
     );
 
     blocTest<NuevaConsultaBloc, NuevaConsultaState>(
+      'una consulta nueva tiene cambios apenas se escribe algo',
+      build: crear,
+      act: (bloc) async {
+        await hastaElFormulario(bloc);
+        expect(bloc.state.cambiosSinGuardar, isFalse);
+
+        bloc.add(const NuevaConsultaDescripcionCambiada('Me pica'));
+        await esperar(bloc, (s) => s.descripcion.isNotEmpty);
+        expect(bloc.state.cambiosSinGuardar, isTrue);
+      },
+    );
+
+    blocTest<NuevaConsultaBloc, NuevaConsultaState>(
       'otra especialidad borra el motivo, el médico y lo respondido',
       build: crear,
       act: (bloc) async {
@@ -523,6 +536,33 @@ void main() {
           'pica': true,
           'tamano': 2.5,
         });
+      },
+    );
+
+    blocTest<NuevaConsultaBloc, NuevaConsultaState>(
+      'salir sin tocar nada no pregunta; con un cambio, sí',
+      setUp: () => servicio.detalles = [borrador()],
+      build: crear,
+      act: (bloc) async {
+        bloc.add(const NuevaConsultaIniciada(borradorId: 'b1'));
+        await esperar(bloc, (s) => !s.cargando);
+        expect(bloc.state.cambiosSinGuardar, isFalse);
+
+        bloc.add(const NuevaConsultaRespuestaCambiada('zona', 'Brazos'));
+        await esperar(bloc, (s) => s.respuestas['zona'] == 'Brazos');
+        expect(bloc.state.cambiosSinGuardar, isTrue);
+
+        bloc.add(const NuevaConsultaRespuestaCambiada('zona', 'Cara'));
+        await esperar(bloc, (s) => s.respuestas['zona'] == 'Cara');
+        expect(bloc.state.cambiosSinGuardar, isFalse);
+
+        bloc.add(
+          NuevaConsultaArchivosElegidos(
+            SeleccionDeArchivos(archivos: [fotoLocal()]),
+          ),
+        );
+        await esperar(bloc, (s) => s.pendientesDeSubir == 1);
+        expect(bloc.state.cambiosSinGuardar, isTrue);
       },
     );
 

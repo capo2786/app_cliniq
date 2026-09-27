@@ -5,8 +5,11 @@ import '../features/auth/data/almacen_de_sesion.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/citas/data/citas_service.dart';
 import '../features/citas/data/videollamada_service.dart';
+import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/legal/data/legal_service.dart';
+import 'archivos/archivos_service.dart';
+import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
 import 'fechas/fecha_local.dart';
 import 'integraciones/costuras.dart';
@@ -92,14 +95,33 @@ class Servicios {
     cache,
   );
 
+  static final ConsultasService consultas = ConsultasService(
+    ApiClient().dio,
+    cache,
+  );
+
+  static final ArchivosService archivos = ArchivosService(ApiClient().dio);
+
+  static SelectorDeArchivos _selector = SelectorDelSistema();
+
+  /// La cámara, la galería y el selector de archivos del teléfono.
+  static SelectorDeArchivos get selectorDeArchivos => _selector;
+
+  /// Cambia los selectores por otros. Solo para pruebas: en el anfitrión de
+  /// pruebas no hay cámara ni galería.
+  @visibleForTesting
+  static set selectorParaPruebas(SelectorDeArchivos otro) => _selector = otro;
+
   /// Lo que se borra del teléfono al cerrar sesión o al vencer la sesión.
   ///
-  /// Las citas, los dependientes y los recordatorios son de quien estaba
-  /// dentro: en un teléfono compartido, la siguiente persona no tiene por
-  /// qué verlos ni oírlos. Los catálogos se quedan: son de la clínica.
+  /// Las citas, las consultas, los dependientes, los archivos descargados y
+  /// los recordatorios son de quien estaba dentro: en un teléfono compartido,
+  /// la siguiente persona no tiene por qué verlos ni oírlos. Los catálogos se
+  /// quedan: son de la clínica.
   static Future<void> limpiarDatosLocales() async {
     await recordatorios.cancelarTodo();
     await cache.vaciarDatosPersonales();
+    await archivos.borrarDescargas();
     await push.olvidarEsteTelefono();
   }
 }
