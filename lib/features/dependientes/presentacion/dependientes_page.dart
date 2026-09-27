@@ -20,6 +20,8 @@ import '../data/models/dependiente.dart';
 import '../dominio/validaciones.dart';
 import '../providers/dependientes_bloc.dart';
 import 'formulario_dependiente_page.dart';
+import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// Quienes están a cargo del titular: hijos, padres, personas que dependen
 /// de él. Se les agenda citas como a uno mismo.
@@ -261,7 +263,8 @@ class _TarjetaDependiente extends StatelessWidget {
                     if (d.parentesco != null) d.parentesco!,
                     if (anios != null) '$anios ${anios == 1 ? 'año' : 'años'}',
                     if (d.cedula != null)
-                      '${nombresDeDocumento[d.tipoDocumento] ?? 'Doc.'} ${d.cedula}',
+                      '${etiquetaDe(context.catalogos, Catalogos.tipoDocumento, d.tipoDocumento)} '
+                          '${d.cedula}',
                   ].join(' · '),
                   style: const TextStyle(
                     color: AppColors.textoSecundario,

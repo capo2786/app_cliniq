@@ -1,7 +1,10 @@
 // test/validaciones_test.dart
 
+import 'package:app_cliniq/core/catalogos/catalogo_service.dart';
 import 'package:app_cliniq/features/dependientes/dominio/validaciones.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'dobles/clinica.dart';
 
 /// La cédula con dígito verificador y las reglas del formulario de
 /// dependientes: las mismas que el panel web y que el servidor.
@@ -47,21 +50,77 @@ void main() {
   });
 
   group('Documento según su tipo', () {
+    // Lo que dice la configuración de prueba (`general.validarCedula`).
+    final validar = configDePrueba().general.validarCedula;
+
+    String? error(String? valor, String tipo, {bool? validarCedula}) =>
+        errorDeDocumento(valor, tipo, validarCedula: validarCedula ?? validar);
+
     test('vacío es válido: el documento es opcional', () {
-      expect(errorDeDocumento('', 'CEDULA'), isNull);
-      expect(errorDeDocumento(null, 'PASAPORTE'), isNull);
+      expect(error('', 'CEDULA'), isNull);
+      expect(error(null, 'PASAPORTE'), isNull);
     });
 
-    test('con CEDULA se exige el módulo 10', () {
-      expect(errorDeDocumento('1710034065', 'CEDULA'), isNull);
-      expect(errorDeDocumento('1710034066', 'CEDULA'), isNotNull);
+    test('con CEDULA y la validación encendida se exige el módulo 10', () {
+      expect(validar, isTrue);
+      expect(error('1710034065', 'CEDULA'), isNull);
+      expect(error('1710034066', 'CEDULA'), isNotNull);
+    });
+
+    test('con la validación apagada en la clínica basta con diez dígitos', () {
+      final apagada = configDePrueba(general: {'validarCedula': false})
+          .general
+          .validarCedula;
+
+      expect(error('1710034066', 'CEDULA', validarCedula: apagada), isNull);
+      expect(error('171003406', 'CEDULA', validarCedula: apagada), isNotNull);
+      expect(error('17100340a6', 'CEDULA', validarCedula: apagada), isNotNull);
     });
 
     test('con PASAPORTE, de 5 a 20 letras o números', () {
-      expect(errorDeDocumento('AB12345', 'PASAPORTE'), isNull);
-      expect(errorDeDocumento('1710034066', 'PASAPORTE'), isNull);
-      expect(errorDeDocumento('AB1', 'PASAPORTE'), isNotNull);
-      expect(errorDeDocumento('AB-12345', 'PASAPORTE'), isNotNull);
+      expect(error('AB12345', 'PASAPORTE'), isNull);
+      expect(error('1710034066', 'PASAPORTE'), isNull);
+      expect(error('AB1', 'PASAPORTE'), isNotNull);
+      expect(error('AB-12345', 'PASAPORTE'), isNotNull);
+    });
+
+    test('un tipo que la aplicación no conoce solo se mide', () {
+      expect(error('XYZ-123', 'CARNET'), isNull);
+      expect(error('X' * 21, 'CARNET'), isNotNull);
+    });
+  });
+
+  group('Catálogos de los formularios', () {
+    final catalogos = catalogosDePrueba();
+
+    test('las opciones son los códigos del catálogo, en su orden', () {
+      expect(codigosParaElegir(catalogos.items(Catalogos.sexo), null), [
+        'F',
+        'M',
+        'O',
+      ]);
+      expect(
+        codigosParaElegir(catalogos.items(Catalogos.tipoSangre), '').first,
+        'O+',
+      );
+    });
+
+    test('un valor guardado que ya no está se conserva al final', () {
+      expect(codigosParaElegir(catalogos.items(Catalogos.sexo), 'X'), [
+        'F',
+        'M',
+        'O',
+        'X',
+      ]);
+    });
+
+    test('la etiqueta sale del catálogo; sin ella, el código', () {
+      expect(etiquetaDe(catalogos, Catalogos.sexo, 'M'), 'Masculino');
+      expect(
+        etiquetaDe(catalogos, Catalogos.tipoDocumento, 'CEDULA'),
+        'Cédula',
+      );
+      expect(etiquetaDe(catalogos, Catalogos.sexo, 'X'), 'X');
     });
   });
 

@@ -9,6 +9,8 @@
 library;
 
 import '../../../core/fechas/fecha_local.dart';
+import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/catalogos/catalogos_cubit.dart';
 
 /// Cédula ecuatoriana con dígito verificador (módulo 10).
 ///
@@ -42,19 +44,32 @@ bool esPasaporteValido(String valor) =>
 
 /// El error de un número de documento, o `null` si vale (o está vacío: el
 /// documento es opcional).
-String? errorDeDocumento(String? valor, String tipoDocumento) {
+///
+/// Los tipos son los códigos del catálogo `TIPO_DOCUMENTO` (códigos fijos).
+/// La cédula se valida con su dígito verificador solo si la clínica lo
+/// pide ([validarCedula], `general.validarCedula`); si no, basta con que
+/// tenga diez dígitos. Un tipo que la aplicación no conoce solo se mide.
+String? errorDeDocumento(
+  String? valor,
+  String tipoDocumento, {
+  required bool validarCedula,
+}) {
   final texto = valor?.trim() ?? '';
   if (texto.isEmpty) return null;
 
-  if (tipoDocumento == 'PASAPORTE') {
-    return esPasaporteValido(texto)
-        ? null
-        : 'El pasaporte debe tener entre 5 y 20 letras o números.';
+  switch (tipoDocumento) {
+    case 'PASAPORTE':
+      return esPasaporteValido(texto)
+          ? null
+          : 'El pasaporte debe tener entre 5 y 20 letras o números.';
+    case 'CEDULA':
+      final vale = validarCedula
+          ? esCedulaValida(texto)
+          : RegExp(r'^\d{10}$').hasMatch(texto);
+      return vale ? null : 'La cédula no es válida. Revisa los diez dígitos.';
+    default:
+      return errorDeLargo(texto, 20);
   }
-
-  return esCedulaValida(texto)
-      ? null
-      : 'La cédula no es válida. Revisa los diez dígitos.';
 }
 
 /// Si una fecha «AAAA-MM-DD» cae después de hoy.
@@ -116,25 +131,23 @@ int? edad(String? fechaNacimiento, DateTime hoy) {
   return anios >= 0 ? anios : null;
 }
 
-/// Los valores que acepta la API para sexo y tipo de sangre.
-const Map<String, String> nombresDeSexo = {
-  'F': 'Femenino',
-  'M': 'Masculino',
-  'O': 'Otro',
-};
+/// Los códigos de un catálogo para ofrecerlos en un selector, en el orden
+/// del panel, y el [actual] al final si el catálogo ya no lo trae (un dato
+/// guardado antes no se pierde al editar).
+List<String> codigosParaElegir(List<ItemCatalogo> items, String? actual) {
+  final codigos = [
+    for (final item in items)
+      if (item.codigo.isNotEmpty) item.codigo,
+  ];
 
-const List<String> tiposDeSangre = [
-  'A+',
-  'A-',
-  'B+',
-  'B-',
-  'AB+',
-  'AB-',
-  'O+',
-  'O-',
-];
+  if (actual != null && actual.isNotEmpty && !codigos.contains(actual)) {
+    codigos.add(actual);
+  }
 
-const Map<String, String> nombresDeDocumento = {
-  'CEDULA': 'Cédula',
-  'PASAPORTE': 'Pasaporte',
-};
+  return codigos;
+}
+
+/// La etiqueta de un código según su catálogo (`F` → «Femenino»), o el
+/// código tal cual si el catálogo no lo trae.
+String etiquetaDe(CatalogosState catalogos, String clave, String codigo) =>
+    catalogos.nombreDe(clave, codigo) ?? codigo;

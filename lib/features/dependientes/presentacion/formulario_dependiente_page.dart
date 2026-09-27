@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/catalogos/catalogos_cubit.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/avisos.dart';
@@ -19,6 +18,8 @@ import '../../../core/tema/tokens.dart';
 import '../data/models/dependiente.dart';
 import '../dominio/validaciones.dart';
 import '../providers/dependientes_bloc.dart';
+import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// Registrar o editar un dependiente.
 ///
@@ -147,15 +148,26 @@ class _FormularioDependientePageState extends State<FormularioDependientePage> {
 
   @override
   Widget build(BuildContext context) {
+    final catalogos = context.catalogos;
+    final validarCedula = context.config.general.validarCedula;
+
+    // Los parentescos de un dependiente (`PARENTESCO_DEPENDIENTE`). Uno que
+    // ya no está en el catálogo se conserva al editar.
     final parentescos = [
-      ...context.watch<CatalogosCubit>().state.parentescos,
-      // Un parentesco que ya no está en el catálogo se conserva al editar.
+      ...catalogos.parentescosDependiente,
       if (_parentesco != null &&
-          !context.read<CatalogosCubit>().state.parentescos.contains(
-            _parentesco,
-          ))
+          !catalogos.parentescosDependiente.contains(_parentesco))
         _parentesco!,
     ];
+    final tiposDocumento = codigosParaElegir(
+      catalogos.items(Catalogos.tipoDocumento),
+      _tipoDocumento,
+    );
+    final sexos = codigosParaElegir(catalogos.items(Catalogos.sexo), _sexo);
+    final tiposSangre = codigosParaElegir(
+      catalogos.items(Catalogos.tipoSangre),
+      _tipoSangre,
+    );
 
     return BlocConsumer<DependientesBloc, DependientesState>(
       listenWhen: (antes, ahora) =>
@@ -232,8 +244,17 @@ class _FormularioDependientePageState extends State<FormularioDependientePage> {
                   const EtiquetaCampo('Documento'),
                   SegmentedButton<String>(
                     segments: [
-                      for (final e in nombresDeDocumento.entries)
-                        ButtonSegment(value: e.key, label: Text(e.value)),
+                      for (final codigo in tiposDocumento)
+                        ButtonSegment(
+                          value: codigo,
+                          label: Text(
+                            etiquetaDe(
+                              catalogos,
+                              Catalogos.tipoDocumento,
+                              codigo,
+                            ),
+                          ),
+                        ),
                     ],
                     selected: {_tipoDocumento},
                     onSelectionChanged: (valor) {
@@ -265,8 +286,11 @@ class _FormularioDependientePageState extends State<FormularioDependientePage> {
                             LengthLimitingTextInputFormatter(10),
                           ]
                         : [LengthLimitingTextInputFormatter(20)],
-                    validator: (valor) =>
-                        errorDeDocumento(valor, _tipoDocumento),
+                    validator: (valor) => errorDeDocumento(
+                      valor,
+                      _tipoDocumento,
+                      validarCedula: validarCedula,
+                    ),
                   ),
                   const SizedBox(height: 14),
                   Row(
@@ -278,10 +302,10 @@ class _FormularioDependientePageState extends State<FormularioDependientePage> {
                             const EtiquetaCampo('Sexo'),
                             SelectorCliniq<String>(
                               valor: _sexo,
-                              opciones: ['', ...nombresDeSexo.keys],
+                              opciones: ['', ...sexos],
                               etiqueta: (s) => s.isEmpty
                                   ? 'Sin indicar'
-                                  : nombresDeSexo[s] ?? s,
+                                  : etiquetaDe(catalogos, Catalogos.sexo, s),
                               pista: 'Sin indicar',
                               onChanged: (valor) =>
                                   setState(() => _sexo = valor ?? ''),
@@ -297,8 +321,14 @@ class _FormularioDependientePageState extends State<FormularioDependientePage> {
                             const EtiquetaCampo('Tipo de sangre'),
                             SelectorCliniq<String>(
                               valor: _tipoSangre,
-                              opciones: ['', ...tiposDeSangre],
-                              etiqueta: (t) => t.isEmpty ? 'Sin indicar' : t,
+                              opciones: ['', ...tiposSangre],
+                              etiqueta: (t) => t.isEmpty
+                                  ? 'Sin indicar'
+                                  : etiquetaDe(
+                                      catalogos,
+                                      Catalogos.tipoSangre,
+                                      t,
+                                    ),
                               pista: 'Sin indicar',
                               onChanged: (valor) =>
                                   setState(() => _tipoSangre = valor ?? ''),

@@ -14,6 +14,7 @@ import 'package:app_cliniq/core/catalogos/catalogos_cubit.dart';
 import 'package:app_cliniq/core/configuracion/config_publica.dart';
 import 'package:app_cliniq/core/configuracion/config_publica_cubit.dart';
 import 'package:app_cliniq/core/configuracion/config_publica_service.dart';
+import 'package:app_cliniq/core/red/estado_de_la_red.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/agendar/dominio/reglas_agendamiento.dart';
 import 'package:dio/dio.dart';
@@ -274,10 +275,12 @@ CatalogoService servicioDeCatalogosSinRed() =>
 /// clínica, ya cargados, como los tiene la aplicación después del arranque.
 Widget conDatosDeLaClinica(
   Widget child, {
+  Key? key,
   ConfigPublica? config,
   CatalogosState? catalogos,
 }) {
   return MultiBlocProvider(
+    key: key,
     providers: [
       BlocProvider(
         create: (_) => ConfigPublicaCubit(
@@ -294,6 +297,22 @@ Widget conDatosDeLaClinica(
     ],
     child: child,
   );
+}
+
+/// Un sondeo de red que contesta enseguida que hay conexión, para las
+/// pantallas sueltas que lo consultan (sin él, el sondeo de verdad dejaría
+/// un plazo pendiente al terminar la prueba).
+void sondeoConRed() {
+  SondeoDeRed.olvidarLaInstancia();
+  final dio = Dio()
+    ..interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (pedido, manejador) => manejador.resolve(
+          Response<dynamic>(requestOptions: pedido, statusCode: 200, data: ''),
+        ),
+      ),
+    );
+  SondeoDeRed(dio);
 }
 
 /// Las rutas públicas de la clínica para [AdaptadorHttpFalso]: la

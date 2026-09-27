@@ -26,6 +26,7 @@ import '../providers/perfil_cubit.dart';
 import 'editar_perfil_page.dart';
 import 'widgets/seguridad.dart';
 import '../../../core/configuracion/en_contexto.dart';
+import '../../../core/catalogos/catalogo_service.dart';
 
 /// El perfil: datos personales y clínicos, seguridad de la cuenta,
 /// documentos aceptados y la salida.
@@ -251,7 +252,7 @@ class _Identidad extends StatelessWidget {
                   child: Text(
                     usuario.cedula == null
                         ? 'Paciente de ${context.config.clinica.nombre}'
-                        : '${nombresDeDocumento[usuario.tipoDocumento] ?? 'Documento'} '
+                        : '${etiquetaDe(context.catalogos, Catalogos.tipoDocumento, usuario.tipoDocumento)} '
                               '${usuario.cedula}',
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -300,12 +301,20 @@ class _DatosPersonales extends StatelessWidget {
           FilaDato(
             icono: Icons.wc_rounded,
             rotulo: 'Sexo',
-            valor: nombresDeSexo[usuario.sexo] ?? usuario.sexo,
+            valor: usuario.sexo == null
+                ? null
+                : etiquetaDe(context.catalogos, Catalogos.sexo, usuario.sexo!),
           ),
           FilaDato(
             icono: Icons.bloodtype_outlined,
             rotulo: 'Tipo de sangre',
-            valor: usuario.tipoSangre,
+            valor: usuario.tipoSangre == null
+                ? null
+                : etiquetaDe(
+                    context.catalogos,
+                    Catalogos.tipoSangre,
+                    usuario.tipoSangre!,
+                  ),
           ),
           FilaDato(
             icono: Icons.home_outlined,

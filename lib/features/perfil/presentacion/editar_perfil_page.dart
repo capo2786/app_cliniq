@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/catalogos/catalogos_cubit.dart';
 import '../../../core/fechas/fecha_local.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/avisos.dart';
@@ -18,6 +17,8 @@ import '../../../core/tema/tokens.dart';
 import '../../auth/data/models/usuario.dart';
 import '../../dependientes/dominio/validaciones.dart';
 import '../providers/perfil_cubit.dart';
+import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/configuracion/en_contexto.dart';
 
 /// Editar los datos propios que la API deja cambiar a uno mismo: nombre,
 /// teléfono, datos demográficos, contacto de emergencia y perfil clínico.
@@ -160,7 +161,14 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
 
   @override
   Widget build(BuildContext context) {
-    final parentescos = context.watch<CatalogosCubit>().state.parentescos;
+    final catalogos = context.catalogos;
+    // El parentesco del contacto de emergencia (`PARENTESCO`).
+    final parentescos = catalogos.parentescos;
+    final sexos = codigosParaElegir(catalogos.items(Catalogos.sexo), _sexo);
+    final tiposSangre = codigosParaElegir(
+      catalogos.items(Catalogos.tipoSangre),
+      _tipoSangre,
+    );
 
     return BlocConsumer<PerfilCubit, PerfilState>(
       listenWhen: (antes, ahora) =>
@@ -252,9 +260,10 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                             const EtiquetaCampo('Sexo'),
                             SelectorCliniq<String>(
                               valor: _sexo,
-                              opciones: ['', ...nombresDeSexo.keys],
-                              etiqueta: (s) =>
-                                  s.isEmpty ? 'Sin indicar' : nombresDeSexo[s]!,
+                              opciones: ['', ...sexos],
+                              etiqueta: (s) => s.isEmpty
+                                  ? 'Sin indicar'
+                                  : etiquetaDe(catalogos, Catalogos.sexo, s),
                               pista: 'Sin indicar',
                               onChanged: (v) => setState(() => _sexo = v ?? ''),
                             ),
@@ -269,8 +278,14 @@ class _EditarPerfilPageState extends State<EditarPerfilPage> {
                             const EtiquetaCampo('Tipo de sangre'),
                             SelectorCliniq<String>(
                               valor: _tipoSangre,
-                              opciones: ['', ...tiposDeSangre],
-                              etiqueta: (t) => t.isEmpty ? 'Sin indicar' : t,
+                              opciones: ['', ...tiposSangre],
+                              etiqueta: (t) => t.isEmpty
+                                  ? 'Sin indicar'
+                                  : etiquetaDe(
+                                      catalogos,
+                                      Catalogos.tipoSangre,
+                                      t,
+                                    ),
                               pista: 'Sin indicar',
                               onChanged: (v) =>
                                   setState(() => _tipoSangre = v ?? ''),

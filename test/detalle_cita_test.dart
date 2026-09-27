@@ -3,7 +3,6 @@
 import 'package:app_cliniq/core/catalogos/catalogo_service.dart';
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/fechas/zona_clinica.dart';
-import 'package:app_cliniq/core/red/estado_de_la_red.dart';
 import 'package:app_cliniq/core/tema/tema_app.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
 import 'package:app_cliniq/features/citas/presentacion/widgets/detalle_cita.dart';
@@ -17,7 +16,7 @@ import 'dobles/clinica.dart';
 /// contacto.
 void main() {
   setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
-  setUp(SondeoDeRed.olvidarLaInstancia);
+  setUp(sondeoConRed);
 
   // Faltan 20 horas: con 12 de anticipación se puede cambiar; con 24, no.
   Cita cita() {
