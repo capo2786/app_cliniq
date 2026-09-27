@@ -29,6 +29,7 @@ import 'service/biometria_service.dart';
 import 'storage/almacen_claves.dart';
 import 'storage/cache_local.dart';
 import 'storage/credenciales_service.dart';
+import 'web/vista_web.dart';
 import '../features/navegacion/data/menu_service.dart';
 
 /// Raíz de composición: el único lugar donde nacen los servicios.
@@ -90,6 +91,18 @@ class Servicios {
     sala: const SalaJitsi(),
     permisos: const PermisosDelSistema(),
   );
+
+  static FabricaDeVistaWeb _vistaWeb = const VistaWebDelSistema();
+
+  /// Las páginas de fuera (un enlace externo del menú, un enlace web de un
+  /// artículo de ayuda o de un documento): en un WebView de la propia
+  /// aplicación, bajo la cabecera de Cliniq.
+  static FabricaDeVistaWeb get vistaWeb => _vistaWeb;
+
+  /// Cambia la vista web por otra. Solo para pruebas: en el anfitrión de
+  /// pruebas no hay WebView.
+  @visibleForTesting
+  static set vistaWebParaPruebas(FabricaDeVistaWeb otra) => _vistaWeb = otra;
 
   // ── Módulos ────────────────────────────────────────────────────────
   static final AuthService auth = AuthService(ApiClient().dio);

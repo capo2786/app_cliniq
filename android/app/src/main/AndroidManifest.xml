@@ -115,18 +115,11 @@
         </intent>
 
         <!--
-            El navegador integrado (Custom Tabs): el registro, el panel web
-            y los enlaces externos del menú. La videoconsulta no: va en un
-            WebView de la aplicación
+            Sin http ni https: la aplicación no abre el navegador. El
+            registro es una pantalla propia, y los enlaces externos del menú
+            y de los artículos se abren en un WebView de la aplicación, como
+            la videoconsulta.
         -->
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="http" />
-        </intent>
-        <intent>
-            <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="https" />
-        </intent>
 
         <!--
             Llamar o escribir a la clínica desde su teléfono y su correo
