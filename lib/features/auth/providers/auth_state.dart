@@ -82,7 +82,8 @@ class AuthAutenticado extends AuthState {
 class AuthError extends AuthState {
   final String mensaje;
 
-  /// La cuenta quedó bloqueada 15 minutos (HTTP 423).
+  /// La cuenta quedó bloqueada por varios intentos fallidos (HTTP 423). Por
+  /// cuántos minutos lo dice la configuración (`seguridad.bloqueoMinutos`).
   final bool bloqueada;
 
   /// Falta confirmar el correo (HTTP 403, `CORREO_NO_VERIFICADO`).

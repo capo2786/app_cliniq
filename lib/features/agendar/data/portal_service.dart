@@ -113,7 +113,8 @@ class PortalService {
     return Cita.desdeJson(respuesta.data as Map);
   }
 
-  /// `PATCH /portal/citas/:id/reprogramar`. Exige 12 horas de anticipación.
+  /// `PATCH /portal/citas/:id/reprogramar`. Exige las horas de anticipación
+  /// de la clínica (`agenda.horasMinimasCambio`).
   Future<Cita> reprogramar(String id, DateTime inicio, DateTime fin) async {
     final respuesta = await _dio.patch<dynamic>(
       '/portal/citas/$id/reprogramar',
@@ -123,7 +124,8 @@ class PortalService {
     return Cita.desdeJson(respuesta.data as Map);
   }
 
-  /// `PATCH /portal/citas/:id/cancelar`. Exige 12 horas de anticipación.
+  /// `PATCH /portal/citas/:id/cancelar`. Exige las horas de anticipación de
+  /// la clínica (`agenda.horasMinimasCambio`).
   Future<Cita> cancelar(String id, String motivo, {String? detalle}) async {
     final respuesta = await _dio.patch<dynamic>(
       '/portal/citas/$id/cancelar',

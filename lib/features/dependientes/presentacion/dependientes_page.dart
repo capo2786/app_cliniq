@@ -22,6 +22,7 @@ import '../providers/dependientes_bloc.dart';
 import 'formulario_dependiente_page.dart';
 import '../../../core/catalogos/catalogo_service.dart';
 import '../../../core/configuracion/en_contexto.dart';
+import '../../../core/presentacion/widgets/contacto_clinica.dart';
 
 /// Quienes están a cargo del titular: hijos, padres, personas que dependen
 /// de él. Se les agenda citas como a uno mismo.
@@ -89,6 +90,7 @@ class DependientesPage extends StatelessWidget {
                         'Si necesitas agendar para alguien a tu '
                         'cargo, pide que lo habiliten en la clínica.',
                   ),
+                  Center(child: ContactoClinica()),
                 ],
               )
             : BlocConsumer<DependientesBloc, DependientesState>(

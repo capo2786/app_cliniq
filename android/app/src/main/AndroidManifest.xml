@@ -116,6 +116,19 @@
             <data android:scheme="https" />
         </intent>
 
+        <!--
+            Llamar o escribir a la clínica desde su teléfono y su correo
+            (vienen de la configuración de la clínica)
+        -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tel" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+
         <!-- Tomar la foto de un adjunto con la cámara del teléfono -->
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />

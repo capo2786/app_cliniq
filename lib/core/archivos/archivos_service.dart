@@ -48,7 +48,7 @@ class ArchivosService {
       queryParameters: const {'inline': '1'},
       options: Options(
         responseType: ResponseType.bytes,
-        // Un PDF de 20 MB con datos móviles tarda más que una lista de citas.
+        // Un PDF grande con datos móviles tarda más que una lista de citas.
         receiveTimeout: const Duration(minutes: 2),
       ),
     );

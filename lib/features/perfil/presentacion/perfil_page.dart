@@ -27,6 +27,7 @@ import 'editar_perfil_page.dart';
 import 'widgets/seguridad.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/catalogos/catalogo_service.dart';
+import '../../../core/presentacion/widgets/contacto_clinica.dart';
 
 /// El perfil: datos personales y clínicos, seguridad de la cuenta,
 /// documentos aceptados y la salida.
@@ -333,10 +334,10 @@ class _DatosPersonales extends StatelessWidget {
                   ].join(' · '),
           ),
           const Divider(color: AppColors.bordeCampo, height: 22),
-          const Text(
-            'El correo y la cédula se cambian en la clínica: son con lo que '
-            'se te identifica.',
-            style: TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
+          const ContactoClinica(
+            mensaje:
+                'El correo y la cédula se cambian en la clínica: son con lo '
+                'que se te identifica.',
           ),
         ],
       ),

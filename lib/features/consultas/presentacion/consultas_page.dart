@@ -26,6 +26,7 @@ import 'detalle_consulta_page.dart';
 import 'nueva_consulta_page.dart';
 import 'widgets/tarjeta_consulta.dart';
 import '../../../core/configuracion/en_contexto.dart';
+import '../../../core/presentacion/widgets/contacto_clinica.dart';
 
 /// Consultas en línea: las del paciente y las de sus dependientes, con los
 /// borradores arriba, las abiertas después y las terminadas al final.
@@ -136,6 +137,7 @@ class _ConsultasPageState extends State<ConsultasPage> {
                         'Esta sección es para pacientes. Si crees que es un '
                         'error, consúltalo en la clínica.',
                   ),
+                  Center(child: ContactoClinica()),
                 ],
               )
             : BlocConsumer<ConsultasBloc, ConsultasState>(
