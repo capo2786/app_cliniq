@@ -88,6 +88,9 @@ class Usuario extends Equatable {
 
   List<String> get permisos => _lista('permisos');
 
+  /// Los nombres de sus roles (`PACIENTE`…), como los manda la API.
+  List<String> get roles => _lista('roles');
+
   /// Claves de los documentos legales que todavía no aceptó.
   List<String> get legalPendientes => _lista('legalPendientes');
 

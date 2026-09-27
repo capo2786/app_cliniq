@@ -35,9 +35,15 @@ class DocumentoLegal extends Equatable {
   /// Dónde se lee, en el panel web.
   String get url => Entorno.urlLegal(slug);
 
-  /// Si le toca a este tipo de usuario. Sin tipos, a todos.
-  bool aplicaA(int tipoDeUsuario) =>
-      tipos.isEmpty || tipos.contains('$tipoDeUsuario');
+  /// Si le toca a esta persona: por su tipo de usuario (`3`) o por el
+  /// nombre de uno de sus roles (`PACIENTE`), que es como el contrato dice
+  /// que la API puede mandarlo. Sin tipos, a todos.
+  bool aplicaA({required int tipoDeUsuario, List<String> roles = const []}) {
+    if (tipos.isEmpty) return true;
+
+    final buscados = {'$tipoDeUsuario', for (final r in roles) r.toUpperCase()};
+    return tipos.any((t) => buscados.contains(t.toUpperCase()));
+  }
 
   static DocumentoLegal? desdeJson(Object? json) {
     if (json is! Map) return null;

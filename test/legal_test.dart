@@ -73,8 +73,18 @@ void main() {
       lista.first.url,
       'https://cliniq.gcaicedo-proyectos.com/legal/terminos-de-uso',
     );
-    expect(lista.first.aplicaA(3), isTrue);
-    expect(lista.last.aplicaA(3), isFalse);
+    expect(lista.first.aplicaA(tipoDeUsuario: 3), isTrue);
+    expect(lista.last.aplicaA(tipoDeUsuario: 3), isFalse);
+    // Con nombres de rol en lugar de números, también.
+    const porNombre = DocumentoLegal(
+      clave: 'X',
+      slug: 'x',
+      version: '1',
+      titulo: 'X',
+      tipos: ['PACIENTE'],
+    );
+    expect(porNombre.aplicaA(tipoDeUsuario: 3, roles: ['PACIENTE']), isTrue);
+    expect(porNombre.aplicaA(tipoDeUsuario: 2, roles: ['MEDICO']), isFalse);
   });
 
   test('sin red, la última lista guardada; sin copia, el error', () async {

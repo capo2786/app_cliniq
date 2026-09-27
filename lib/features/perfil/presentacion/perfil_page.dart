@@ -560,7 +560,7 @@ class _DocumentosDeLaClinica extends StatelessWidget {
       builder: (context, state) {
         final documentos = [
           for (final d in state.documentos)
-            if (d.aplicaA(usuario.tipo)) d,
+            if (d.aplicaA(tipoDeUsuario: usuario.tipo, roles: usuario.roles)) d,
         ];
 
         if (documentos.isEmpty) return const SizedBox.shrink();
