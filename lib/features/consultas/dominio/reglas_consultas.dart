@@ -1,9 +1,12 @@
 import '../../../core/configuracion/config_publica.dart';
 import '../../../core/fechas/fecha_local.dart';
-import '../../../core/fechas/instante.dart';
 import '../../../core/formato/fechas.dart';
 import '../data/models/campo_formulario.dart';
 import '../data/models/consulta.dart';
+
+// Los instantes se formatean igual en toda la aplicación (antes vivían
+// aquí): quien importa estas reglas los sigue teniendo.
+export '../../../core/formato/instantes.dart' show momentoLegible, selloLegible;
 
 /// Hasta cuántos caracteres admite la descripción y cada mensaje (los mismos
 /// del servidor para los mensajes: 1–4000).
@@ -79,17 +82,6 @@ String? tiempoRestante(ConsultaResumen consulta, DateTime ahora) {
 /// Si ya pasó el plazo de respuesta.
 bool estaDemorada(ConsultaResumen consulta, DateTime ahora) =>
     tiempoRestante(consulta, ahora) == 'Demorada';
-
-/// «Lunes 28 de septiembre, 14:00»: un instante de la API en la hora de la
-/// clínica.
-String momentoLegible(DateTime instante) {
-  final local = enHoraDeLaClinica(instante);
-  return '${FormatoFecha.diaLargo(local)}, ${FormatoFecha.hora(local)}';
-}
-
-/// «28/09/2026 · 14:00», para los sellos de los mensajes.
-String selloLegible(DateTime instante) =>
-    FormatoFecha.cortaConHora(enHoraDeLaClinica(instante));
 
 // ── Listas ───────────────────────────────────────────────────────────
 
