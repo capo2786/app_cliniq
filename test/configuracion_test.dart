@@ -190,39 +190,41 @@ void main() {
       );
     });
 
-    test('las horas de soporte por severidad: un objeto de enteros desde 1',
-        () {
-      expect(
-        configDePrueba(
-          general: {
-            'soporteHorasSla': {'CRITICA': '6', 'BAJA': 200},
-          },
-        ).general.soporteHorasSla,
-        {'CRITICA': 6, 'BAJA': 200},
-      );
-      expect(
-        () => configDePrueba(general: {'soporteHorasSla': <String, int>{}}),
-        throwsFormatException,
-      );
-      expect(
-        () => configDePrueba(general: {'soporteHorasSla': 72}),
-        throwsFormatException,
-      );
-      expect(
-        () => configDePrueba(
-          general: {
-            'soporteHorasSla': {'ALTA': 0},
-          },
-        ),
-        throwsA(
-          isA<FormatException>().having(
-            (e) => e.message,
-            'message',
-            contains('general.soporteHorasSla.ALTA'),
+    test(
+      'las horas de soporte por severidad: un objeto de enteros desde 1',
+      () {
+        expect(
+          configDePrueba(
+            general: {
+              'soporteHorasSla': {'CRITICA': '6', 'BAJA': 200},
+            },
+          ).general.soporteHorasSla,
+          {'CRITICA': 6, 'BAJA': 200},
+        );
+        expect(
+          () => configDePrueba(general: {'soporteHorasSla': <String, int>{}}),
+          throwsFormatException,
+        );
+        expect(
+          () => configDePrueba(general: {'soporteHorasSla': 72}),
+          throwsFormatException,
+        );
+        expect(
+          () => configDePrueba(
+            general: {
+              'soporteHorasSla': {'ALTA': 0},
+            },
           ),
-        ),
-      );
-    });
+          throwsA(
+            isA<FormatException>().having(
+              (e) => e.message,
+              'message',
+              contains('general.soporteHorasSla.ALTA'),
+            ),
+          ),
+        );
+      },
+    );
 
     test('los días de gestación salen de la sección clínica', () {
       expect(

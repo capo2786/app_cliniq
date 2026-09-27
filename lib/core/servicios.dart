@@ -8,6 +8,7 @@ import '../features/citas/data/videollamada_service.dart';
 import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/legal/data/legal_service.dart';
+import '../features/mi_salud/data/mi_salud_service.dart';
 import 'archivos/archivos_service.dart';
 import 'archivos/selector_de_archivos.dart';
 import 'catalogos/catalogo_service.dart';
@@ -113,6 +114,10 @@ class Servicios {
   );
 
   static final ArchivosService archivos = ArchivosService(ApiClient().dio);
+
+  // ── Mi salud, centro de ayuda y soporte ────────────────────────────
+  /// La historia clínica que ve el paciente, sus recetas y sus órdenes.
+  static final MiSaludService miSalud = MiSaludService(ApiClient().dio, cache);
 
   static SelectorDeArchivos _selector = SelectorDelSistema();
 

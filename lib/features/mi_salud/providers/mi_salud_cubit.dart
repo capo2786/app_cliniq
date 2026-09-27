@@ -105,6 +105,9 @@ class MiSaludCubit extends Cubit<MiSaludState> {
     this._dependientes,
   }) : super(const MiSaludState());
 
+  /// El servicio con que se abren las recetas y las órdenes de la lista.
+  MiSaludService get servicio => _servicio;
+
   /// Al abrir: los dependientes (sin esperar por ellos) y la salud del
   /// titular.
   Future<void> iniciar() async {
