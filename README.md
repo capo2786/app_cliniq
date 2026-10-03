@@ -27,7 +27,7 @@ la aplicación salen del mismo cálculo, portado línea a línea.
 | Java | 17 (compilación de Android) |
 | Xcode | Solo para compilar iOS |
 | Android | 7.0 (API 24) o posterior: el mínimo de Flutter |
-| iOS | 15.1 o posterior: la videoconsulta en WKWebView (WebRTC y el permiso de la cámara para la página) |
+| iOS | 15.5 o posterior: ML Kit (el rostro del escáner) pide 15.5; la videoconsulta en WKWebView, 15.1 |
 
 Con [FVM](https://fvm.app) instalado, `fvm use` deja la versión correcta.
 
@@ -210,16 +210,16 @@ antes de tocarla.
 | --- | --- | --- |
 | `camera` ^0.12.1 | Los cuadros de la cámara (YUV420 o NV21 en Android, BGRA en iOS) y el flash como linterna en el modo dedo (`FlashMode.torch`). En Android trae CameraX 1.6 (`camera_android_camerax`); en iOS usa AVFoundation del sistema (`camera_avfoundation`, iOS 13+) | ~1–2 MB en Android (CameraX), ~0,2 MB en iOS |
 | `fftea` ^1.5.0+1 | La FFT del procesamiento de la señal (Dart puro, MIT). El filtro Butterworth es propio (biquads de 20 líneas, probados): `iirjdart` es de 2022 y no admite Dart 3 | <50 KB |
-| `fl_chart` ^1.2.0 | El gráfico de la evolución del pulso y de la presión en «Mis signos vitales» (Dart puro) | ~0,3 MB |
+| `fl_chart` ^1.2.0 | Las «Tendencias» de «Mis signos vitales» (con la franja de referencia) y las gráficas del detalle de la medición (Dart puro) | ~0,3 MB |
+| `google_mlkit_face_detection` ^0.15.1 | El rostro del escáner: la caja, los ángulos y los contornos (~130 puntos) de la cara, con ML Kit de Google, **gratis y en el teléfono**. Modelo empaquetado (`com.google.mlkit:face-detection` en Android; `GoogleMLKit/FaceDetection` en iOS): funciona sin red desde el primer uso | Android: unos 7 MB más por arquitectura (lo que Google indica para el modelo empaquetado). iOS: varios MB más por los pods de ML Kit (`MLKitVision`, `FaceDetection`); hay que medirlo en el primer IPA (`flutter build ipa --analyze-size`) |
 
-Ninguno hace red: el escáner entero ocurre en el teléfono. **No se usa
-`google_mlkit_face_detection`**, aunque el contrato lo nombraba: el SDK de ML
-Kit, según los términos de Google, puede contactar a sus servidores
-(métricas de uso y actualizaciones) y el dueño pidió que el escáner no use
-dependencias que hagan red; además sumaba ~7 MB en Android y obligaba a
-subir iOS a 15.5. En su lugar, el modo rostro mide la piel dentro del óvalo
-que la persona ve en pantalla (ver «Escáner experimental»). Si más adelante
-se acepta ML Kit, entra detrás de `ExtractorDeRostro` sin tocar el resto.
+**Privacidad con ML Kit.** Las imágenes de la cámara **nunca salen del
+teléfono ni se guardan**: cada cuadro pasa al código nativo de ML Kit en el
+mismo teléfono y se suelta. Según los términos de Google, ML Kit **puede
+enviar a Google métricas anónimas de uso de la librería** (rendimiento,
+errores, versión), **nunca imágenes**. Si ML Kit no está o falla dos veces
+seguidas, el escáner sigue por el color de la piel dentro del marco, sin
+cortar la medición (ver «Escáner experimental»). Lo demás no hace red.
 
 ### Fechas y recordatorios
 
@@ -276,10 +276,14 @@ El identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   `flutter_file_dialog` pide `minSdk` 24, que es el de Flutter.
 
 - **Escáner experimental.** Usa la misma `CAMERA` con el paquete `camera`:
-  la trasera con el flash como linterna (`FlashMode.torch`, sin permiso
-  aparte) o la frontal. `android.hardware.camera.flash` se declara **no
-  obligatorio**: un teléfono sin flash instala igual y el escáner le propone
-  el modo rostro. El permiso se pide al empezar a medir.
+  la frontal (el rostro, en resolución media y NV21) o, si la clínica lo
+  enciende, la trasera con el flash como linterna (`FlashMode.torch`, sin
+  permiso aparte). `android.hardware.camera.flash` se declara **no
+  obligatorio**: un teléfono sin flash instala igual. El permiso se pide al
+  empezar a medir. ML Kit pide `minSdk` 21 y el de Flutter es 24: no hay
+  nada que cambiar en Gradle; el modelo va empaquetado (sin
+  `com.google.mlkit.vision.DEPENDENCIES` en el manifiesto, que solo hace
+  falta para bajar modelos por Google Play).
 
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
@@ -302,15 +306,17 @@ escáner experimental, cuyas imágenes se procesan en el teléfono y no se
 guardan ni se envían), del micrófono
 (`NSMicrophoneUsageDescription`: la videoconsulta) y de la fototeca
 (`NSPhotoLibraryUsageDescription`), en español, y solo orientación vertical
-en teléfono. La plataforma mínima es **iOS 15.1** (`platform :ios, '15.1'` en
-`ios/Podfile` e `IPHONEOS_DEPLOYMENT_TARGET` del proyecto): WebRTC funciona en
-WKWebView desde iOS 14.3, y desde iOS 15 la aplicación concede la cámara y el
-micrófono a la página sin que esta vuelva a preguntar. El `post_install` del
+en teléfono. La plataforma mínima es **iOS 15.5** (`platform :ios, '15.5'` en
+`ios/Podfile` e `IPHONEOS_DEPLOYMENT_TARGET` del proyecto): ML Kit
+(`google_mlkit_commons` y `google_mlkit_face_detection`) pide 15.5; WebRTC
+funciona en WKWebView desde iOS 14.3, y desde iOS 15 la aplicación concede la
+cámara y el micrófono a la página sin que esta vuelva a preguntar. ML Kit no
+tiene arquitecturas de 32 bits; Flutter ya compila solo `arm64`. El `post_install` del
 `Podfile` enciende en `permission_handler` solo `PERMISSION_CAMERA` y
 `PERMISSION_MICROPHONE` (sin ellas, iOS los da por negados sin preguntar).
 Tras cambiar dependencias, `cd ios && pod install --repo-update` (el
 `Podfile.lock` del repositorio está atrasado); `pdfx`, `share_plus` y
-`flutter_file_dialog` piden iOS 13 o menos, por debajo del 15.1 del
+`flutter_file_dialog` piden iOS 13 o menos, por debajo del 15.5 del
 proyecto, y ninguno necesita una clave nueva en `Info.plist` (la carpeta de
 documentos de la aplicación no se comparte con Archivos: no hay
 `UIFileSharingEnabled`). El
@@ -1134,8 +1140,24 @@ hay accesos ni «Registrar».
   una atención». Lo propio que el médico no usó se puede borrar (pregunta
   antes; el servidor lo comprueba). «Ver mediciones anteriores» pide la
   página siguiente.
-- **La evolución**: un gráfico simple (`fl_chart`) de la presión (sistólica
-  y diastólica) y del pulso, si hay dos puntos o más, con las 30 últimas.
+- **Dos pestañas: «Tendencias» y «Registro».** «Registro» es la lista de
+  arriba. «Tendencias» (la que abre) pide al servidor las mediciones del
+  periodo elegido —**7 días, 30 días o 3 meses**— con `desde` y
+  `limit=100` (hasta 5 páginas), y enseña una tarjeta por tipo con datos
+  (FC, PA, SpO2, temperatura, glucosa, peso y FR): el último valor con su
+  fecha y su etiqueta de rango, el mínimo, el promedio y el máximo del
+  periodo y una gráfica de línea (`fl_chart`) con la **franja del rango de
+  referencia para adultos** y el texto «Referencia para adultos». Los
+  puntos de la cámara son cuadrados y los de los aparatos (o a mano),
+  círculos, con su leyenda. Sin red, la tendencia usa lo que ya está en el
+  teléfono y lo dice. El cálculo es puro y probado
+  (`dominio/tendencias.dart`).
+- **Rangos de referencia para adultos** (`dominio/rangos_referencia.dart`,
+  los mismos del panel): FC 60–100 lpm, FR 12–20 rpm, PA 90–120 / 60–80
+  mmHg, SpO2 95–100 %, temperatura 36,0–37,5 °C, glucosa 70–100 mg/dL en
+  ayunas; el peso no tiene. Dan la etiqueta «En rango (60–100)», «Alta» o
+  «Baja» y la franja de las gráficas. No son los rangos que acepta el
+  servidor (`rangoDelTipo`, mucho más anchos).
 - **«Registrar»**: el tipo (presión, pulso, saturación, temperatura,
   glucosa, peso o respiraciones), el valor —la presión con la alta y la
   baja—, cómo se midió (con un aparato; el pulso y las respiraciones,
@@ -1182,23 +1204,81 @@ decide si usa el valor (queda marcado su origen).
   tratamientos. Ante síntomas de alarma llama al
   {{clinica.telefonoEmergencia}}», con «Entiendo», recordado en la caché
   cifrada por persona (`escaner-aviso:<uid>`).
-- **Modos**: **Dedo (recomendado)**, la yema sobre la cámara trasera y el
-  flash encendido, sin apretar (con ilustración), o **Rostro (beta)**, la
-  cámara frontal con la cara dentro de un óvalo, buena luz y quieto.
-- **Mientras mide**: la onda en vivo, la cuenta regresiva y la calidad en
-  vivo con el consejo del momento («Cubre bien la cámara y el flash con la
-  yema», «Apoya el dedo sin apretar», «Quédate quieto», «Más luz»,
-  «Coloca tu rostro dentro del óvalo»). Si la calidad se queda por debajo
-  de 0,3 durante 8 segundos, se detiene con un consejo y «Reintentar». Si
-  la cámara deja de enviar cuadros 5 segundos o la aplicación pasa a
-  segundo plano, también. La cuenta va con el tiempo de los propios
-  cuadros.
-- **El resultado**: «78 lpm» con la calidad (buena desde 0,7, regular desde
-  0,4, baja por debajo; por debajo de 0,3 no se da ningún valor: «No
-  pudimos medir esta vez» con un consejo), la FR si la calidad es ≥ 0,6 y
-  hay un pico respiratorio claro, el momento (en reposo o tras actividad) y
-  quién lo calculó: «Calculado en el teléfono» o «Analizado en el servidor
-  (experimental)». Después, «Guardar en mis signos vitales», «Enviar a mi
+- **Modos**: el **rostro** es el modo de siempre. El **dedo** es opcional
+  y viene apagado (`telemedicina.escanerDedoActivo`): en un teléfono con
+  varias cámaras no siempre se sabe cuál cubrir. Apagado, no hay selector y
+  se entra directo al rostro; encendido, el selector ofrece primero «Con tu
+  rostro (recomendado)» y después «Con el dedo (alternativo)»: «Cubre con
+  la yema la lente que está junto a la luz que se enciende». El lector de
+  huellas no sirve: Android e iOS solo le dicen a la aplicación «es el
+  dueño» o «no lo es», nunca la imagen ni la señal.
+- **Mientras mide, con el rostro (a pantalla completa)**: la cámara frontal
+  cubre toda la pantalla, espejada, con una viñeta oscura fuera de un marco
+  grande (80 % del ancho, en proporción de rostro) y **cuatro esquinas que
+  respiran** (de 1,00 a 1,03) y cambian de color: blanco al buscar, ámbar
+  al ajustar, verde al medir. Encima, una **malla de alambre** con los
+  contornos que detecta ML Kit (triangulación de Delaunay propia), con
+  puntos que brillan y **laten al ritmo de la FC en vivo** (sin ella, con
+  un ritmo lento y neutro), suavizados entre detecciones para verse
+  fluidos; aparece y desaparece con un fundido. Una **línea de barrido**
+  recorre el marco cada 2,5 s. **Sin ML Kit no hay malla**: solo las
+  esquinas y el barrido. Con las animaciones del sistema apagadas no hay
+  latido ni barrido.
+  - Arriba: cerrar, «Signos vitales · Experimental» y **la guía**, una
+    instrucción a la vez: «Pon tu cara dentro del marco», «Acércate un
+    poco» (la cara ocupa menos del 35 % del ancho), «Aléjate un poco» (más
+    del 85 %), «Centra tu cara», «Mira de frente a la cámara» (giro de más
+    de 15° o inclinación de más de 12°), «Quédate quieto» (la caja se
+    mueve), «Busca un lugar con más luz» y «Perfecto, no te muevas».
+  - **Arranca sola**: la cuenta empieza cuando la cara está bien encuadrada
+    1 s seguido, con un toque háptico; antes se ve «Preparando…». Si la
+    cara se pierde más de 2 s, la cuenta **se pausa** («En pausa · 18 s»)
+    y se quitan de la serie esos cuadros; al volver bien encuadrada sigue
+    sin el hueco. Si no vuelve en 8 s, se detiene con un consejo y
+    «Reintentar».
+  - Abajo, un panel oscuro translúcido: «Frecuencia cardiaca» en vivo
+    (aparece a los 8–10 s con calidad regular o mejor, con la etiqueta «en
+    vivo»; antes, «—» con un brillo de carga), «Respiración» («—» hasta el
+    final), «Calidad de señal» con su barra, la onda con **los latidos
+    detectados marcados**, una mini gráfica de la FC de cada segundo,
+    «Latidos detectados: N», la barra de avance con «Tomando la medición…
+    18 s», «Cancelar» y «El video se analiza en tu teléfono y nunca se
+    guarda ni se envía». La FC en vivo es solo una guía: el valor final es
+    el del análisis de la medición entera.
+- **Mientras mide, con el dedo**: el círculo que late, el consejo del
+  momento («Cubre bien la cámara y el flash con la yema», «Apoya el dedo
+  sin apretar», «Quédate quieto») y el mismo panel; mide desde el primer
+  cuadro.
+- En los dos: si la calidad se queda por debajo de 0,3 durante 8 segundos,
+  se detiene con un consejo y «Reintentar». Si la cámara deja de enviar
+  cuadros 5 segundos o la aplicación pasa a segundo plano, también. La
+  cuenta va con el tiempo de los propios cuadros. Al terminar, un toque
+  háptico.
+- **El resultado**: tarjetas en dos columnas que entran escalonadas, con
+  los números subiendo: la FC con su etiqueta de rango («En rango
+  (60–100)», «Alta», «Baja»), la FR en rpm si la calidad es ≥ 0,6 y hay un
+  pico respiratorio claro, la variabilidad (SDNN y RMSSD en ms) si la
+  calculó el servidor, y la calidad (buena desde 0,7, regular desde 0,4,
+  baja por debajo; por debajo de 0,3 no se da ningún valor: «No pudimos
+  medir esta vez» con un consejo). Una tarjeta honesta, «Presión y
+  saturación: regístralas con tu tensiómetro u oxímetro», lleva a
+  «Registrar». También el momento (en reposo o tras actividad) y quién lo
+  calculó: «Calculado en el teléfono» o «Analizado en el servidor
+  (experimental)».
+- **«Detalle de la medición»**, debajo: calculado **en el teléfono** con la
+  misma serie aunque el resultado sea del servidor («Detalle calculado en
+  tu teléfono»), y sin guardarse. Datos en tarjetas pequeñas, solo con la
+  calidad que los sostiene: intervalo medio entre latidos, FC mínima y
+  máxima, latidos detectados, y con buena calidad, 30 s o más y 20
+  intervalos, pNN50, SD1 y SD2; siempre la duración y la calidad (%). Seis
+  gráficas con su explicación sencilla: la onda del pulso con sus latidos,
+  la FC durante la medición con la franja de 60 a 100, los intervalos entre
+  latidos (tacograma), Poincaré con SD1 y SD2, el espectro de 42 a 210 lpm
+  con el pico de la FC y la onda lenta de la respiración (solo con FR).
+  Sin datos suficientes, «No hay suficiente señal para esta gráfica».
+  Nunca estrés, SpO2, presión, LF/HF ni nada que 30 s de cámara no
+  sostengan.
+- Después, «Guardar en mis signos vitales», «Enviar a mi
   médico» (adjunta la medición a la **próxima cita de telemedicina** o a
   una **consulta en línea abierta** de ese paciente, la que la persona
   elija; abierto desde una cita o una consulta, a esa) o «Descartar». Se
@@ -1207,7 +1287,9 @@ decide si usa el valor (queda marcado su origen).
   v1»).
 - **Privacidad** (LOPDP), dicho en una línea en cada paso: **ninguna imagen
   se guarda ni se envía**. `FuenteCamara` reduce cada cuadro, en el
-  momento, a unos pocos promedios (`CuadroPpg`) y lo suelta; los números se
+  momento, a unos pocos promedios (`CuadroPpg`) y lo suelta (ML Kit lo
+  analiza en el mismo teléfono y puede mandar a Google métricas anónimas
+  de uso de la librería, nunca imágenes); los números se
   juntan solo mientras dura la medición y se borran al terminar, cancelar o
   descartar. Al servidor solo llegan números: el resultado y, para el
   análisis experimental, la serie de promedios por cuadro.
@@ -1220,17 +1302,38 @@ cámara ─► FuenteCamara ─► CuadroPpg ─► SerieSenal ─► MotorSigno
 ```
 
 - **La fuente** (`FuenteDeCuadros`, inyectable): la de verdad,
-  `FuenteCamara`, abre la trasera con la linterna (y fija la exposición y el
-  enfoque al encenderla) o la frontal, en la resolución más baja a 30
-  cuadros por segundo; las pruebas usan `FuenteFalsa` con señales
-  sintéticas.
+  `FuenteCamara`, abre la frontal en resolución media (ML Kit necesita
+  caras de unos 200 píxeles para los contornos) o la trasera con la
+  linterna en la más baja (y fija la exposición y el enfoque al
+  encenderla), a 30 cuadros por segundo; las pruebas usan `FuenteFalsa`
+  con señales sintéticas y `FuenteDeImagenesFalsa`, que pasa imágenes
+  sintéticas por el procesador del rostro de verdad.
+- **El rostro** (`escaner/rostro/`): `DetectorDeRostro` (interfaz;
+  `DetectorMlKit` con contornos, modo rápido y sin clasificación, y uno
+  falso en las pruebas) devuelve `RostroDetectado` —la caja, los contornos,
+  los ángulos Y y Z— en las coordenadas de la imagen derecha y espejada
+  como la ve la persona (en Android se gira según el sensor y el teléfono y
+  se espeja la frontal; en iOS el paquete `camera` ya la entrega así).
+  `ProcesadorDeRostro` detecta como mucho ~10 veces por segundo sin
+  bloquear (si hay una detección en curso, el cuadro sigue) y promedia el
+  RGB en **cada** cuadro con la última región conocida: la frente (sobre
+  las cejas) y las dos mejillas (entre el ojo, la nariz, el labio y el
+  óvalo), y de ahí solo la piel (YCbCr); como mucho ~900 píxeles por
+  cuadro. Si ML Kit no se puede crear o falla dos veces seguidas, sigue
+  con `ExtractorDeRostro` (color de piel en el marco) sin cortar. La guía
+  (`guia_encuadre.dart`), la triangulación (`delaunay.dart`, Bowyer–Watson)
+  y el suavizado son puros y probados.
+- **La cuenta** (`ControlDeMedicion`, puro): el arranque solo, la pausa y
+  la pérdida del rostro. **En vivo** (`EstimadorEnVivo`, puro): cada
+  segundo, sobre los últimos ~10 s, la calidad, la onda con sus latidos y
+  la FC, con su historia y los latidos contados sin repetir.
 - **La extracción** (`extractor_de_cuadros.dart`, pura): en el dedo, el
   promedio del rojo y de la luminancia Y del centro de la imagen, la
   cobertura (la fracción de puntos rojos y brillantes, como se ve la yema
-  con el flash detrás) y la saturación (rojos quemados). En el rostro, la
-  frente y las dos mejillas dentro del óvalo de la pantalla y, de ahí, solo
-  los puntos de **piel** por su color (YCbCr); qué puntos son piel se decide
-  cada 15 cuadros. Si hay poca piel, «Coloca tu rostro dentro del óvalo».
+  con el flash detrás) y la saturación (rojos quemados). En el respaldo del
+  rostro (sin ML Kit), la frente y las dos mejillas dentro de un óvalo fijo
+  del marco y, de ahí, solo los puntos de **piel** por su color (YCbCr);
+  qué puntos son piel se decide cada 15 cuadros.
 - **La serie** (`SerieSenal`) separa la extracción del cálculo y se escribe
   como `{metodo, t (ms), canales: {y, r} | {r, g, b}}`.
 - **El cálculo** (`dominio/procesamiento_ppg.dart` y `dominio/ppg/`, puro y
@@ -1294,7 +1397,8 @@ en release):
 3. Que la calidad baje y aparezca el consejo al: levantar el dedo («Cubre
    bien la cámara…»), apretar fuerte («Apoya el dedo sin apretar»), mover la
    mano o la cabeza («Quédate quieto»), apagar la luz en el modo rostro
-   («Más luz») y sacar la cara del óvalo.
+   («Busca un lugar con más luz») y sacar la cara del marco («Pon tu cara
+   dentro del marco»); que la cuenta arranque sola, se pause y siga.
 4. Que el flash se encienda en el modo dedo y **se apague** al terminar,
    cancelar, salir de la pantalla o pasar la aplicación a segundo plano.
 5. El permiso: negarlo una vez («Reintentar») y para siempre («Abrir
@@ -1303,11 +1407,17 @@ en release):
    aplicación (`adb shell run-as ec.cliniq.sage.app ls -R`) y, con un proxy
    (Charles, mitmproxy), que solo salgan números (el `POST
    /portal/mediciones` y, si hay red, `POST /portal/mediciones/analizar`).
-7. En el modo rostro, que la frente y las mejillas caigan dentro del óvalo
-   en la orientación del sensor de cada teléfono (si la cobertura de piel
-   sale baja con la cara bien puesta, revisar la rotación en
-   `aPixelDelSensor`).
+7. En el modo rostro, que **la malla caiga sobre la cara** (si sale
+   corrida o al revés, revisar `orientacionDelCuadro`: el giro y el espejo
+   de cada plataforma) y que la vista de la cámara y la malla tengan la
+   misma proporción (la vista previa y el flujo de imágenes usan la misma
+   resolución media). Que ML Kit funcione sin red desde la primera vez y
+   que, sin él, se vean solo las esquinas y el barrido.
 8. La temperatura del teléfono y la batería en tres mediciones seguidas.
+9. La fluidez: que la malla vaya a 60 cuadros por segundo y la cuenta no se
+   trabe con la FC en vivo (cada segundo, en el hilo principal: si da
+   tirones en un teléfono modesto, pasarla a `Isolate.run`). El tamaño de
+   la aplicación con ML Kit (`flutter build apk --analyze-size`).
 
 ## Botones de ayuda
 
