@@ -405,7 +405,9 @@ class EscanerCubit extends Cubit<EscanerState> {
   Future<void> _soltar() async {
     _vigilancia?.cancel();
     _vigilancia = null;
-    await _suscripcion?.cancel();
+    // Sin esperar: se puede estar dentro de la entrega de un cuadro, y la
+    // cancelación termina después; `_terminando` ya descarta lo que llegue.
+    unawaited(_suscripcion?.cancel());
     _suscripcion = null;
     _cuadros.clear();
     _ultimaLectura = -1;
