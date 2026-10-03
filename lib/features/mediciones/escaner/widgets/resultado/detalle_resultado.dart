@@ -54,13 +54,20 @@ class DetalleDeLaMedicion extends StatelessWidget {
           style: TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
         ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final (rotulo, valor) in datos)
-              _DatoPequeno(rotulo: rotulo, valor: valor),
-          ],
+        // Tres por fila (dos en pantallas muy angostas).
+        LayoutBuilder(
+          builder: (context, limites) {
+            final porFila = limites.maxWidth < 300 ? 2 : 3;
+            final ancho = (limites.maxWidth - 8 * (porFila - 1)) / porFila;
+            return Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final (rotulo, valor) in datos)
+                  _DatoPequeno(rotulo: rotulo, valor: valor, ancho: ancho),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 14),
         GraficasDelDetalle(detalle: d, frValida: frValida),
@@ -72,14 +79,18 @@ class DetalleDeLaMedicion extends StatelessWidget {
 class _DatoPequeno extends StatelessWidget {
   final String rotulo;
   final String valor;
+  final double ancho;
 
-  const _DatoPequeno({required this.rotulo, required this.valor});
+  const _DatoPequeno({
+    required this.rotulo,
+    required this.valor,
+    required this.ancho,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final ancho = (MediaQuery.sizeOf(context).width - 32 - 16) / 3;
     return Container(
-      width: ancho.clamp(92, 180).toDouble(),
+      width: ancho,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
         color: AppColors.tarjeta,

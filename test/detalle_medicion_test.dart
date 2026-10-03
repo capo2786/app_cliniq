@@ -12,6 +12,7 @@ import 'package:app_cliniq/features/mediciones/dominio/detalle_medicion.dart';
 import 'package:app_cliniq/features/mediciones/dominio/procesamiento_ppg.dart';
 import 'package:app_cliniq/features/mediciones/dominio/rangos_referencia.dart';
 import 'package:app_cliniq/features/mediciones/escaner/motor_signos_camara.dart';
+import 'package:app_cliniq/features/mediciones/presentacion/widgets/ejes_graficas.dart';
 import 'package:app_cliniq/features/mediciones/escaner/serie_senal.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -187,5 +188,14 @@ void main() {
         'Referencia para adultos (en ayunas)',
       );
     });
+  });
+
+  test('los pasos de los ejes son redondos', () {
+    expect(intervaloRedondo(93, marcas: 4), 20);
+    expect(intervaloRedondo(168), 50);
+    expect(intervaloRedondo(398), 100);
+    expect(intervaloRedondo(22), 5);
+    expect(intervaloRedondo(1.2, marcas: 3), 0.5);
+    expect(intervaloRedondo(0), 1);
   });
 }

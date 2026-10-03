@@ -10,6 +10,7 @@ import '../../../data/models/medicion.dart';
 import '../../../dominio/detalle_medicion.dart';
 import '../../../dominio/rangos_referencia.dart';
 import '../dibujos_escaner.dart';
+import '../../../presentacion/widgets/ejes_graficas.dart';
 
 /// El mensaje de una gráfica sin datos suficientes.
 const String sinSenalParaGrafica = 'No hay suficiente señal para esta gráfica';
@@ -125,41 +126,6 @@ class GraficasDelDetalle extends StatelessWidget {
     );
   }
 
-  static FlTitlesData _titulos({required String ejeX, bool sinEjeY = false}) {
-    Widget rotulo(double valor, TitleMeta meta, String unidad) =>
-        SideTitleWidget(
-          meta: meta,
-          child: Text(
-            '${valor.round()}$unidad',
-            style: const TextStyle(color: AppColors.textoTenue, fontSize: 10),
-          ),
-        );
-    return FlTitlesData(
-      topTitles: const AxisTitles(),
-      rightTitles: const AxisTitles(),
-      leftTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: !sinEjeY,
-          reservedSize: 34,
-          getTitlesWidget: (v, meta) => rotulo(v, meta, ''),
-        ),
-      ),
-      bottomTitles: AxisTitles(
-        sideTitles: SideTitles(
-          showTitles: true,
-          reservedSize: 22,
-          getTitlesWidget: (v, meta) => rotulo(v, meta, ' $ejeX'),
-        ),
-      ),
-    );
-  }
-
-  static FlGridData get _rejilla => FlGridData(
-    drawVerticalLine: false,
-    getDrawingHorizontalLine: (_) =>
-        const FlLine(color: AppColors.bordeCampo, strokeWidth: 1),
-  );
-
   static Widget _lineas({
     required Key key,
     required List<FlSpot> puntos,
@@ -186,9 +152,14 @@ class GraficasDelDetalle extends StatelessWidget {
           minY: minY - margen,
           maxY: maxY + margen,
           lineTouchData: const LineTouchData(enabled: false),
-          gridData: _rejilla,
+          gridData: rejillaDeGraficas,
           borderData: FlBorderData(show: false),
-          titlesData: _titulos(ejeX: ejeX, sinEjeY: sinEjeY),
+          titlesData: titulosDeEjes(
+            rangoX: puntos.last.x - puntos.first.x,
+            rangoY: maxY - minY,
+            unidadX: ejeX,
+            sinEjeY: sinEjeY,
+          ),
           rangeAnnotations: RangeAnnotations(
             horizontalRangeAnnotations: [
               if (franja != null)
@@ -250,9 +221,13 @@ class GraficasDelDetalle extends StatelessWidget {
           minY: math.max(0, minimo - 80),
           maxY: maximo + 40,
           barTouchData: BarTouchData(enabled: false),
-          gridData: _rejilla,
+          gridData: rejillaDeGraficas,
           borderData: FlBorderData(show: false),
-          titlesData: _titulos(ejeX: ''),
+          titlesData: titulosDeEjes(
+            rangoX: d.intervalos.length.toDouble(),
+            rangoY: maximo - minimo,
+            unidadX: '',
+          ),
           barGroups: [
             for (final (i, intervalo) in d.intervalos.indexed)
               BarChartGroupData(
@@ -286,9 +261,13 @@ class GraficasDelDetalle extends StatelessWidget {
           minY: minimo,
           maxY: maximo,
           scatterTouchData: ScatterTouchData(enabled: false),
-          gridData: _rejilla,
+          gridData: rejillaDeGraficas,
           borderData: FlBorderData(show: false),
-          titlesData: _titulos(ejeX: 'ms'),
+          titlesData: titulosDeEjes(
+            rangoX: maximo - minimo,
+            rangoY: maximo - minimo,
+            unidadX: 'ms',
+          ),
           scatterSpots: [
             for (var i = 1; i < rr.length; i++)
               ScatterSpot(

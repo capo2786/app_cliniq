@@ -12,6 +12,7 @@ import '../../data/models/medicion.dart';
 import '../../dominio/rangos_referencia.dart';
 import '../../dominio/reglas_mediciones.dart';
 import '../../dominio/tendencias.dart';
+import 'ejes_graficas.dart';
 
 /// La evolución de un tipo en el periodo: la línea de los valores (y la
 /// diastólica en la presión), la franja verde de la referencia para
@@ -124,16 +125,9 @@ class GraficoEvolucion extends StatelessWidget {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 36,
-                      getTitlesWidget: (valor, meta) => SideTitleWidget(
-                        meta: meta,
-                        child: Text(
-                          numeroLegible(valor),
-                          style: const TextStyle(
-                            color: AppColors.textoTenue,
-                            fontSize: 10.5,
-                          ),
-                        ),
-                      ),
+                      interval: intervaloRedondo(maximo - minimo + 2 * margen),
+                      getTitlesWidget: (valor, meta) =>
+                          rotuloDeEje(valor, meta, formato: numeroLegible),
                     ),
                   ),
                 ),
