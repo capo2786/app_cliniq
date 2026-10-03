@@ -19,12 +19,16 @@ import '../../auth/providers/auth_bloc.dart';
 import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 import '../data/cola_mediciones.dart';
 import '../data/mediciones_service.dart';
+import '../data/models/medicion.dart';
 import '../dominio/destinos_medico.dart';
 import '../escaner/escaner_page.dart';
 import '../providers/mis_signos_vitales_cubit.dart';
 import '../providers/tendencias_cubit.dart';
+import 'detalle/detalle_medicion_page.dart';
+import 'detalle/ficha_medicion.dart';
 import 'registrar_medicion_page.dart';
 import 'widgets/registro_signos.dart';
+import 'widgets/selector_pestana_signos.dart';
 import 'widgets/tendencias_signos.dart';
 
 export 'widgets/registro_signos.dart' show nombreDelTipoYValor;
@@ -93,6 +97,7 @@ class MisSignosVitalesPage extends StatelessWidget {
         pacienteId: pacienteId,
         pacienteNombre: pacienteNombre,
         destino: destino,
+        servicio: servicio,
         cola: cola,
       ),
     );
@@ -103,12 +108,14 @@ class _VistaSignos extends StatefulWidget {
   final String? pacienteId;
   final String? pacienteNombre;
   final DestinoMedico? destino;
+  final MedicionesService? servicio;
   final ColaMediciones? cola;
 
   const _VistaSignos({
     required this.pacienteId,
     required this.pacienteNombre,
     required this.destino,
+    required this.servicio,
     required this.cola,
   });
 
@@ -116,11 +123,8 @@ class _VistaSignos extends StatefulWidget {
   State<_VistaSignos> createState() => _VistaSignosState();
 }
 
-/// Las dos pestañas.
-enum _Pestana { tendencias, registro }
-
 class _VistaSignosState extends State<_VistaSignos> {
-  _Pestana _pestana = _Pestana.tendencias;
+  PestanaSignos _pestana = PestanaSignos.tendencias;
 
   String? get pacienteId => widget.pacienteId;
   String? get pacienteNombre => widget.pacienteNombre;
@@ -147,6 +151,39 @@ class _VistaSignosState extends State<_VistaSignos> {
     );
     if (guardo == true && context.mounted) await _recargar(context);
   }
+
+  /// Abre «Detalle de la medición»; si vuelve con `true` (se eliminó o ya
+  /// no existe), la lista y las tendencias se vuelven a pedir.
+  Future<void> _abrir(BuildContext context, DetalleMedicionPage pagina) async {
+    final cambio = await Navigator.of(context)
+        .push<bool>(MaterialPageRoute(builder: (_) => pagina));
+    if (cambio == true && context.mounted) await _recargar(context);
+  }
+
+  void _abrirMedicion(BuildContext context, Medicion m) => _abrir(
+    context,
+    DetalleMedicionPage(
+      medicionId: m.id,
+      medicion: m,
+      companera: companeraDe(
+        m,
+        context.read<MisSignosVitalesCubit>().state.mediciones,
+      ),
+      pacienteNombre: pacienteNombre,
+      servicio: widget.servicio,
+      cola: cola,
+    ),
+  );
+
+  void _abrirPendiente(BuildContext context, EnvioPendiente envio) => _abrir(
+    context,
+    DetalleMedicionPage.pendiente(
+      envio,
+      pacienteNombre: pacienteNombre,
+      servicio: widget.servicio,
+      cola: cola,
+    ),
+  );
 
   Future<void> _medir(BuildContext context) async {
     final guardo = await Navigator.of(context).push<bool>(
@@ -278,18 +315,20 @@ class _VistaSignosState extends State<_VistaSignos> {
                         ),
                       }
                     else ...[
-                      _SelectorDePestana(
+                      SelectorDePestanaSignos(
                         elegida: _pestana,
                         alElegir: (p) => setState(() => _pestana = p),
                       ),
                       const SizedBox(height: 14),
                       switch (_pestana) {
-                        _Pestana.tendencias => TendenciasSignos(
+                        PestanaSignos.tendencias => TendenciasSignos(
                           respaldo: state.mediciones,
                         ),
-                        _Pestana.registro => RegistroSignos(
+                        PestanaSignos.registro => RegistroSignos(
                           state: state,
                           ahora: ahora,
+                          alAbrir: (m) => _abrirMedicion(context, m),
+                          alAbrirPendiente: (e) => _abrirPendiente(context, e),
                         ),
                       },
                     ],
@@ -299,72 +338,6 @@ class _VistaSignosState extends State<_VistaSignos> {
             },
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _SelectorDePestana extends StatelessWidget {
-  final _Pestana elegida;
-  final ValueChanged<_Pestana> alElegir;
-
-  const _SelectorDePestana({required this.elegida, required this.alElegir});
-
-  @override
-  Widget build(BuildContext context) {
-    Widget pestana(_Pestana p, String texto, IconData icono) {
-      final activa = p == elegida;
-      return Expanded(
-        child: Semantics(
-          selected: activa,
-          button: true,
-          child: InkWell(
-            key: Key('pestana-${p.name}'),
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => alElegir(p),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: activa ? AppColors.tarjeta : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    icono,
-                    size: 18,
-                    color: activa ? AppColors.texto : AppColors.textoTenue,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    texto,
-                    style: TextStyle(
-                      color: activa ? AppColors.texto : AppColors.textoTenue,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.campo,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.bordeCampo),
-      ),
-      child: Row(
-        children: [
-          pestana(_Pestana.tendencias, 'Tendencias', Icons.insights_rounded),
-          pestana(_Pestana.registro, 'Registro', Icons.list_alt_rounded),
-        ],
       ),
     );
   }
