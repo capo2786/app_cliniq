@@ -127,6 +127,16 @@ class AppColors {
   static const Color veloClaro = Color(0x33FFFFFF);
   static const Color veloTransparente = Color(0x00FFFFFF);
 
+  // ── Escáner de signos vitales ──────────────────────────────────────
+  /// La yema del dedo en las ilustraciones del escáner.
+  static const Color yema = Color(0xFFE2A68A);
+
+  /// El cristal de la cámara en las ilustraciones del escáner.
+  static const Color lente = Color(0xFF05090A);
+
+  /// El velo oscuro alrededor del óvalo del rostro.
+  static const Color veloOvalo = Color(0x99000000);
+
   /// Fondo cálido y claro del icono de la aplicación: el anillo gris azulado
   /// y la cruz terracota necesitan un fondo claro para leerse en el lanzador.
   static const Color fondoIcono = Color(0xFFF4EFEA);
