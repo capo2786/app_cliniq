@@ -2,7 +2,7 @@ name: app_cliniq
 description: "Cliniq: la aplicación del paciente para agendar y seguir sus citas."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+1
 
 environment:
   sdk: ^3.13.4
