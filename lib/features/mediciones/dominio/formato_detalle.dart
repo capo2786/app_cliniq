@@ -6,9 +6,10 @@
 /// `contratos/detalle-medicion.md`, punto 1): **solo números**, nunca
 /// imágenes ni la serie cruda de la cámara.
 ///
-/// - [detalleAJson] lo escribe dentro de los límites del formato y
-///   redondeado: 3 decimales en la onda, la respiración y la potencia del
-///   espectro; 2 en la calidad; 1 en lo demás.
+/// - [detalleAJson] lo escribe dentro de los límites del formato (y de los
+///   que agregó el API) y redondeado: 3 decimales en la onda, la
+///   respiración y la potencia del espectro; 2 en la calidad; 1 en lo
+///   demás. Antes de enviarlo, `validacion_detalle.dart` lo comprueba.
 /// - [detalleDesdeJson] es tolerante: si algo no cuadra, devuelve `null` en
 ///   vez de lanzar. Las claves desconocidas se ignoran.
 library;
@@ -41,6 +42,25 @@ double _entre(double x, double minimo, double maximo) =>
 List<T> _ultimos<T>(List<T> x, int maximo) =>
     x.length > maximo ? x.sublist(x.length - maximo) : x;
 
+/// Un segundo de la medición que el servidor acepta (0 a 600).
+bool _segundoPosible(double s) => s >= 0 && s <= 600;
+
+/// Las métricas, si están en los rangos que acepta el servidor; si no, no
+/// se mandan (y la variabilidad no se enseña).
+MetricasRr? _metricasPosibles(MetricasRr? m) {
+  if (m == null) return null;
+  bool entre(double x, double minimo, double maximo) =>
+      x.isFinite && x >= minimo && x <= maximo;
+  final posibles =
+      m.intervalos >= 0 &&
+      m.intervalos <= _maxIntervalos &&
+      m.corregidos >= 0 &&
+      [m.medio, m.minimo, m.maximo].every((x) => entre(x, 250, 2000)) &&
+      [m.sdnn, m.rmssd, m.sd1, m.sd2].every((x) => entre(x, 0, 2000)) &&
+      entre(m.pnn50, 0, 100);
+  return posibles ? m : null;
+}
+
 /// El detalle en el formato v1, listo para enviar.
 Map<String, dynamic> detalleAJson(DetalleMedicion d) {
   final onda = _ultimos(d.onda, _maxOnda);
@@ -52,18 +72,18 @@ Map<String, dynamic> detalleAJson(DetalleMedicion d) {
 
   final fc = _ultimos([
     for (final p in d.fcPorSegundo)
-      if (p.segundo.isFinite && p.fc >= 30 && p.fc <= 220) p,
+      if (_segundoPosible(p.segundo) && p.fc >= 30 && p.fc <= 220) p,
   ], _maxFc);
   final intervalos = _ultimos([
     for (final i in d.intervalos)
-      if (i.segundo.isFinite && i.ms >= 250 && i.ms <= 2000) i,
+      if (_segundoPosible(i.segundo) && i.ms >= 250 && i.ms <= 2000) i,
   ], _maxIntervalos);
   final espectro = [
     for (final p in d.espectro)
       if (p.lpm >= 30 && p.lpm <= 240 && p.potencia.isFinite) p,
   ].take(_maxEspectro).toList();
   final respiracion = _ultimos(d.respiracion, _maxRespiracion);
-  final m = d.metricas;
+  final m = _metricasPosibles(d.metricas);
   final pico = d.picoLpm;
 
   return {
@@ -98,12 +118,12 @@ Map<String, dynamic> detalleAJson(DetalleMedicion d) {
             'sd2': _r1(m.sd2),
             'corregidos': m.corregidos,
           },
-    'vfcValida': d.vfcValida,
+    'vfcValida': d.vfcValida && m != null,
     'espectro': {
       'lpm': [for (final p in espectro) _r1(p.lpm)],
       'potencia': [for (final p in espectro) _r3(_entre(p.potencia, 0, 1))],
     },
-    if (pico != null && pico.isFinite) 'picoLpm': _r1(pico),
+    if (pico != null && pico >= 30 && pico <= 240) 'picoLpm': _r1(pico),
     if (respiracion.isNotEmpty)
       'respiracion': {
         'fs': _r1(_entre(d.fsRespiracion, 1, 30)),

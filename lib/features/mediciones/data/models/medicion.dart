@@ -4,6 +4,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/fechas/instante.dart';
 import '../../dominio/detalle_medicion.dart';
+import '../../dominio/validacion_detalle.dart';
 
 /*
  * Las mediciones del paciente, con la forma de `/portal/mediciones` (ver
@@ -288,6 +289,16 @@ class MedicionNueva extends Equatable {
   /// El servidor guarda el detalle solo en el pulso medido con la cámara.
   bool get admiteDetalle => tipo == TipoMedicion.fc && metodo.esCamara;
 
+  /// El detalle tal como se envía (y se guarda en la cola), o `null` si
+  /// esta medición no lo admite o si no pasa la validación: entonces la
+  /// medición va sin él y nunca se pierde por su detalle.
+  Map<String, dynamic>? get detalleParaEnviar {
+    final d = detalle;
+    if (!admiteDetalle || d == null) return null;
+    final json = d.aJson();
+    return detalleValido(json) ? json : null;
+  }
+
   /// La misma medición, adjunta a una cita o a una consulta en línea.
   MedicionNueva adjuntaA({String? citaId, String? consultaId}) => MedicionNueva(
     tipo: tipo,
@@ -314,7 +325,7 @@ class MedicionNueva extends Equatable {
     'medidoEn': aTextoInstante(medidoEn),
     'citaId': ?citaId,
     'consultaId': ?consultaId,
-    'detalle': ?(admiteDetalle ? detalle?.aJson() : null),
+    'detalle': ?detalleParaEnviar,
   };
 
   /// Lee una medición de la cola del teléfono (la forma de [aJson]).
