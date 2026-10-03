@@ -285,6 +285,30 @@ void main() {
       },
     );
 
+    test('el modo dedo del escáner: opcional y apagado por defecto', () {
+      expect(configDePrueba().telemedicina.escanerDedoActivo, isFalse);
+      expect(
+        configDePrueba(
+          telemedicina: {'escanerDedoActivo': true},
+        ).telemedicina.escanerDedoActivo,
+        isTrue,
+      );
+
+      // Un servidor anterior no lo manda: queda apagado.
+      final json = configJson();
+      (json['telemedicina'] as Map).remove('escanerDedoActivo');
+      expect(
+        ConfigPublica.desdeJson(json).telemedicina.escanerDedoActivo,
+        isFalse,
+      );
+
+      // Si llega, se lee estricto.
+      expect(
+        () => configDePrueba(telemedicina: {'escanerDedoActivo': 'sí'}),
+        throwsFormatException,
+      );
+    });
+
     test('los colores de marca son opcionales: si no son un color, no hay', () {
       expect(configDePrueba().clinica.colorPrimario, isNull);
       expect(
