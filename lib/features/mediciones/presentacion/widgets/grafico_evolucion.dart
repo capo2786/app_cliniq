@@ -1,5 +1,7 @@
 // lib/features/mediciones/presentacion/widgets/grafico_evolucion.dart
 
+import 'dart:math' as math;
+
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 
@@ -7,111 +9,94 @@ import '../../../../core/fechas/instante.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/medicion.dart';
+import '../../dominio/rangos_referencia.dart';
 import '../../dominio/reglas_mediciones.dart';
+import '../../dominio/tendencias.dart';
 
-/// Hasta cuántos puntos se dibujan (los más recientes).
-const int puntosDelGrafico = 30;
-
-/// Las mediciones de un tipo para el gráfico: de la más antigua a la más
-/// reciente, las últimas [puntosDelGrafico].
-List<Medicion> serieDelTipo(List<Medicion> mediciones, TipoMedicion tipo) {
-  final deTipo = [
-    for (final m in mediciones)
-      if (m.tipo == tipo) m,
-  ]..sort((a, b) => a.medidoEn.compareTo(b.medidoEn));
-  return deTipo.length > puntosDelGrafico
-      ? deTipo.sublist(deTipo.length - puntosDelGrafico)
-      : deTipo;
-}
-
-/// Un gráfico simple de la evolución de la FC o de la PA (sistólica y
-/// diastólica), con la primera y la última fecha. Solo con dos puntos o
-/// más: con uno no hay evolución que ver.
+/// La evolución de un tipo en el periodo: la línea de los valores (y la
+/// diastólica en la presión), la franja verde de la referencia para
+/// adultos y cada punto con su forma según de dónde salió: círculo, de un
+/// aparato de casa o a mano; cuadrado, de la cámara (experimental).
+/// Solo con dos puntos o más: con uno no hay evolución que ver.
 class GraficoEvolucion extends StatelessWidget {
-  final TipoMedicion tipo;
-  final List<Medicion> serie;
+  final TendenciaDelTipo tendencia;
+  final PeriodoTendencia periodo;
+  final DateTime ahora;
 
-  const GraficoEvolucion({super.key, required this.tipo, required this.serie});
+  const GraficoEvolucion({
+    super.key,
+    required this.tendencia,
+    required this.periodo,
+    required this.ahora,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final tipo = tendencia.tipo;
     final esPresion = tipo == TipoMedicion.pa;
-    final principal = [
-      for (final (i, m) in serie.indexed)
-        FlSpot(i.toDouble(), m.valor.toDouble()),
-    ];
-    final diastolica = esPresion
+    final desde = periodo.desde(ahora);
+    double x(DateTime instante) =>
+        instante.difference(desde).inMinutes / Duration.minutesPerDay;
+
+    final puntos = tendencia.puntos;
+    final principal = [for (final p in puntos) FlSpot(x(p.instante), p.valor)];
+    final segunda = esPresion
         ? [
-            for (final (i, m) in serie.indexed)
-              if (m.valor2 != null) FlSpot(i.toDouble(), m.valor2!.toDouble()),
+            for (final p in puntos)
+              if (p.valor2 != null) FlSpot(x(p.instante), p.valor2!),
           ]
         : const <FlSpot>[];
+    final camara = [for (final p in puntos) p.deCamara];
+    final camara2 = [
+      for (final p in puntos)
+        if (p.valor2 != null) p.deCamara,
+    ];
 
-    final valores = [...principal, ...diastolica].map((p) => p.y);
-    final minimo = valores.reduce((a, b) => a < b ? a : b);
-    final maximo = valores.reduce((a, b) => a > b ? a : b);
-    final margen = ((maximo - minimo) * 0.15).clamp(4, 30).toDouble();
+    final franjas = [
+      ?referenciaDelTipo(tipo),
+      if (esPresion) referenciaDiastolica,
+    ];
+    final valores = [
+      ...principal.map((p) => p.y),
+      ...segunda.map((p) => p.y),
+      for (final f in franjas) ...[f.minimo.toDouble(), f.maximo.toDouble()],
+    ];
+    final minimo = valores.reduce(math.min);
+    final maximo = valores.reduce(math.max);
+    final margen = math.max((maximo - minimo) * 0.12, tipo.margenMinimo);
 
-    final primera = FormatoFecha.diaYMesCorto(
-      enHoraDeLaClinica(serie.first.medidoEn),
+    LineChartBarData linea(
+      List<FlSpot> spots,
+      List<bool> deCamara,
+      Color color,
+    ) => LineChartBarData(
+      spots: spots,
+      color: color,
+      barWidth: 2.4,
+      isStrokeCapRound: true,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, _, _, indice) =>
+            indice < deCamara.length && deCamara[indice]
+            ? FlDotSquarePainter(size: 8, color: color, strokeWidth: 0)
+            : FlDotCirclePainter(radius: 3.6, color: color, strokeWidth: 0),
+      ),
     );
-    final ultima = FormatoFecha.diaYMesCorto(
-      enHoraDeLaClinica(serie.last.medidoEn),
-    );
-    final ultimoValor = valorDeMedicion(serie.last);
-
-    LineChartBarData linea(List<FlSpot> puntos, Color color) =>
-        LineChartBarData(
-          spots: puntos,
-          color: color,
-          barWidth: 2.6,
-          isCurved: false,
-          isStrokeCapRound: true,
-          dotData: FlDotData(show: puntos.length <= 12),
-        );
 
     return Semantics(
       label:
-          '${nombreDelTipo(tipo)}: ${serie.length} mediciones del $primera al '
-          '$ultima; la última, $ultimoValor',
+          '${nombreDelTipo(tipo)}: ${puntos.length} mediciones en '
+          '${periodo.nombre}; la última, ${valorDeMedicion(tendencia.ultima)}',
       excludeSemantics: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  nombreDelTipo(tipo),
-                  style: const TextStyle(
-                    color: AppColors.texto,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              Text(
-                'Última: $ultimoValor',
-                style: const TextStyle(
-                  color: AppColors.textoSuave,
-                  fontSize: 12.5,
-                ),
-              ),
-            ],
-          ),
-          if (esPresion)
-            const Padding(
-              padding: EdgeInsets.only(top: 4),
-              child: Text(
-                'Arriba la sistólica (la alta), abajo la diastólica (la baja)',
-                style: TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
-              ),
-            ),
-          const SizedBox(height: 10),
           SizedBox(
-            height: 140,
+            height: 150,
             child: LineChart(
               LineChartData(
+                minX: 0,
+                maxX: periodo.dias.toDouble(),
                 minY: (minimo - margen).floorToDouble(),
                 maxY: (maximo + margen).ceilToDouble(),
                 lineTouchData: const LineTouchData(enabled: false),
@@ -121,6 +106,16 @@ class GraficoEvolucion extends StatelessWidget {
                       const FlLine(color: AppColors.bordeCampo, strokeWidth: 1),
                 ),
                 borderData: FlBorderData(show: false),
+                rangeAnnotations: RangeAnnotations(
+                  horizontalRangeAnnotations: [
+                    for (final f in franjas)
+                      HorizontalRangeAnnotation(
+                        y1: f.minimo.toDouble(),
+                        y2: f.maximo.toDouble(),
+                        color: AppColors.exito.withValues(alpha: 0.12),
+                      ),
+                  ],
+                ),
                 titlesData: FlTitlesData(
                   topTitles: const AxisTitles(),
                   rightTitles: const AxisTitles(),
@@ -132,7 +127,7 @@ class GraficoEvolucion extends StatelessWidget {
                       getTitlesWidget: (valor, meta) => SideTitleWidget(
                         meta: meta,
                         child: Text(
-                          valor.round().toString(),
+                          numeroLegible(valor),
                           style: const TextStyle(
                             color: AppColors.textoTenue,
                             fontSize: 10.5,
@@ -145,10 +140,11 @@ class GraficoEvolucion extends StatelessWidget {
                 lineBarsData: [
                   linea(
                     principal,
+                    camara,
                     esPresion ? AppColors.acentoClaro : AppColors.celeste,
                   ),
-                  if (diastolica.length >= 2)
-                    linea(diastolica, AppColors.violeta),
+                  if (segunda.length >= 2)
+                    linea(segunda, camara2, AppColors.violeta),
                 ],
               ),
             ),
@@ -158,23 +154,85 @@ class GraficoEvolucion extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                primera,
+                FormatoFecha.diaYMesCorto(enHoraDeLaClinica(desde)),
                 style: const TextStyle(
                   color: AppColors.textoTenue,
                   fontSize: 11,
                 ),
               ),
-              Text(
-                ultima,
-                style: const TextStyle(
-                  color: AppColors.textoTenue,
-                  fontSize: 11,
-                ),
+              const Text(
+                'Hoy',
+                style: TextStyle(color: AppColors.textoTenue, fontSize: 11),
               ),
             ],
           ),
+          if (franjas.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              esPresion
+                  ? '${leyendaDeReferencia(tipo)}: arriba la sistólica, abajo '
+                        'la diastólica'
+                  : leyendaDeReferencia(tipo),
+              style: const TextStyle(color: AppColors.textoTenue, fontSize: 11),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+extension on TipoMedicion {
+  /// El margen mínimo arriba y abajo de la gráfica, en las unidades del
+  /// tipo.
+  double get margenMinimo => switch (this) {
+    TipoMedicion.temp => 0.3,
+    TipoMedicion.peso => 1,
+    _ => 4,
+  };
+}
+
+/// La leyenda de las formas: de dónde salió cada punto.
+class LeyendaDeOrigen extends StatelessWidget {
+  const LeyendaDeOrigen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget item(Widget forma, String texto) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        forma,
+        const SizedBox(width: 6),
+        Text(
+          texto,
+          style: const TextStyle(
+            color: AppColors.textoSecundario,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+    return Wrap(
+      key: const Key('tendencias-leyenda'),
+      spacing: 16,
+      runSpacing: 6,
+      children: [
+        item(
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: AppColors.textoSuave,
+              shape: BoxShape.circle,
+            ),
+          ),
+          'Aparato de casa o a mano',
+        ),
+        item(
+          Container(width: 8, height: 8, color: AppColors.textoSuave),
+          'Cámara (experimental)',
+        ),
+      ],
     );
   }
 }

@@ -88,6 +88,37 @@ class MedicionesService {
     }
   }
 
+  /// Las mediciones desde [desde] (para las tendencias), en páginas de
+  /// [porPagina] (el máximo del servidor) hasta tenerlas todas o llegar a
+  /// [maximoPaginas]. `completo` dice si llegaron todas. No se guardan: sin
+  /// red, lanza el error.
+  Future<({List<Medicion> mediciones, bool completo})> delPeriodo(
+    String uid, {
+    String? pacienteId,
+    required DateTime desde,
+    int porPagina = 100,
+    int maximoPaginas = 5,
+  }) async {
+    final paciente = _paciente(uid, pacienteId);
+    final mediciones = <Medicion>[];
+    var hayMas = true;
+    for (var pagina = 1; hayMas && pagina <= maximoPaginas; pagina++) {
+      final respuesta = await _dio.get<dynamic>(
+        ruta,
+        queryParameters: {
+          if (paciente != uid) 'pacienteId': paciente,
+          'desde': desde.toUtc().toIso8601String(),
+          'limit': porPagina,
+          if (pagina > 1) 'page': pagina,
+        },
+      );
+      final leida = leerPagina(respuesta.data);
+      mediciones.addAll(leida.mediciones);
+      hayMas = leida.hayMas;
+    }
+    return (mediciones: mediciones, completo: !hayMas);
+  }
+
   /// La primera página guardada de ese paciente, si hay.
   Future<PaginaMediciones?> guardada(String uid, {String? pacienteId}) async {
     final copia = await _cache.leerCopia(

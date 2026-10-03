@@ -36,6 +36,10 @@ const _ayuda = {
   ),
 };
 
+/// El «ahora» de las tendencias: las mediciones de prueba son del 1 y 2 de
+/// octubre de 2026.
+final _ahora = DateTime.utc(2026, 10, 3, 15);
+
 void main() {
   setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
 
@@ -89,7 +93,11 @@ void main() {
         '«?»', (tester) async {
       await montarPantalla(
         tester,
-        MisSignosVitalesPage(servicio: servicio(), cola: cola()),
+        MisSignosVitalesPage(
+          servicio: servicio(),
+          cola: cola(),
+          ahora: () => _ahora,
+        ),
         ayuda: _ayuda,
       );
       await tester.pumpAndSettle();
@@ -98,10 +106,24 @@ void main() {
       expect(find.byKey(const Key('signos-registrar')), findsOneWidget);
       // El escáner viene apagado por defecto: no se ofrece.
       expect(find.byKey(const Key('signos-camara')), findsNothing);
-      // Dos presiones: hay evolución; un solo pulso: no.
+      // Abre en «Tendencias». Dos presiones: hay evolución; un solo pulso:
+      // no.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('grafico-PA')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.byKey(const Key('grafico-PA')), findsOneWidget);
       expect(find.byKey(const Key('grafico-FC')), findsNothing);
 
+      // La lista, en «Registro».
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('pestana-registro')),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.byKey(const Key('pestana-registro')));
+      await tester.pumpAndSettle();
       await tester.drag(find.byType(ListView).first, const Offset(0, -500));
       await tester.pumpAndSettle();
       expect(find.text('135/88 mmHg'), findsWidgets);
@@ -148,11 +170,15 @@ void main() {
         MisSignosVitalesPage(servicio: servicio(), cola: cola()),
       );
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('pestana-registro')));
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.byKey(const Key('eliminar-pa1')),
         200,
         scrollable: find.byType(Scrollable).first,
       );
+      await tester.ensureVisible(find.byKey(const Key('eliminar-pa1')));
+      await tester.pumpAndSettle();
 
       await tester.tap(find.byKey(const Key('eliminar-pa1')));
       await tester.pumpAndSettle();
