@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/formato/fechas.dart';
+import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
 import '../../../core/presentacion/widgets/aviso_sin_conexion.dart';
 import '../../../core/presentacion/widgets/cerrar_sesion.dart';
@@ -25,12 +26,16 @@ import 'enlaces_de_ayuda.dart';
 import 'widgets/acceso_a_soporte.dart';
 import 'widgets/buscador_de_ayuda.dart';
 
-/// El centro de ayuda: buscar, elegir una categoría y leer un artículo.
+/// El centro de ayuda: «Tu guía» (la guía de usuario de quien entró)
+/// primero, buscar, elegir una categoría y leer un artículo.
 ///
 /// La búsqueda la hace el servidor mientras se escribe (con una pausa, para
 /// no pedir por cada letra) o al tocar «buscar» en el teclado. Sin conexión
 /// se busca en la última copia guardada. Si nada ayuda, el acceso a
 /// soporte.
+///
+/// Con [articuloInicial] (el «Ver la guía completa» de un botón de ayuda, o
+/// `/ayuda?articulo=<id>`), abre ese artículo en cuanto llega la lista.
 class CentroAyudaPage extends StatelessWidget {
   /// Por defecto, `Servicios.ayuda`.
   final AyudaService? servicio;
@@ -40,16 +45,85 @@ class CentroAyudaPage extends StatelessWidget {
   /// esos enlaces avisan que la sección no está disponible.
   final AbrirRutaInterna? abrirRuta;
 
-  const CentroAyudaPage({super.key, this.servicio, this.abrirRuta});
+  /// El identificador del artículo que se abre al llegar.
+  final String? articuloInicial;
+
+  const CentroAyudaPage({
+    super.key,
+    this.servicio,
+    this.abrirRuta,
+    this.articuloInicial,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final inicial = articuloInicial?.trim() ?? '';
+
     return BlocProvider(
       create: (_) => AyudaCubit(
         servicio: servicio ?? Servicios.ayuda,
         uid: context.read<AuthBloc>().usuario?.uid ?? '',
       )..buscar(),
-      child: _VistaAyuda(abrirRuta: abrirRuta),
+      child: inicial.isEmpty
+          ? _VistaAyuda(abrirRuta: abrirRuta)
+          : _AbrirArticuloInicial(
+              id: inicial,
+              abrirRuta: abrirRuta,
+              child: _VistaAyuda(abrirRuta: abrirRuta),
+            ),
+    );
+  }
+}
+
+/// Abre el artículo [id] la primera vez que llega la lista (del servidor o
+/// de la copia). Si no está —no es para quien entró, o ya no existe—, lo
+/// dice y se queda en el centro.
+class _AbrirArticuloInicial extends StatefulWidget {
+  final String id;
+  final AbrirRutaInterna? abrirRuta;
+  final Widget child;
+
+  const _AbrirArticuloInicial({
+    required this.id,
+    required this.abrirRuta,
+    required this.child,
+  });
+
+  @override
+  State<_AbrirArticuloInicial> createState() => _AbrirArticuloInicialState();
+}
+
+class _AbrirArticuloInicialState extends State<_AbrirArticuloInicial> {
+  bool _hecho = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<AyudaCubit, AyudaState>(
+      listenWhen: (_, ahora) => !_hecho && ahora.carga == CargaAyuda.lista,
+      listener: (context, state) {
+        _hecho = true;
+        final articulo = state.articulos
+            .where((a) => a.id == widget.id)
+            .firstOrNull;
+
+        if (articulo == null) {
+          mostrarAviso(
+            context,
+            'No encontramos esa guía en el centro de ayuda.',
+          );
+          return;
+        }
+
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ArticuloAyudaPage(
+              articulo: articulo,
+              abrirRuta: widget.abrirRuta,
+            ),
+          ),
+        );
+      },
+      child: widget.child,
     );
   }
 }
@@ -187,25 +261,33 @@ class _VistaAyuda extends StatelessWidget {
         const SizedBox(height: 18),
       ],
       for (final grupo in state.visibles) ...[
-        EtiquetaSeccion(grupo.categoria),
-        _Grupo(grupo: grupo, alAbrir: (a) => _abrir(context, a)),
+        EtiquetaSeccion(
+          grupo.esGuia ? 'Tu guía · ${grupo.categoria}' : grupo.categoria,
+        ),
+        _Grupo(
+          key: grupo.esGuia ? Key('tu-guia-${grupo.categoria}') : null,
+          grupo: grupo,
+          alAbrir: (a) => _abrir(context, a),
+        ),
         const SizedBox(height: 16),
       ],
     ];
   }
 }
 
-/// Los artículos de una categoría, en una tarjeta.
+/// Los artículos de una categoría, en una tarjeta. La de una guía de
+/// usuario va teñida y con su artículo principal destacado.
 class _Grupo extends StatelessWidget {
   final GrupoDeArticulos grupo;
   final void Function(ArticuloAyuda articulo) alAbrir;
 
-  const _Grupo({required this.grupo, required this.alAbrir});
+  const _Grupo({super.key, required this.grupo, required this.alAbrir});
 
   @override
   Widget build(BuildContext context) {
     return TarjetaTranslucida(
       padding: EdgeInsets.zero,
+      tinte: grupo.esGuia ? AppColors.acentoClaro : null,
       child: Column(
         children: [
           for (final (i, articulo) in grupo.articulos.indexed) ...[
@@ -227,6 +309,7 @@ class _FilaArticulo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resumen = textoPlano(articulo.contenido);
+    final inicio = articulo.esInicioDeGuia;
 
     return InkWell(
       key: Key('articulo-${articulo.id}'),
@@ -236,6 +319,10 @@ class _FilaArticulo extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 14, 10, 14),
         child: Row(
           children: [
+            if (inicio) ...[
+              Icon(Icons.map_outlined, color: AppColors.acentoClaro, size: 22),
+              const SizedBox(width: 12),
+            ],
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

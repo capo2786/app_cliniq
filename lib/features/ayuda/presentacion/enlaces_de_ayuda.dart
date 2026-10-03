@@ -15,12 +15,18 @@ typedef AbrirRutaInterna = bool Function(BuildContext context, String ruta);
 
 /// La pantalla nativa de una ruta de la ayuda, de soporte o de Mi salud, o
 /// `null` si la ruta es de otro módulo.
+///
+/// `/ayuda?articulo=<id>` abre el centro de ayuda con ese artículo.
 Widget? pantallaDeLaRuta(String ruta, {AbrirRutaInterna? abrirRuta}) {
-  final limpia = Uri.tryParse(ruta)?.path ?? ruta;
+  final uri = Uri.tryParse(ruta);
+  final limpia = uri?.path ?? ruta;
   final partes = limpia.split('/').where((p) => p.isNotEmpty).toList();
 
   return switch (partes) {
-    ['ayuda'] => CentroAyudaPage(abrirRuta: abrirRuta),
+    ['ayuda'] => CentroAyudaPage(
+      abrirRuta: abrirRuta,
+      articuloInicial: uri?.queryParameters['articulo'],
+    ),
     ['soporte'] => const SoportePage(),
     ['soporte', 'tickets', final id] => TicketPage(id: id),
     ['mi-salud'] => const MiSaludPage(),

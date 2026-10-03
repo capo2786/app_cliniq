@@ -2,6 +2,7 @@
 
 import 'package:app_cliniq/core/network/api_client.dart';
 import 'package:app_cliniq/core/presentacion/pagina_web_page.dart';
+import 'package:app_cliniq/core/presentacion/widgets/chip_opcion.dart';
 import 'package:app_cliniq/core/servicios.dart';
 import 'package:app_cliniq/core/storage/cache_local.dart';
 import 'package:app_cliniq/features/ayuda/data/ayuda_service.dart';
@@ -186,6 +187,79 @@ void main() {
       expect(find.text('¿Cómo agendo una cita?'), findsNothing);
     });
 
+    testWidgets('«Tu guía» va primero, con su artículo principal', (
+      tester,
+    ) async {
+      api.rutas['GET /ayuda'] = (_) => [
+        ...articulosJson(),
+        ...guiaDelPacienteJson(),
+      ];
+
+      await montarPantalla(tester, CentroAyudaPage(servicio: servicio()));
+      await tester.pumpAndSettle();
+
+      expect(find.text('TU GUÍA · GUÍA DEL PACIENTE'), findsOneWidget);
+      expect(
+        find.byKey(const Key('tu-guia-Guía del paciente')),
+        findsOneWidget,
+      );
+      // También entre las categorías, después de «Todas».
+      expect(
+        tester
+            .widgetList<ChipDeOpcion>(find.byType(ChipDeOpcion))
+            .map((c) => c.texto)
+            .take(3),
+        ['Todas', 'Guía del paciente', 'Citas'],
+      );
+      expect(
+        tester.getTopLeft(find.text('Empieza aquí')).dy,
+        lessThan(tester.getTopLeft(find.text('Cómo ver tus recetas')).dy),
+      );
+    });
+
+    testWidgets('con un artículo inicial, lo abre al llegar la lista', (
+      tester,
+    ) async {
+      api.rutas['GET /ayuda'] = (_) => [
+        ...articulosJson(),
+        ...guiaDelPacienteJson(),
+      ];
+
+      await montarPantalla(
+        tester,
+        CentroAyudaPage(servicio: servicio(), articuloInicial: 'g1'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ArticuloAyudaPage), findsOneWidget);
+      expect(
+        find.text(
+          'Todo lo que puedes hacer en la aplicación de Clínica Andina.',
+        ),
+        findsOneWidget,
+      );
+
+      // Al volver, el centro de ayuda (y no se vuelve a abrir solo).
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(ArticuloAyudaPage), findsNothing);
+      expect(find.byType(CentroAyudaPage), findsOneWidget);
+    });
+
+    testWidgets('un artículo inicial que no está se dice', (tester) async {
+      await montarPantalla(
+        tester,
+        CentroAyudaPage(servicio: servicio(), articuloInicial: 'zz'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byType(ArticuloAyudaPage), findsNothing);
+      expect(
+        find.text('No encontramos esa guía en el centro de ayuda.'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('«¿No encontraste lo que buscabas?» lleva a soporte', (
       tester,
     ) async {
@@ -308,6 +382,14 @@ void main() {
       );
       expect(pantallaDeLaRuta('/mi-salud/'), isA<MiSaludPage>());
       expect(pantallaDeLaRuta('/soporte?x=1'), isA<SoportePage>());
+      expect(
+        pantallaDeLaRuta('/ayuda?articulo=g1'),
+        isA<CentroAyudaPage>().having(
+          (p) => p.articuloInicial,
+          'articuloInicial',
+          'g1',
+        ),
+      );
       expect(pantallaDeLaRuta('/portal/agendar'), isNull);
     });
   });
