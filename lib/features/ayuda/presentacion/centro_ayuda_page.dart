@@ -25,6 +25,7 @@ import 'articulo_ayuda_page.dart';
 import 'enlaces_de_ayuda.dart';
 import 'widgets/acceso_a_soporte.dart';
 import 'widgets/buscador_de_ayuda.dart';
+import 'widgets/boton_ayuda.dart';
 
 /// El centro de ayuda: «Tu guía» (la guía de usuario de quien entró)
 /// primero, buscar, elegir una categoría y leer un artículo.
@@ -153,7 +154,11 @@ class _VistaAyuda extends StatelessWidget {
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         title: const Text('Centro de ayuda'),
-        actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+        actions: const [
+          BotonAyuda(clave: 'app.ayuda'),
+          BotonCerrarSesion(),
+          SizedBox(width: 6),
+        ],
       ),
       body: FondoDegradado(
         child: BlocBuilder<AyudaCubit, AyudaState>(

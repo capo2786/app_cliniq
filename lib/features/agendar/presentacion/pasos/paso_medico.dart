@@ -12,6 +12,7 @@ import '../widgets/buscador_medicos.dart';
 import '../widgets/con_proximos_turnos.dart';
 import '../widgets/tarjeta_medico.dart';
 import '../widgets/tarjeta_primer_turno.dart';
+import '../../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Paso 3: el médico.
 ///
@@ -95,12 +96,22 @@ class _ListaDeMedicos extends StatelessWidget {
         ),
         const SizedBox(height: 14),
         if (primero != null) ...[
-          TarjetaPrimerTurno(
-            primero: primero,
-            ahora: state.ahora,
-            confirmando: state.confirmandoPrimerTurno,
-            onTap: () =>
-                _elegir(context, AgendarPrimerTurnoElegido(primero.turno)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TarjetaPrimerTurno(
+                  primero: primero,
+                  ahora: state.ahora,
+                  confirmando: state.confirmandoPrimerTurno,
+                  onTap: () => _elegir(
+                    context,
+                    AgendarPrimerTurnoElegido(primero.turno),
+                  ),
+                ),
+              ),
+              const BotonAyuda(clave: 'app.agendar.primerTurno', enLinea: true),
+            ],
           ),
           const SizedBox(height: 18),
         ],

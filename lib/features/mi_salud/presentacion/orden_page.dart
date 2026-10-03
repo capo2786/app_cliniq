@@ -43,6 +43,7 @@ class OrdenPage extends StatelessWidget {
             ..cargar(),
       child: VistaDeDocumento<Orden>(
         titulo: 'Orden',
+        claveDeAyuda: 'app.miSalud.orden',
         cargando: 'Abriendo la orden…',
         alVerPdf: (context, orden) =>
             abrirPdfDelDocumento(context, TipoDocumentoFirmado.orden, orden),

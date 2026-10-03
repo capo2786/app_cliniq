@@ -19,6 +19,7 @@ import '../dominio/reglas_arco.dart';
 import '../providers/arco_cubit.dart';
 import 'nueva_solicitud_arco_page.dart';
 import 'widgets/tarjeta_solicitud_arco.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Mis derechos sobre mis datos (ARCO, LOPDP): las solicitudes hechas, con su
 /// estado, su plazo y la respuesta de la clínica, y el camino a una nueva.
@@ -65,7 +66,13 @@ class _VistaPrivacidad extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: AppColors.fondo,
-      appBar: AppBar(title: const Text('Mis derechos sobre mis datos')),
+      appBar: AppBar(
+        title: const Text('Mis derechos sobre mis datos'),
+        actions: const [
+          BotonAyuda(clave: 'app.arco'),
+          SizedBox(width: 6),
+        ],
+      ),
       body: FondoDegradado(
         child: RefreshIndicator(
           color: AppColors.acentoClaro,

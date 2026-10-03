@@ -29,6 +29,7 @@ import 'orden_page.dart';
 import 'receta_page.dart';
 import 'visor_pdf_page.dart';
 import 'widgets/partes_documento.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// «Mi salud»: lo que el paciente tiene derecho a ver de su historia
 /// clínica, como en el panel. Su ficha y sus alergias, las últimas
@@ -102,7 +103,11 @@ class _VistaMiSaludState extends State<_VistaMiSalud> {
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         title: const Text('Mi salud'),
-        actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+        actions: const [
+          BotonAyuda(clave: 'app.miSalud'),
+          BotonCerrarSesion(),
+          SizedBox(width: 6),
+        ],
       ),
       body: FondoDegradado(
         child: BlocBuilder<MiSaludCubit, MiSaludState>(

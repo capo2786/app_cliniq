@@ -21,6 +21,7 @@ import '../providers/soporte_cubit.dart';
 import 'nuevo_ticket_page.dart';
 import 'ticket_page.dart';
 import 'widgets/tarjeta_ticket.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Soporte: mis tickets, abrir uno nuevo y conversar con el equipo.
 ///
@@ -120,7 +121,11 @@ class _VistaSoporteState extends State<_VistaSoporte> {
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         title: const Text('Soporte'),
-        actions: const [BotonCerrarSesion(), SizedBox(width: 6)],
+        actions: const [
+          BotonAyuda(clave: 'app.soporte'),
+          BotonCerrarSesion(),
+          SizedBox(width: 6),
+        ],
       ),
       body: FondoDegradado(
         child: BlocBuilder<SoporteCubit, SoporteState>(

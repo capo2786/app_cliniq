@@ -52,6 +52,7 @@ class CertificadoPage extends StatelessWidget {
       )..cargar(),
       child: VistaDeDocumento<CertificadoReposo>(
         titulo: 'Certificado de reposo',
+        claveDeAyuda: 'app.miSalud.certificado',
         cargando: 'Abriendo el certificado…',
         alVerPdf: (context, certificado) => abrirPdfDelDocumento(
           context,

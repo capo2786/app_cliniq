@@ -55,6 +55,7 @@ class RecetaPage extends StatelessWidget {
             ..cargar(),
       child: VistaDeDocumento<Receta>(
         titulo: 'Receta',
+        claveDeAyuda: 'app.miSalud.receta',
         cargando: 'Abriendo la receta…',
         alVerPdf: (context, receta) =>
             abrirPdfDelDocumento(context, TipoDocumentoFirmado.receta, receta),

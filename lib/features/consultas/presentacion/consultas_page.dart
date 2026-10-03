@@ -28,6 +28,7 @@ import 'widgets/tarjeta_consulta.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/presentacion/widgets/contacto_clinica.dart';
 import '../../avisos/presentacion/widgets/boton_campana.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Consultas en línea: las del paciente y las de sus dependientes, con los
 /// borradores arriba, las abiertas después y las terminadas al final.
@@ -127,7 +128,11 @@ class _ConsultasPageState extends State<ConsultasPage> {
       backgroundColor: AppColors.fondo,
       appBar: AppBar(
         title: const Text('Consultas en línea'),
-        actions: const [BotonCampana(), SizedBox(width: 6)],
+        actions: const [
+          BotonAyuda(clave: 'app.consultas'),
+          BotonCampana(),
+          SizedBox(width: 6),
+        ],
       ),
       body: FondoDegradado(
         child: !puede

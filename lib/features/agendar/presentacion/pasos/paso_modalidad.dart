@@ -8,6 +8,7 @@ import '../../providers/agendar_bloc.dart';
 import '../../providers/agendar_event.dart';
 import '../../providers/agendar_state.dart';
 import '../widgets/opcion_seleccionable.dart';
+import '../../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Paso 4: la modalidad. Solo las que ofrece el médico elegido.
 class PasoModalidad extends StatelessWidget {
@@ -23,15 +24,22 @@ class PasoModalidad extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          medico == null
-              ? 'Elige cómo quieres la consulta.'
-              : '${medico.nombre} atiende así:',
-          style: const TextStyle(
-            color: AppColors.textoSecundario,
-            fontSize: 13,
-            height: 1.4,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                medico == null
+                    ? 'Elige cómo quieres la consulta.'
+                    : '${medico.nombre} atiende así:',
+                style: const TextStyle(
+                  color: AppColors.textoSecundario,
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            const BotonAyuda(clave: 'app.agendar.modalidad', enLinea: true),
+          ],
         ),
         const SizedBox(height: 16),
         for (final tipo in state.modalidadesMedico) ...[
