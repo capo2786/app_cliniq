@@ -178,6 +178,20 @@ void main() {
     );
   });
 
+  testWidgets('con las animaciones del sistema apagadas: sin barrido', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final fuente = await empezar(tester);
+    await emitir(tester, fuente, 0, 40);
+    expect(find.byKey(const Key('escaner-esquinas')), findsOneWidget);
+    expect(find.byKey(const Key('escaner-barrido')), findsNothing);
+    // La malla sigue a la detección, sin latir.
+    expect(opacidadDeLaMalla(tester), 1);
+  });
+
   testWidgets('sin ML Kit: solo las esquinas y el barrido, sin malla', (
     tester,
   ) async {
