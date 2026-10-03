@@ -12,15 +12,17 @@ library;
 import 'package:equatable/equatable.dart';
 
 import '../data/models/medicion.dart';
+import 'rostro/rostro_detectado.dart';
 
 /// Cómo se mide con la cámara.
 enum ModoEscaner {
-  /// La yema sobre la cámara trasera, con el flash encendido. El
-  /// recomendado: el más confiable.
+  /// La yema sobre la cámara trasera, con el flash encendido. Opcional
+  /// (`telemedicina.escanerDedoActivo`): en un teléfono con varias cámaras
+  /// no siempre se sabe cuál cubrir.
   dedo(MetodoMedicion.camaraDedo),
 
-  /// El rostro frente a la cámara frontal (beta): depende de la luz y de
-  /// estar quieto.
+  /// El rostro frente a la cámara frontal: el modo de siempre. Depende de
+  /// la luz y de estar quieto.
   rostro(MetodoMedicion.camaraRostro);
 
   /// El método con que se guarda la medición.
@@ -50,6 +52,15 @@ class CuadroPpg extends Equatable {
   /// La fracción de píxeles quemados (≥ 250) en el rojo.
   final double saturacion;
 
+  /// Modo rostro: la última detección del rostro (de ML Kit), o `null` si
+  /// en ese momento no se ve ninguno.
+  final RostroDetectado? rostro;
+
+  /// Modo rostro: ML Kit no está y el rostro se busca por el color de la
+  /// piel dentro del marco. Entonces [rostro] siempre es `null` y lo que
+  /// dice si hay cara es la [cobertura].
+  final bool porColorDePiel;
+
   const CuadroPpg({
     required this.momento,
     required this.rojo,
@@ -58,9 +69,39 @@ class CuadroPpg extends Equatable {
     required this.luminancia,
     this.cobertura = 1,
     this.saturacion = 0,
+    this.rostro,
+    this.porColorDePiel = false,
   });
 
   double get segundos => momento.inMicroseconds / 1e6;
+
+  /// El mismo cuadro en otro momento (al reanudar tras una pausa, la serie
+  /// sigue sin el hueco).
+  CuadroPpg conMomento(Duration otro) => CuadroPpg(
+    momento: otro,
+    rojo: rojo,
+    verde: verde,
+    azul: azul,
+    luminancia: luminancia,
+    cobertura: cobertura,
+    saturacion: saturacion,
+    rostro: rostro,
+    porColorDePiel: porColorDePiel,
+  );
+
+  /// El mismo cuadro con lo que se sabe del rostro.
+  CuadroPpg conRostro(RostroDetectado? rostro, {bool porColorDePiel = false}) =>
+      CuadroPpg(
+        momento: momento,
+        rojo: rojo,
+        verde: verde,
+        azul: azul,
+        luminancia: luminancia,
+        cobertura: cobertura,
+        saturacion: saturacion,
+        rostro: rostro,
+        porColorDePiel: porColorDePiel,
+      );
 
   @override
   List<Object?> get props => [
@@ -71,6 +112,8 @@ class CuadroPpg extends Equatable {
     luminancia,
     cobertura,
     saturacion,
+    rostro,
+    porColorDePiel,
   ];
 }
 
