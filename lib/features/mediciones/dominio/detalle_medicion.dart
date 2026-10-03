@@ -6,8 +6,8 @@
 /// Puro e inmutable. Reúne lo que el análisis ya calculó (la señal
 /// filtrada, los latidos, el espectro, la señal remuestreada) sin volver a
 /// calcularlo, y agrega lo que falta: la FC por segundo, los intervalos
-/// limpios con sus medidas (pNN50, SD1, SD2) y la onda lenta de la
-/// respiración. No se guarda en el servidor.
+/// corregidos con sus medidas (pNN50, SD1, SD2) y la onda lenta de la
+/// respiración.
 library;
 
 import 'dart:math' as math;
@@ -41,11 +41,15 @@ class DetalleMedicion {
   /// La FC estimada cada segundo.
   final List<PuntoFc> fcPorSegundo;
 
-  /// Los intervalos entre latidos, ya limpios.
+  /// Los intervalos entre latidos, ya corregidos.
   final List<Intervalo> intervalos;
 
   /// Sus medidas, o `null` si hay muy pocos.
   final MetricasRr? metricas;
+
+  /// La variabilidad (pNN50, SD1, SD2, Poincaré, SDNN y RMSSD) alcanza para
+  /// enseñarse. Se decide al medir ([variabilidadValida]) y se guarda así.
+  final bool vfcValida;
 
   /// La potencia de 42 a 210 lpm y dónde está el pico de la FC.
   final List<PuntoEspectro> espectro;
@@ -73,6 +77,7 @@ class DetalleMedicion {
     this.fcPorSegundo = const [],
     this.intervalos = const [],
     this.metricas,
+    this.vfcValida = false,
     this.espectro = const [],
     this.picoLpm,
     this.respiracion = const [],
@@ -88,7 +93,8 @@ class DetalleMedicion {
           : senal,
     );
     final corte = senal.length - onda.length;
-    final intervalos = intervalosLimpios(a.latidos);
+    final corregidos = corregirIntervalos(a.latidos);
+    final metricas = MetricasRr.deCorregidos(corregidos);
     final remuestreada = a.remuestreada;
 
     return DetalleMedicion(
@@ -104,8 +110,13 @@ class DetalleMedicion {
       fs: a.fs,
       latidos: a.latidos.length,
       fcPorSegundo: fcPorVentana(senal, fs: a.fs),
-      intervalos: intervalos,
-      metricas: MetricasRr.de([for (final i in intervalos) i.ms]),
+      intervalos: corregidos.intervalos,
+      metricas: metricas,
+      vfcValida: variabilidadValida(
+        calidad: a.calidad.valor,
+        duracion: duracion,
+        metricas: metricas,
+      ),
       espectro: _espectroParaDibujar(a.espectro),
       picoLpm: a.fcEspectral,
       respiracion: remuestreada == null || remuestreada.length < 15 * a.fs
@@ -117,13 +128,21 @@ class DetalleMedicion {
   /// La calidad alcanza para los datos extra.
   bool get calidadSuficiente => calidad >= umbralCalidadRegular;
 
-  /// La variabilidad es confiable: buena calidad, ≥ 30 s y suficientes
-  /// intervalos.
-  bool get vfcValida =>
+  /// La variabilidad es confiable: buena calidad, ≥ 30 s, suficientes
+  /// intervalos y como mucho un 10 % corregidos o descartados.
+  static bool variabilidadValida({
+    required double calidad,
+    required double duracion,
+    required MetricasRr? metricas,
+  }) =>
       calidad >= umbralCalidadBuena &&
       duracion >= segundosParaVfc &&
       metricas != null &&
-      intervalos.length >= intervalosParaVfc;
+      metricas.intervalos >= intervalosParaVfc &&
+      metricas.pocasCorrecciones;
+
+  /// Las medidas de la variabilidad, solo si se pueden enseñar.
+  MetricasRr? get metricasVfc => vfcValida ? metricas : null;
 
   double? get fcMinima => fcPorSegundo.isEmpty
       ? null

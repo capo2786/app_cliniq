@@ -57,10 +57,23 @@ List<double> detectarPicos(
   }
   elegidos.sort();
 
-  return [for (final i in elegidos) (i + _desplazamientoParabolico(x, i)) / fs];
+  return refinarPicos(x, elegidos, fs: fs);
 }
 
-double _desplazamientoParabolico(List<double> x, int i) {
+/// Los instantes (s) de los picos en los índices [picos] de [x], afinados
+/// con una parábola por tres puntos (el pico y sus dos vecinos), como
+/// `refinar_picos` del servidor. Sin afinar, cada latido quedaría pegado a
+/// un cuadro (~33 ms a 30 Hz), y ese error se suma al RMSSD.
+List<double> refinarPicos(
+  List<double> x,
+  List<int> picos, {
+  double fs = frecuenciaAnalisis,
+}) => [for (final i in picos) (i + desplazamientoParabolico(x, i)) / fs];
+
+/// Cuánto se corre el vértice de la parábola que pasa por `x[i − 1]`,
+/// `x[i]` y `x[i + 1]`, en muestras (entre −0,5 y 0,5). En los bordes o en
+/// una meseta, nada.
+double desplazamientoParabolico(List<double> x, int i) {
   if (i <= 0 || i >= x.length - 1) return 0;
   final denominador = x[i - 1] - 2 * x[i] + x[i + 1];
   if (denominador == 0) return 0;
