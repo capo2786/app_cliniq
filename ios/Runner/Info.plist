@@ -27,7 +27,7 @@
 		<key>NSFaceIDUsageDescription</key>
 		<string>Usamos Face ID para que entres a Cliniq sin escribir tu contraseña.</string>
 		<key>NSCameraUsageDescription</key>
-		<string>Usamos la cámara para que el médico te vea en la videoconsulta y para que tomes fotos de recetas, exámenes o de lo que quieras mostrarle en tu consulta en línea.</string>
+		<string>Usamos la cámara para que el médico te vea en la videoconsulta, para que tomes fotos de recetas, exámenes o de lo que quieras mostrarle en tu consulta en línea y, si la clínica lo activa, para medir tu pulso con el escáner experimental. Las imágenes del escáner se procesan en el teléfono y no se guardan ni se envían.</string>
 		<key>NSMicrophoneUsageDescription</key>
 		<string>Usamos el micrófono para que el médico te escuche en la videoconsulta.</string>
 		<key>NSPhotoLibraryUsageDescription</key>

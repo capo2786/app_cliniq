@@ -24,6 +24,16 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!--
+        El escáner experimental de signos vitales usa la misma CAMERA (con el
+        paquete camera): la trasera con el flash como linterna en el modo
+        dedo (FlashMode.torch, sin permiso aparte) o la frontal en el modo
+        rostro. El flash no es obligatorio para instalar la aplicación: un
+        teléfono sin flash la instala igual y el escáner le propone el modo
+        rostro.
+    -->
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+
     <!-- Recordatorios locales 24 h y 1 h antes de cada cita -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
