@@ -11,7 +11,8 @@ import '../serie_senal.dart';
 import 'dibujos_escaner.dart';
 import 'pasos_comunes.dart';
 
-/// Elegir el modo: dedo (recomendado) o rostro (beta).
+/// Elegir el modo, solo si la clínica encendió el dedo: primero el rostro
+/// (recomendado) y después el dedo (alternativo).
 class PasoElegirModo extends StatelessWidget {
   final String? pacienteNombre;
 
@@ -25,7 +26,6 @@ class PasoElegirModo extends StatelessWidget {
       required Key key,
       required IconData icono,
       required String titulo,
-      required String etiqueta,
       required Color color,
       required String descripcion,
       required ModoEscaner modo,
@@ -54,7 +54,6 @@ class PasoElegirModo extends StatelessWidget {
                         fontSize: 16,
                       ),
                     ),
-                    Pastilla(texto: etiqueta, color: color),
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -88,27 +87,25 @@ class PasoElegirModo extends StatelessWidget {
         const SizedBox(height: 20),
         const EtiquetaSeccion('¿Cómo quieres medir?'),
         opcion(
-          key: const Key('modo-dedo'),
-          icono: Icons.fingerprint_rounded,
-          titulo: 'Dedo',
-          etiqueta: 'Recomendado',
+          key: const Key('modo-rostro'),
+          icono: Icons.face_retouching_natural_rounded,
+          titulo: 'Con tu rostro (recomendado)',
           color: AppColors.exito,
           descripcion:
-              'La yema sobre la cámara trasera, con el flash encendido. Es '
-              'la forma más confiable.',
-          modo: ModoEscaner.dedo,
+              'Mira a la cámara de adelante unos segundos. La medición '
+              'empieza sola cuando tu cara está bien encuadrada.',
+          modo: ModoEscaner.rostro,
         ),
         const SizedBox(height: 12),
         opcion(
-          key: const Key('modo-rostro'),
-          icono: Icons.face_retouching_natural_rounded,
-          titulo: 'Rostro',
-          etiqueta: 'Beta',
-          color: AppColors.alerta,
+          key: const Key('modo-dedo'),
+          icono: Icons.fingerprint_rounded,
+          titulo: 'Con el dedo (alternativo)',
+          color: AppColors.celeste,
           descripcion:
-              'Tu cara frente a la cámara frontal. Menos precisa: necesita '
-              'buena luz y que estés quieto.',
-          modo: ModoEscaner.rostro,
+              'Cubre con la yema la lente que está junto a la luz que se '
+              'enciende.',
+          modo: ModoEscaner.dedo,
         ),
         const LineaPrivacidad(),
       ],
@@ -121,10 +118,14 @@ class PasoInstrucciones extends StatelessWidget {
   final ModoEscaner modo;
   final int segundos;
 
+  /// Con el modo dedo encendido se puede volver a elegir el modo.
+  final bool dedoActivo;
+
   const PasoInstrucciones({
     super.key,
     required this.modo,
     required this.segundos,
+    this.dedoActivo = false,
   });
 
   @override
@@ -133,15 +134,16 @@ class PasoInstrucciones extends StatelessWidget {
     final pasos = switch (modo) {
       ModoEscaner.dedo => [
         'Siéntate y apoya la mano en una mesa.',
-        'Cubre la cámara trasera y el flash con la yema del dedo índice, sin '
-            'apretar.',
-        'No muevas el dedo durante $segundos segundos. El flash se calienta '
+        'Cubre con la yema del dedo índice la lente que está junto a la luz '
+            'que se enciende, sin apretar.',
+        'No muevas el dedo durante $segundos segundos. La luz se calienta '
             'un poco: es normal.',
       ],
       ModoEscaner.rostro => [
         'Busca una luz pareja de frente (una ventana); evita el sol directo '
             'y la luz de atrás.',
-        'Pon tu rostro dentro del óvalo, sin lentes de sol ni gorra.',
+        'Sostén el teléfono frente a tu cara, sin lentes de sol ni gorra. '
+            'La medición empieza sola cuando tu cara está bien encuadrada.',
         'Quédate quieto y sin hablar durante $segundos segundos.',
       ],
     };
@@ -156,13 +158,14 @@ class PasoInstrucciones extends StatelessWidget {
             icono: Icons.play_arrow_rounded,
             onPressed: cubit.empezar,
           ),
-          TextButton(
-            onPressed: cubit.volverAModos,
-            child: const Text(
-              'Cambiar de modo',
-              style: TextStyle(color: AppColors.textoSecundario),
+          if (dedoActivo)
+            TextButton(
+              onPressed: cubit.volverAModos,
+              child: const Text(
+                'Cambiar de modo',
+                style: TextStyle(color: AppColors.textoSecundario),
+              ),
             ),
-          ),
         ],
       ),
       children: [
@@ -173,7 +176,7 @@ class PasoInstrucciones extends StatelessWidget {
         ),
         const SizedBox(height: 18),
         EtiquetaSeccion(
-          modo == ModoEscaner.dedo ? 'Con el dedo' : 'Con el rostro (beta)',
+          modo == ModoEscaner.dedo ? 'Con el dedo' : 'Con tu rostro',
         ),
         for (final (i, paso) in pasos.indexed)
           Padding(

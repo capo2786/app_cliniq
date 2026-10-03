@@ -12,11 +12,12 @@
 ///   luminancia Y), la **cobertura** (la fracción de puntos rojos y
 ///   brillantes, como se ve la yema con el flash detrás) y la
 ///   **saturación** (la fracción de rojos quemados).
-/// - **Rostro:** la frente y las dos mejillas dentro del óvalo que la
-///   persona ve en pantalla, y de ahí solo los puntos de **piel** (por su
-///   color en YCbCr). Qué puntos son piel se decide cada
-///   [ExtractorDeRostro.cuadrosPorMascara] cuadros y se mantiene entre medio,
-///   para que el conjunto de píxeles no cambie de un cuadro a otro.
+/// - **Rostro, sin ML Kit (respaldo):** la frente y las dos mejillas
+///   dentro de un óvalo fijo en el marco que la persona ve en pantalla, y
+///   de ahí solo los puntos de **piel** (por su color en YCbCr). Qué puntos
+///   son piel se decide cada [ExtractorDeRostro.cuadrosPorMascara] cuadros
+///   y se mantiene entre medio, para que el conjunto de píxeles no cambie
+///   de un cuadro a otro.
 library;
 
 import 'dart:math' as math;
@@ -173,7 +174,7 @@ CuadroPpg reducirDedo(ImagenCruda imagen, Duration momento) {
 /// como la ve la persona.
 typedef Region = ({double x0, double y0, double x1, double y1});
 
-/// El óvalo de la pantalla del rostro, en coordenadas normalizadas de la
+/// El óvalo fijo del respaldo (sin ML Kit), en coordenadas normalizadas de la
 /// imagen derecha: centro y semiejes.
 class Ovalo {
   final double cx;
@@ -274,41 +275,62 @@ class ExtractorDeRostro {
     if (_cuadros % cuadrosPorMascara == 0 || _mascara.isEmpty) {
       final rejilla = _rejilla(imagen, rotacion);
       _total = rejilla.length;
-      _mascara = [
-        for (final p in rejilla)
-          if (esPiel(leerPixel(imagen, p.x, p.y))) p,
-      ];
+      _mascara = soloPiel(imagen, rejilla);
     }
     _cuadros++;
 
-    var sr = 0.0, sg = 0.0, sb = 0.0, sy = 0.0;
-    for (final p in _mascara) {
-      final c = leerPixel(imagen, p.x, p.y);
-      sr += c.r;
-      sg += c.g;
-      sb += c.b;
-      sy += _luminancia(c);
-    }
-    final n = _mascara.length;
-    final piel = _total == 0 ? 0.0 : n / _total;
-    if (n == 0) {
-      return CuadroPpg(
-        momento: momento,
-        rojo: 0,
-        verde: 0,
-        azul: 0,
-        luminancia: 0,
-        cobertura: 0,
-      );
-    }
-
-    return CuadroPpg(
-      momento: momento,
-      rojo: sr / n,
-      verde: sg / n,
-      azul: sb / n,
-      luminancia: sy / n,
-      cobertura: piel,
+    return promediarPixeles(
+      imagen,
+      _mascara,
+      momento,
+      cobertura: _total == 0 ? 0.0 : _mascara.length / _total,
     );
   }
+}
+
+/// Los [candidatos] (píxeles de la imagen cruda) que son piel por su color.
+List<({int x, int y})> soloPiel(
+  ImagenCruda imagen,
+  Iterable<({int x, int y})> candidatos,
+) => [
+  for (final p in candidatos)
+    if (esPiel(leerPixel(imagen, p.x, p.y))) p,
+];
+
+/// El promedio de color de unos [pixeles] de la imagen cruda: un
+/// [CuadroPpg] con la [cobertura] dada. Sin píxeles, todo en cero.
+CuadroPpg promediarPixeles(
+  ImagenCruda imagen,
+  List<({int x, int y})> pixeles,
+  Duration momento, {
+  required double cobertura,
+}) {
+  final n = pixeles.length;
+  if (n == 0) {
+    return CuadroPpg(
+      momento: momento,
+      rojo: 0,
+      verde: 0,
+      azul: 0,
+      luminancia: 0,
+      cobertura: 0,
+    );
+  }
+
+  var sr = 0.0, sg = 0.0, sb = 0.0, sy = 0.0;
+  for (final p in pixeles) {
+    final c = leerPixel(imagen, p.x, p.y);
+    sr += c.r;
+    sg += c.g;
+    sb += c.b;
+    sy += _luminancia(c);
+  }
+  return CuadroPpg(
+    momento: momento,
+    rojo: sr / n,
+    verde: sg / n,
+    azul: sb / n,
+    luminancia: sy / n,
+    cobertura: cobertura,
+  );
 }

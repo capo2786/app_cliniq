@@ -113,7 +113,7 @@ void main() {
           ),
         ),
       );
-      expect(sinCara.consejo, ConsejosEscaner.rostroEnElOvalo);
+      expect(sinCara.consejo, ConsejosEscaner.rostroEnElMarco);
 
       final oscuro = Sintetizador(8).rostro(lpm: 72, segundos: 3);
       final apagado = SerieRgb(

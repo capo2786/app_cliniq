@@ -97,57 +97,8 @@ class _PintorDedo extends CustomPainter {
   bool shouldRepaint(covariant _PintorDedo antes) => antes.acento != acento;
 }
 
-/// El óvalo del modo rostro sobre la vista de la cámara: oscurece lo de
-/// fuera y marca el borde. Usa el mismo [Ovalo] que el extractor, así lo
-/// que la persona encaja es lo que se mide.
-class OvaloDelRostro extends StatelessWidget {
-  final Ovalo ovalo;
-  final Color color;
-
-  const OvaloDelRostro({
-    super.key,
-    this.ovalo = const Ovalo(),
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) =>
-      CustomPaint(painter: _PintorOvalo(ovalo, color), size: Size.infinite);
-}
-
-class _PintorOvalo extends CustomPainter {
-  final Ovalo ovalo;
-  final Color color;
-
-  _PintorOvalo(this.ovalo, this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromCenter(
-      center: Offset(ovalo.cx * size.width, ovalo.cy * size.height),
-      width: 2 * ovalo.rx * size.width,
-      height: 2 * ovalo.ry * size.height,
-    );
-    final fuera = Path()
-      ..fillType = PathFillType.evenOdd
-      ..addRect(Offset.zero & size)
-      ..addOval(rect);
-    canvas.drawPath(fuera, Paint()..color = AppColors.veloOvalo);
-    canvas.drawOval(
-      rect,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _PintorOvalo antes) =>
-      antes.color != color || antes.ovalo != ovalo;
-}
-
-/// La ilustración del modo rostro: una cara dentro del óvalo.
+/// La ilustración del modo rostro: una cara dentro del marco, con la
+/// frente y las mejillas marcadas.
 class DibujoRostro extends StatelessWidget {
   final double alto;
 
@@ -155,7 +106,7 @@ class DibujoRostro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Semantics(
-    label: 'Ilustración: el rostro dentro del óvalo, de frente y con buena luz',
+    label: 'Ilustración: el rostro dentro del marco, de frente y con buena luz',
     child: SizedBox(
       height: alto,
       child: AspectRatio(
@@ -202,27 +153,41 @@ class _PintorCara extends CustomPainter {
         region,
       );
     }
-    final borde = Rect.fromCenter(
+    // Las cuatro esquinas del marco, como en la medición.
+    final marco = Rect.fromCenter(
       center: Offset(ovalo.cx * w, ovalo.cy * h),
-      width: 2 * ovalo.rx * w,
-      height: 2 * ovalo.ry * h,
+      width: 2.5 * ovalo.rx * w,
+      height: 2.4 * ovalo.ry * h,
     );
-    canvas.drawOval(
-      borde,
-      Paint()
-        ..color = acento
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3,
-    );
+    final lado = marco.shortestSide * 0.22;
+    final trazo = Paint()
+      ..color = acento
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+    for (final (esquina, dx, dy) in [
+      (marco.topLeft, 1.0, 1.0),
+      (marco.topRight, -1.0, 1.0),
+      (marco.bottomRight, -1.0, -1.0),
+      (marco.bottomLeft, 1.0, -1.0),
+    ]) {
+      canvas
+        ..drawLine(esquina, esquina.translate(dx * lado, 0), trazo)
+        ..drawLine(esquina, esquina.translate(0, dy * lado), trazo);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _PintorCara antes) => antes.acento != acento;
 }
 
-/// La onda del pulso en vivo.
+/// La onda del pulso, con brillo y un punto en cada latido detectado.
 class OndaEnVivo extends StatelessWidget {
   final List<double> onda;
+
+  /// Los índices de [onda] donde se detectó un latido.
+  final List<int> latidos;
+
   final Color color;
   final double alto;
 
@@ -230,6 +195,7 @@ class OndaEnVivo extends StatelessWidget {
     super.key,
     required this.onda,
     required this.color,
+    this.latidos = const [],
     this.alto = 90,
   });
 
@@ -237,15 +203,16 @@ class OndaEnVivo extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(
     height: alto,
     width: double.infinity,
-    child: CustomPaint(painter: _PintorOnda(onda, color)),
+    child: CustomPaint(painter: _PintorOnda(onda, latidos, color)),
   );
 }
 
 class _PintorOnda extends CustomPainter {
   final List<double> onda;
+  final List<int> latidos;
   final Color color;
 
-  _PintorOnda(this.onda, this.color);
+  _PintorOnda(this.onda, this.latidos, this.color);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -259,30 +226,41 @@ class _PintorOnda extends CustomPainter {
     );
     if (onda.length < 2) return;
 
-    final trazo = Path();
-    for (var i = 0; i < onda.length; i++) {
-      final x = size.width * i / (onda.length - 1);
-      final y = medio - onda[i].clamp(-1, 1) * (size.height * 0.42);
-      if (i == 0) {
-        trazo.moveTo(x, y);
-      } else {
-        trazo.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(
-      trazo,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.6
-        ..strokeJoin = StrokeJoin.round
-        ..strokeCap = StrokeCap.round,
+    Offset punto(int i) => Offset(
+      size.width * i / (onda.length - 1),
+      medio - onda[i].clamp(-1, 1) * (size.height * 0.42),
     );
+    final trazo = Path()..moveTo(punto(0).dx, punto(0).dy);
+    for (var i = 1; i < onda.length; i++) {
+      trazo.lineTo(punto(i).dx, punto(i).dy);
+    }
+    Paint linea(Color c, double ancho) => Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = ancho
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    canvas
+      ..drawPath(trazo, linea(color.withValues(alpha: 0.22), 7))
+      ..drawPath(trazo, linea(color, 2.4));
+
+    for (final i in latidos) {
+      if (i < 0 || i >= onda.length) continue;
+      canvas
+        ..drawCircle(
+          punto(i),
+          7,
+          Paint()..color = color.withValues(alpha: 0.25),
+        )
+        ..drawCircle(punto(i), 3.4, Paint()..color = AppColors.texto);
+    }
   }
 
   @override
   bool shouldRepaint(covariant _PintorOnda antes) =>
-      !identical(antes.onda, onda) || antes.color != color;
+      !identical(antes.onda, onda) ||
+      !identical(antes.latidos, latidos) ||
+      antes.color != color;
 }
 
 /// El círculo que late mientras se mide con el dedo: no hay vista previa

@@ -49,13 +49,7 @@ double? estimarFr({
   if (pulso <= 0) return null;
 
   // RIIV: la línea base, debajo de 0,6 Hz y sin la deriva más lenta.
-  final base = espectroDe(
-    quitarTendencia(
-      filtrarIdaYVuelta(sinTendenciaLenta, pasaBajos(0.6, fs: fs), fs: fs),
-      fs: fs,
-      corteHz: 0.05,
-    ),
-  );
+  final base = espectroDe(lineaBaseRespiratoria(sinTendenciaLenta, fs: fs));
   if (math.sqrt(base.varianzaEntre(0.12, frMaximaHz)) / pulso >= riivMinima) {
     espectros.add(base);
   }
@@ -127,3 +121,14 @@ double? estimarFr({
 
   return pico.frecuencia * 60;
 }
+
+/// La onda lenta de la PPG donde se ve la respiración (RIIV): la señal
+/// remuestreada debajo de 0,6 Hz y sin la deriva más lenta (0,05 Hz).
+Float64List lineaBaseRespiratoria(
+  List<double> remuestreada, {
+  double fs = frecuenciaAnalisis,
+}) => quitarTendencia(
+  filtrarIdaYVuelta(remuestreada, pasaBajos(0.6, fs: fs), fs: fs),
+  fs: fs,
+  corteHz: 0.05,
+);

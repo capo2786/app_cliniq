@@ -59,11 +59,13 @@ import 'ppg/tendencia.dart';
 export 'ppg/calidad.dart';
 export 'ppg/constantes.dart';
 export 'ppg/espectro.dart';
+export 'ppg/fc_por_ventana.dart';
 export 'ppg/filtros.dart';
 export 'ppg/picos.dart';
 export 'ppg/pos.dart';
 export 'ppg/respiracion.dart';
 export 'ppg/tendencia.dart';
+export 'ppg/variabilidad.dart';
 
 /// El resultado del análisis de una señal PPG.
 class AnalisisPpg {
@@ -83,6 +85,20 @@ class AnalisisPpg {
   /// La señal ya filtrada, para dibujar la onda.
   final Float64List senal;
 
+  /// Los instantes de los latidos detectados en [senal], en segundos desde
+  /// su primera muestra.
+  final List<double> latidos;
+
+  /// El espectro de [senal] (Welch), si se llegó a calcular.
+  final Espectro? espectro;
+
+  /// La señal remuestreada, antes de filtrar (con su nivel): de ella sale
+  /// la onda lenta de la respiración.
+  final Float64List? remuestreada;
+
+  /// La frecuencia de muestreo de [senal] y [remuestreada].
+  final double fs;
+
   const AnalisisPpg({
     required this.calidad,
     required this.senal,
@@ -90,6 +106,10 @@ class AnalisisPpg {
     this.fr,
     this.fcEspectral,
     this.fcPicos,
+    this.latidos = const [],
+    this.espectro,
+    this.remuestreada,
+    this.fs = frecuenciaAnalisis,
   });
 }
 
@@ -132,6 +152,7 @@ AnalisisPpg analizarSenal(
     return AnalisisPpg(
       calidad: const CalidadSenal(valor: 0, motivo: MotivoCalidad.senalPlana),
       senal: filtrada,
+      fs: fs,
     );
   }
 
@@ -141,11 +162,13 @@ AnalisisPpg analizarSenal(
     return AnalisisPpg(
       calidad: const CalidadSenal(valor: 0, motivo: MotivoCalidad.senalPlana),
       senal: filtrada,
+      fs: fs,
     );
   }
   final fcEspectral = pico.frecuencia * 60;
 
-  final conteo = fcPorPicos(detectarPicos(filtrada, fs: fs));
+  final latidos = detectarPicos(filtrada, fs: fs);
+  final conteo = fcPorPicos(latidos);
   final desacuerdo = conteo == null ? null : (conteo.fc - fcEspectral).abs();
 
   final calidad = calcularCalidad(
@@ -172,6 +195,10 @@ AnalisisPpg analizarSenal(
     fcEspectral: fcEspectral,
     fcPicos: conteo?.fc,
     senal: filtrada,
+    latidos: latidos,
+    espectro: espectro,
+    remuestreada: cruda,
+    fs: fs,
   );
 }
 

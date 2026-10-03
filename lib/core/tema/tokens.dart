@@ -134,7 +134,7 @@ class AppColors {
   /// El cristal de la cámara en las ilustraciones del escáner.
   static const Color lente = Color(0xFF05090A);
 
-  /// El velo oscuro alrededor del óvalo del rostro.
+  /// El velo oscuro alrededor del marco del rostro en el escáner.
   static const Color veloOvalo = Color(0x99000000);
 
   /// Fondo cálido y claro del icono de la aplicación: el anillo gris azulado

@@ -19,18 +19,21 @@ import '../../auth/providers/auth_bloc.dart';
 import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 import '../data/cola_mediciones.dart';
 import '../data/mediciones_service.dart';
-import '../data/models/medicion.dart';
 import '../dominio/destinos_medico.dart';
-import '../dominio/reglas_mediciones.dart';
 import '../escaner/escaner_page.dart';
 import '../providers/mis_signos_vitales_cubit.dart';
+import '../providers/tendencias_cubit.dart';
 import 'registrar_medicion_page.dart';
-import 'widgets/grafico_evolucion.dart';
-import 'widgets/partes_mediciones.dart';
+import 'widgets/registro_signos.dart';
+import 'widgets/tendencias_signos.dart';
+
+export 'widgets/registro_signos.dart' show nombreDelTipoYValor;
 
 /// «Mis signos vitales»: lo que el paciente midió en casa (y, si la
-/// clínica lo activa, con el escáner experimental), por fecha, con la
-/// evolución del pulso y de la presión.
+/// clínica lo activa, con el escáner experimental), en dos pestañas:
+/// «Tendencias» (por tipo, en 7 días, 30 días o 3 meses, con el mínimo, el
+/// promedio, el máximo y la franja de referencia) y «Registro» (la lista
+/// por fecha).
 ///
 /// Se abre desde Mi salud (del titular o del dependiente elegido) y desde
 /// el detalle de una cita de telemedicina o de una consulta en línea
@@ -49,6 +52,9 @@ class MisSignosVitalesPage extends StatelessWidget {
   final MedicionesService? servicio;
   final ColaMediciones? cola;
 
+  /// El reloj de las tendencias (para las pruebas); por defecto, el real.
+  final DateTime Function()? ahora;
+
   const MisSignosVitalesPage({
     super.key,
     this.pacienteId,
@@ -56,19 +62,33 @@ class MisSignosVitalesPage extends StatelessWidget {
     this.destino,
     this.servicio,
     this.cola,
+    this.ahora,
   });
 
   @override
   Widget build(BuildContext context) {
     final uid = context.read<AuthBloc>().usuario?.uid ?? '';
+    final elServicio = servicio ?? Servicios.mediciones;
 
-    return BlocProvider(
-      create: (_) => MisSignosVitalesCubit(
-        servicio: servicio ?? Servicios.mediciones,
-        cola: cola ?? Servicios.colaMediciones,
-        uid: uid,
-        pacienteId: pacienteId,
-      )..iniciar(),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => MisSignosVitalesCubit(
+            servicio: elServicio,
+            cola: cola ?? Servicios.colaMediciones,
+            uid: uid,
+            pacienteId: pacienteId,
+          )..iniciar(),
+        ),
+        BlocProvider(
+          create: (_) => TendenciasCubit(
+            servicio: elServicio,
+            uid: uid,
+            pacienteId: pacienteId,
+            ahora: ahora ?? Servicios.reloj.instante,
+          )..cargar(),
+        ),
+      ],
       child: _VistaSignos(
         pacienteId: pacienteId,
         pacienteNombre: pacienteNombre,
@@ -79,7 +99,7 @@ class MisSignosVitalesPage extends StatelessWidget {
   }
 }
 
-class _VistaSignos extends StatelessWidget {
+class _VistaSignos extends StatefulWidget {
   final String? pacienteId;
   final String? pacienteNombre;
   final DestinoMedico? destino;
@@ -92,8 +112,29 @@ class _VistaSignos extends StatelessWidget {
     required this.cola,
   });
 
+  @override
+  State<_VistaSignos> createState() => _VistaSignosState();
+}
+
+/// Las dos pestañas.
+enum _Pestana { tendencias, registro }
+
+class _VistaSignosState extends State<_VistaSignos> {
+  _Pestana _pestana = _Pestana.tendencias;
+
+  String? get pacienteId => widget.pacienteId;
+  String? get pacienteNombre => widget.pacienteNombre;
+  DestinoMedico? get destino => widget.destino;
+  ColaMediciones? get cola => widget.cola;
+
+  /// Algo nuevo se guardó: la lista y las tendencias se vuelven a pedir.
+  Future<void> _recargar(BuildContext context) async {
+    final tendencias = context.read<TendenciasCubit>();
+    await context.read<MisSignosVitalesCubit>().cargar();
+    await tendencias.cargar();
+  }
+
   Future<void> _registrar(BuildContext context) async {
-    final cubit = context.read<MisSignosVitalesCubit>();
     final guardo = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => RegistrarMedicionPage(
@@ -104,11 +145,10 @@ class _VistaSignos extends StatelessWidget {
         ),
       ),
     );
-    if (guardo == true) await cubit.cargar();
+    if (guardo == true && context.mounted) await _recargar(context);
   }
 
   Future<void> _medir(BuildContext context) async {
-    final cubit = context.read<MisSignosVitalesCubit>();
     final guardo = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => EscanerPage(
@@ -119,22 +159,7 @@ class _VistaSignos extends StatelessWidget {
         ),
       ),
     );
-    if (guardo == true) await cubit.cargar();
-  }
-
-  Future<void> _eliminar(BuildContext context, Medicion m) async {
-    final cubit = context.read<MisSignosVitalesCubit>();
-    final si = await confirmarAccion(
-      context,
-      titulo: '¿Eliminar esta medición?',
-      mensaje:
-          'Se borra «${nombreDelTipoYValor(m)}» de tus signos vitales. Tu '
-          'médico ya no la verá.',
-      confirmar: 'Eliminar',
-      icono: Icons.delete_outline_rounded,
-      peligroso: true,
-    );
-    if (si) await cubit.eliminar(m.id);
+    if (guardo == true && context.mounted) await _recargar(context);
   }
 
   @override
@@ -168,7 +193,7 @@ class _VistaSignos extends StatelessWidget {
               return RefreshIndicator(
                 color: AppColors.acentoClaro,
                 backgroundColor: AppColors.superficie,
-                onRefresh: cubit.cargar,
+                onRefresh: () => _recargar(context),
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: context.margenDeScroll(inferior: 28),
@@ -232,18 +257,6 @@ class _VistaSignos extends StatelessWidget {
                       RecuadroAviso.alerta(state.error!),
                       const SizedBox(height: 12),
                     ],
-                    if (state.pendientes.isNotEmpty) ...[
-                      const EtiquetaSeccion('Pendientes de enviar'),
-                      for (final envio in state.pendientes) ...[
-                        TarjetaPendiente(
-                          envio: envio,
-                          alDescartar: () =>
-                              cubit.descartarPendiente(envio.idLocal),
-                        ),
-                        const SizedBox(height: 10),
-                      ],
-                      const SizedBox(height: 12),
-                    ],
                     if (!state.hayAlgo)
                       switch (state.carga) {
                         CargaSignos.error => EstadoError(
@@ -265,19 +278,20 @@ class _VistaSignos extends StatelessWidget {
                         ),
                       }
                     else ...[
-                      _Evolucion(mediciones: state.mediciones),
-                      ..._porDia(context, state, ahora),
-                      if (state.hayMas) ...[
-                        const SizedBox(height: 6),
-                        BotonSecundario(
-                          key: const Key('signos-ver-mas'),
-                          texto: state.cargandoMas
-                              ? 'Cargando…'
-                              : 'Ver mediciones anteriores',
-                          icono: Icons.history_rounded,
-                          onPressed: state.cargandoMas ? null : cubit.verMas,
+                      _SelectorDePestana(
+                        elegida: _pestana,
+                        alElegir: (p) => setState(() => _pestana = p),
+                      ),
+                      const SizedBox(height: 14),
+                      switch (_pestana) {
+                        _Pestana.tendencias => TendenciasSignos(
+                          respaldo: state.mediciones,
                         ),
-                      ],
+                        _Pestana.registro => RegistroSignos(
+                          state: state,
+                          ahora: ahora,
+                        ),
+                      },
                     ],
                   ],
                 ),
@@ -288,78 +302,68 @@ class _VistaSignos extends StatelessWidget {
       ),
     );
   }
-
-  List<Widget> _porDia(
-    BuildContext context,
-    MisSignosVitalesState state,
-    DateTime ahora,
-  ) {
-    final ordenadas = [...state.mediciones]
-      ..sort((a, b) => b.medidoEn.compareTo(a.medidoEn));
-    final widgets = <Widget>[];
-    String? diaAnterior;
-    for (final m in ordenadas) {
-      final dia = diaDeLaMedicion(m.medidoEn, ahora);
-      if (dia != diaAnterior) {
-        if (diaAnterior != null) widgets.add(const SizedBox(height: 8));
-        widgets.add(EtiquetaSeccion(dia));
-        diaAnterior = dia;
-      }
-      widgets
-        ..add(
-          TarjetaMedicion(
-            key: Key('medicion-${m.id}'),
-            medicion: m,
-            eliminando: state.eliminandoId == m.id,
-            alEliminar: () => _eliminar(context, m),
-          ),
-        )
-        ..add(const SizedBox(height: 10));
-    }
-    return widgets;
-  }
 }
 
-/// «Presión arterial 120/80 mmHg».
-String nombreDelTipoYValor(Medicion m) =>
-    '${nombreDelTipo(m.tipo)} ${valorDeMedicion(m)}';
+class _SelectorDePestana extends StatelessWidget {
+  final _Pestana elegida;
+  final ValueChanged<_Pestana> alElegir;
 
-/// La evolución del pulso y de la presión, si hay dos puntos o más.
-class _Evolucion extends StatelessWidget {
-  final List<Medicion> mediciones;
-
-  const _Evolucion({required this.mediciones});
+  const _SelectorDePestana({required this.elegida, required this.alElegir});
 
   @override
   Widget build(BuildContext context) {
-    final graficos = [
-      for (final tipo in const [TipoMedicion.pa, TipoMedicion.fc])
-        if (serieDelTipo(mediciones, tipo) case final serie
-            when serie.length >= 2)
-          GraficoEvolucion(
-            key: Key('grafico-${tipo.codigo}'),
-            tipo: tipo,
-            serie: serie,
-          ),
-    ];
-    if (graficos.isEmpty) return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const EtiquetaSeccion('Evolución'),
-          TarjetaTranslucida(
-            child: Column(
-              children: [
-                for (final (i, g) in graficos.indexed) ...[
-                  if (i > 0) const SizedBox(height: 22),
-                  g,
+    Widget pestana(_Pestana p, String texto, IconData icono) {
+      final activa = p == elegida;
+      return Expanded(
+        child: Semantics(
+          selected: activa,
+          button: true,
+          child: InkWell(
+            key: Key('pestana-${p.name}'),
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => alElegir(p),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: BoxDecoration(
+                color: activa ? AppColors.tarjeta : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    icono,
+                    size: 18,
+                    color: activa ? AppColors.texto : AppColors.textoTenue,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    texto,
+                    style: TextStyle(
+                      color: activa ? AppColors.texto : AppColors.textoTenue,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ],
-              ],
+              ),
             ),
           ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.campo,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.bordeCampo),
+      ),
+      child: Row(
+        children: [
+          pestana(_Pestana.tendencias, 'Tendencias', Icons.insights_rounded),
+          pestana(_Pestana.registro, 'Registro', Icons.list_alt_rounded),
         ],
       ),
     );

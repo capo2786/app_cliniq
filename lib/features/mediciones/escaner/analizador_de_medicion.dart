@@ -15,8 +15,9 @@ import 'serie_senal.dart';
 /// servidor responde a tiempo, manda su resultado («Analizado en el
 /// servidor»); si falla, no hay red o tarda más de
 /// [AnalisisEnServidor.plazo], queda el del teléfono («Calculado en el
-/// teléfono»). Nunca se mezclan: el resultado es de uno u otro, y su motor
-/// queda en las notas de la medición.
+/// teléfono»). Los valores nunca se mezclan: son de uno u otro, y su motor
+/// queda en las notas de la medición. El detalle de la medición (las
+/// gráficas) es siempre el del teléfono.
 class AnalizadorDeMedicion {
   final MotorSignosCamara local;
 
@@ -45,7 +46,9 @@ class AnalizadorDeMedicion {
     }
 
     try {
-      return await remoto.analizar(serie).timeout(plazo);
+      final delServidor = await remoto.analizar(serie).timeout(plazo);
+      // El detalle y las gráficas siempre salen del teléfono.
+      return delServidor.conDetalle(enElTelefono.detalle);
     } catch (error) {
       debugPrint('Cliniq · escáner: el análisis del servidor no llegó: $error');
       return enElTelefono;
