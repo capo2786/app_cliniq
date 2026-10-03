@@ -136,7 +136,7 @@ void main() {
     expect(find.byKey(const Key('receta-r1')), findsOneWidget);
   });
 
-  testWidgets('la receta se abre entera, con su código de verificación', (
+  testWidgets('la receta en dos bloques: para la farmacia y cómo tomarlo', (
     tester,
   ) async {
     await montar(tester);
@@ -145,13 +145,125 @@ void main() {
     expect(find.byType(RecetaPage), findsOneWidget);
     expect(api.claves, contains('GET /portal/recetas/r1'));
     expect(find.text('Receta médica'), findsOneWidget);
+    expect(
+      find.text('N.º 000123 · Emitida el viernes 25 de septiembre de 2026'),
+      findsOneWidget,
+    );
+
+    // Para la farmacia: el genérico, la concentración y la forma, y la
+    // cantidad en números y en letras.
+    final farmacia = find.byKey(const Key('receta-para-la-farmacia'));
+    expect(find.text('PARA LA FARMACIA · 1 MEDICAMENTO'), findsOneWidget);
+    expect(
+      find.descendant(of: farmacia, matching: find.text('Amoxicilina')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: farmacia, matching: find.text('500 mg · Cápsula')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: farmacia,
+        matching: find.text('Cantidad: 30 (treinta)'),
+      ),
+      findsOneWidget,
+    );
+    // Lo del paciente no va en la parte de la farmacia.
+    expect(
+      find.descendant(of: farmacia, matching: find.text('Cada 8 horas')),
+      findsNothing,
+    );
+
+    // Cómo tomarlo: la pauta, las indicaciones, las recomendaciones y los
+    // signos de alarma.
+    await bajarHasta(tester, find.byKey(const Key('signos-de-alarma')));
+    expect(find.text('CÓMO TOMARLO'), findsOneWidget);
     expect(find.text('Amoxicilina 500 mg Cápsula'), findsOneWidget);
-    expect(find.text('1 cápsula, Cada 8 horas, 10 días'), findsOneWidget);
-    expect(find.text('Vía: Oral · Cantidad: 30'), findsOneWidget);
+    expect(find.text('1 cápsula'), findsOneWidget);
+    expect(find.text('Cada 8 horas'), findsOneWidget);
+    expect(find.text('10 días'), findsOneWidget);
+    expect(find.text('Oral'), findsOneWidget);
+    expect(find.text('Después de las comidas'), findsOneWidget);
+    expect(find.text('Tomar abundante agua.'), findsOneWidget);
+    expect(
+      find.text('Fiebre de más de 39 °C o dificultad para respirar.'),
+      findsOneWidget,
+    );
+    // El número de emergencias de la clínica, para llamar.
+    expect(find.byKey(const Key('boton-emergencia')), findsOneWidget);
 
     await bajarHasta(tester, find.byKey(const Key('codigo-verificacion')));
     expect(find.text('UC7F6DB5UU'), findsOneWidget);
     expect(find.text('1005-2019-2081234'), findsOneWidget);
+    // La modalidad de la atención, con el nombre de su catálogo.
+    expect(find.text('Modalidad de la atención'), findsOneWidget);
+  });
+
+  testWidgets('una receta vieja, sin cantidad en letras ni signos de alarma', (
+    tester,
+  ) async {
+    await montarPantalla(
+      tester,
+      RecetaPage(
+        id: 'r8',
+        servicio: MiSaludService(
+          DioGrabador({
+            'GET /portal/recetas/r8': (_) => recetaJson(id: 'r8', vieja: true),
+          }).dio,
+          cache,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Emitida el viernes 25 de septiembre de 2026'),
+      findsOneWidget,
+    );
+    expect(find.text('Cantidad: 30'), findsOneWidget);
+    // Sin la modalidad, no se sabe si fue a distancia: no se avisa.
+    expect(find.byKey(const Key('aviso-receta-sin-firma')), findsNothing);
+    await bajarHasta(tester, find.byKey(const Key('codigo-verificacion')));
+    expect(find.byKey(const Key('signos-de-alarma')), findsNothing);
+    expect(find.text('Modalidad de la atención'), findsNothing);
+  });
+
+  testWidgets('a distancia y sin firma, la receta avisa que así no sirve en '
+      'la farmacia; firmada o presencial, no', (tester) async {
+    Future<void> abrir(Map<String, dynamic> receta) async {
+      await montarPantalla(
+        tester,
+        RecetaPage(
+          // Otra clave: otra pantalla, con su propio documento.
+          key: ValueKey(receta['_id']),
+          id: receta['_id'] as String,
+          servicio: MiSaludService(
+            DioGrabador({'GET /portal/recetas/${receta['_id']}': (_) => receta})
+                .dio,
+            cache,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    await abrir(recetaJson(id: 'r1'));
+    expect(find.byKey(const Key('aviso-receta-sin-firma')), findsOneWidget);
+    expect(
+      find.textContaining('no es válida para retirar los medicamentos'),
+      findsOneWidget,
+    );
+
+    await abrir(recetaJson(id: 'r2', modalidad: 'ASINCRONA'));
+    expect(find.byKey(const Key('aviso-receta-sin-firma')), findsOneWidget);
+
+    await abrir(recetaJson(id: 'r3', firmada: true, pdfDisponible: true));
+    expect(find.byKey(const Key('aviso-receta-sin-firma')), findsNothing);
+    expect(find.byKey(const Key('sello-firma')), findsOneWidget);
+
+    await abrir(recetaJson(id: 'r4', modalidad: 'PRESENCIAL'));
+    expect(find.byKey(const Key('aviso-receta-sin-firma')), findsNothing);
   });
 
   testWidgets('la orden urgente de imagen lo dice', (tester) async {
@@ -164,6 +276,59 @@ void main() {
     expect(find.text('Proteína C reactiva (PCR)'), findsNothing);
     expect(find.textContaining('Proteína C reactiva'), findsOneWidget);
     expect(find.text('En ayunas'), findsOneWidget);
+  });
+
+  testWidgets('la orden: número, preparación, exámenes por área, '
+      'indicaciones clínicas, firma y «Ver PDF»', (tester) async {
+    api.rutas['GET /portal/ordenes/o1'] = (_) =>
+        ordenJson(firmada: true, pdfDisponible: true);
+
+    await montar(tester);
+    await tocar(tester, find.byKey(const Key('orden-o1')));
+
+    expect(find.text('Orden de laboratorio'), findsOneWidget);
+    expect(
+      find.text('N.º 000045 · Emitida el viernes 25 de septiembre de 2026'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('sello-firma')), findsOneWidget);
+    expect(find.text('Ayuno de 8 horas'), findsOneWidget);
+    expect(find.text('HEMATOLOGÍA'), findsOneWidget);
+    expect(find.text('SEROLOGÍA E INFECCIOSAS'), findsOneWidget);
+
+    await bajarHasta(tester, find.byKey(const Key('codigo-verificacion')));
+    expect(find.text('Control de infección respiratoria.'), findsOneWidget);
+    expect(find.text('Traer resultados al control.'), findsOneWidget);
+    expect(find.text('Presencial'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+    await tester.pumpAndSettle();
+    expect(find.byType(VisorPdfPage), findsOneWidget);
+    expect(pdf.pedidos.single, (
+      tipo: TipoDocumentoFirmado.orden,
+      id: 'o1',
+      sha256: huellaDePrueba,
+    ));
+    expect(find.text('Orden de laboratorio'), findsOneWidget);
+    expect(find.byKey(const Key('aviso-vista-previa')), findsNothing);
+  });
+
+  testWidgets('«Ver PDF» también desde la fila de la orden, sin firma: la '
+      'vista previa', (tester) async {
+    await montar(tester);
+    await bajarHasta(tester, find.byKey(const Key('pdf-orden-o1')));
+    expect(find.text('Firmada electrónicamente'), findsNothing);
+
+    await tocar(tester, find.byKey(const Key('pdf-orden-o1')));
+
+    expect(find.byType(VisorPdfPage), findsOneWidget);
+    expect(find.byType(OrdenPage), findsNothing);
+    expect(pdf.pedidos.single, (
+      tipo: TipoDocumentoFirmado.orden,
+      id: 'o1',
+      sha256: null,
+    ));
+    expect(find.byKey(const Key('aviso-vista-previa')), findsOneWidget);
   });
 
   testWidgets('«para quién»: los dependientes, y al elegir uno se pide el '
@@ -410,7 +575,7 @@ void main() {
       ));
     });
 
-    testWidgets('sin firma o sin PDF disponible no hay sello ni «Ver PDF»', (
+    testWidgets('sin firma no hay sello, y «Ver PDF» abre la vista previa', (
       tester,
     ) async {
       respuesta = miSaludJson(
@@ -427,13 +592,42 @@ void main() {
 
       await montar(tester);
       await bajarHasta(tester, find.byKey(const Key('certificado-c1')));
-      expect(find.byKey(const Key('pdf-receta-r1')), findsNothing);
-      expect(find.byKey(const Key('pdf-certificado-c1')), findsNothing);
+      expect(find.byKey(const Key('pdf-receta-r1')), findsOneWidget);
+      expect(find.byKey(const Key('pdf-certificado-c1')), findsOneWidget);
       expect(find.text('Firmada electrónicamente'), findsNothing);
 
       await tocar(tester, find.byKey(const Key('receta-r1')));
       expect(find.byKey(const Key('sello-firma')), findsNothing);
-      expect(find.byKey(const Key('boton-ver-pdf')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+      await tester.pumpAndSettle();
+      expect(pdf.pedidos.single, (
+        tipo: TipoDocumentoFirmado.receta,
+        id: 'r1',
+        sha256: null,
+      ));
+      expect(find.byKey(const Key('aviso-vista-previa')), findsOneWidget);
+    });
+
+    testWidgets('si el servidor no da el PDF, el visor enseña su mensaje', (
+      tester,
+    ) async {
+      pdf.responder = (_, _) async => throw errorHttp(
+        409,
+        'El PDF de este documento aún no está disponible.',
+      );
+      api.rutas['GET /portal/recetas/r1'] = (_) => recetaJson();
+
+      await montar(tester);
+      await tocar(tester, find.byKey(const Key('receta-r1')));
+      await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VisorPdfPage), findsOneWidget);
+      expect(
+        find.text('El PDF de este documento aún no está disponible.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('una consulta todavía abierta enseña solo lo firmado', (

@@ -31,6 +31,9 @@ Map<String, dynamic> firmaJson({String? sha256 = huellaDePrueba}) => {
   'revocacion': {'metodo': 'CRL', 'resultado': 'VALIDO'},
 };
 
+/// Una receta con la forma del contrato de documentos: número, modalidad
+/// de la atención, cantidad en letras y signos de alarma. [vieja] la deja
+/// como las de antes, sin ninguno de esos campos.
 Map<String, dynamic> recetaJson({
   String id = 'r1',
   String estado = 'EMITIDA',
@@ -38,6 +41,8 @@ Map<String, dynamic> recetaJson({
   String? anuladaMotivo,
   bool firmada = false,
   bool pdfDisponible = false,
+  String modalidad = 'TELEMEDICINA',
+  bool vieja = false,
 }) => {
   '_id': id,
   'atencionId': 'at1',
@@ -50,6 +55,7 @@ Map<String, dynamic> recetaJson({
   'medicoEspecialidad': 'Medicina Familiar',
   'medicoRegistro': '1005-2019-2081234',
   'fecha': '2026-09-25T23:21:20.000Z',
+  if (!vieja) ...{'numero': 123, 'modalidad': modalidad},
   'diagnosticos': [
     {
       'sistema': 'CIE10',
@@ -69,6 +75,7 @@ Map<String, dynamic> recetaJson({
       'frecuencia': 'Cada 8 horas',
       'duracion': '10 días',
       'cantidad': '30',
+      if (!vieja) 'cantidadEnLetras': 'treinta',
       'indicaciones': 'Después de las comidas',
     },
   ],
@@ -76,6 +83,8 @@ Map<String, dynamic> recetaJson({
   'estado': estado,
   'anuladaMotivo': ?anuladaMotivo,
   'indicacionesNoFarmacologicas': 'Tomar abundante agua.',
+  if (!vieja)
+    'signosAlarma': 'Fiebre de más de 39 °C o dificultad para respirar.',
   'createdAt': '2026-09-26T04:21:20.762Z',
   'firmado': firmada,
   'pdfDisponible': pdfDisponible,
@@ -136,10 +145,17 @@ Map<String, dynamic> certificadoJson({
   'firma': firmado ? firmaJson() : {'estado': 'SIN_FIRMA'},
 };
 
+/// Una orden con la forma del contrato de documentos: número, modalidad,
+/// firma, exámenes por área, indicaciones clínicas y preparación. [vieja]
+/// la deja como las de antes, sin ninguno de esos campos.
 Map<String, dynamic> ordenJson({
   String id = 'o1',
   String tipo = 'LABORATORIO',
   String prioridad = 'RUTINA',
+  String estado = 'EMITIDA',
+  bool firmada = false,
+  bool pdfDisponible = false,
+  bool vieja = false,
 }) => {
   '_id': id,
   'atencionId': 'at1',
@@ -152,20 +168,29 @@ Map<String, dynamic> ordenJson({
   'medicoEspecialidad': 'Medicina Familiar',
   'medicoRegistro': '1005-2019-2081234',
   'fecha': '2026-09-25T23:19:24.000Z',
+  if (!vieja) ...{'numero': 45, 'modalidad': 'PRESENCIAL'},
   'diagnosticos': <Object?>[],
   'items': [
-    {'nombre': 'Biometría hemática'},
+    {'nombre': 'Biometría hemática', if (!vieja) 'grupo': 'Hematología'},
     {
       'nombre': 'Proteína C reactiva (PCR)',
       'codigo': 'PCR',
+      if (!vieja) 'grupo': 'Serología e infecciosas',
       'indicaciones': 'En ayunas',
     },
   ],
   'codigoVerificacion': 'G2KKBTJTBK',
-  'estado': 'EMITIDA',
+  'estado': estado,
   'tipo': tipo,
   'prioridad': prioridad,
+  if (!vieja) ...{
+    'indicacionesClinicas': 'Control de infección respiratoria.',
+    'preparacion': 'Ayuno de 8 horas',
+  },
   'observaciones': 'Traer resultados al control.',
+  'firmado': firmada,
+  'pdfDisponible': pdfDisponible,
+  'firma': firmada ? firmaJson() : {'estado': 'SIN_FIRMA'},
 };
 
 Map<String, dynamic> atencionJson({

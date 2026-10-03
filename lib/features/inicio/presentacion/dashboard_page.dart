@@ -17,6 +17,7 @@ import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
 import '../../avisos/providers/campana_cubit.dart';
+import '../../ayuda/providers/ayuda_contextual_cubit.dart';
 import '../../citas/providers/citas_bloc.dart';
 import '../../citas/providers/citas_event.dart';
 import '../../consultas/providers/consultas_bloc.dart';
@@ -52,9 +53,9 @@ const Set<PantallaNativa> pantallasDePestana = {
 /// persona de la aplicación.
 ///
 /// Aquí nacen también las cargas de todo lo que comparten las pestañas
-/// —citas, consultas en línea, dependientes, el menú y la campana de
-/// avisos— y los recordatorios, y se vuelven a pedir al regresar a la
-/// aplicación. La campana se enciende si el menú la trae.
+/// —citas, consultas en línea, dependientes, el menú, la campana de avisos
+/// y los textos de los botones de ayuda— y los recordatorios, y se vuelven
+/// a pedir al regresar a la aplicación. La campana se enciende si el menú la trae.
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -132,6 +133,8 @@ class _DashboardPageState extends State<DashboardPage>
     unawaited(context.read<MenuCubit>().cargar(usuario.uid));
     context.read<CampanaCubit>().reanudar();
     unawaited(context.read<EncuestasCubit>().cargar(usuario.uid));
+    // Una vez por sesión; si falló, se reintenta aquí al volver.
+    unawaited(context.read<AyudaContextualCubit>().cargar(usuario.uid));
 
     if (usuario.puede(Permisos.misCitas)) {
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));

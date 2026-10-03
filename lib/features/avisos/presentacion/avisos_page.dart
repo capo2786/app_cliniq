@@ -19,6 +19,7 @@ import '../data/avisos_service.dart';
 import '../dominio/avisos.dart';
 import '../providers/avisos_cubit.dart';
 import '../providers/campana_cubit.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Los avisos de la campana (`/notificaciones`).
 ///
@@ -87,7 +88,13 @@ class _VistaAvisos extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: AppColors.fondo,
-          appBar: AppBar(title: Text(titulo)),
+          appBar: AppBar(
+            title: Text(titulo),
+            actions: const [
+              BotonAyuda(clave: 'app.avisos'),
+              SizedBox(width: 6),
+            ],
+          ),
           body: FondoDegradado(
             child: RefreshIndicator(
               color: AppColors.acentoClaro,

@@ -14,6 +14,7 @@ import '../providers/citas_bloc.dart';
 import '../providers/citas_state.dart';
 import 'widgets/tarjeta_cita.dart';
 import 'widgets/videoconsulta.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// La videoconsulta de una cita (`/portal/videoconsulta/:citaId`), para los
 /// avisos y enlaces que llevan a ella.
@@ -49,7 +50,13 @@ class _VideoconsultaPageState extends State<VideoconsultaPage> {
 
         return Scaffold(
           backgroundColor: AppColors.fondo,
-          appBar: AppBar(title: const Text('Videoconsulta')),
+          appBar: AppBar(
+            title: const Text('Videoconsulta'),
+            actions: const [
+              BotonAyuda(clave: 'app.videoconsulta'),
+              SizedBox(width: 6),
+            ],
+          ),
           body: FondoDegradado(
             child: ListView(
               padding: context.margenDeScroll(),

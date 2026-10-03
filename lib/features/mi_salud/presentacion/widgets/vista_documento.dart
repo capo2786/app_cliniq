@@ -13,18 +13,23 @@ import '../../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/mi_salud.dart';
 import '../../providers/documento_cubit.dart';
+import '../../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// El esqueleto de una receta, una orden o un certificado abierto: la
 /// barra, lo que se dice mientras carga o si falla, la copia guardada y
 /// deslizar para ponerlo al día. El contenido lo pone cada pantalla.
 ///
-/// Con [alVerPdf], si el documento tiene su PDF firmado disponible, abajo va
-/// «Ver PDF» (en la `BarraDeAccion`).
+/// Con [alVerPdf], si el documento sigue vigente, abajo va «Ver PDF» (en la
+/// `BarraDeAccion`). Con [claveDeAyuda], el botón de ayuda en la barra de
+/// arriba (si la clínica escribió su texto).
 class VistaDeDocumento<T extends DocumentoClinico> extends StatelessWidget {
   final String titulo;
   final String cargando;
   final List<Widget> Function(BuildContext context, T documento) contenido;
   final void Function(BuildContext context, T documento)? alVerPdf;
+
+  /// La clave del texto de ayuda de la pantalla (`app.miSalud.receta`).
+  final String? claveDeAyuda;
 
   const VistaDeDocumento({
     super.key,
@@ -32,6 +37,7 @@ class VistaDeDocumento<T extends DocumentoClinico> extends StatelessWidget {
     required this.cargando,
     required this.contenido,
     this.alVerPdf,
+    this.claveDeAyuda,
   });
 
   @override
@@ -43,7 +49,13 @@ class VistaDeDocumento<T extends DocumentoClinico> extends StatelessWidget {
 
         return Scaffold(
           backgroundColor: AppColors.fondo,
-          appBar: AppBar(title: Text(titulo)),
+          appBar: AppBar(
+            title: Text(titulo),
+            actions: [
+              if (claveDeAyuda case final clave?) BotonAyuda(clave: clave),
+              const SizedBox(width: 6),
+            ],
+          ),
           // Sin PDF, sin barra: una vacía le quitaría a la lista el margen
           // de la barra del sistema.
           bottomNavigationBar: _barra(context, documento),

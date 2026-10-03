@@ -24,6 +24,7 @@ import '../providers/citas_state.dart';
 import 'widgets/detalle_cita.dart';
 import 'widgets/tarjeta_cita.dart';
 import '../../avisos/presentacion/widgets/boton_campana.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Las citas del paciente y de sus dependientes: próximas e historial.
 class CitasPage extends StatelessWidget {
@@ -55,6 +56,7 @@ class CitasPage extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Mis citas'),
           actions: const [
+            BotonAyuda(clave: 'app.misCitas'),
             BotonCampana(),
             BotonCerrarSesion(),
             SizedBox(width: 6),

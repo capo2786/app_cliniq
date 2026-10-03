@@ -27,6 +27,7 @@ import 'pasos/paso_medico.dart';
 import 'pasos/paso_motivo.dart';
 import 'pasos/paso_paciente.dart';
 import 'pasos/paso_resumen.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Una consulta en línea nueva (o un borrador que se retoma), paso a paso.
 ///
@@ -235,6 +236,7 @@ class _VistaNuevaConsulta extends StatelessWidget {
                     : 'Consulta en línea',
               ),
               actions: [
+                const BotonAyuda(clave: 'app.consultas.nueva'),
                 if (editable)
                   PopupMenuButton<String>(
                     tooltip: 'Más opciones',

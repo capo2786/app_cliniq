@@ -50,6 +50,18 @@ void main() {
           if (!hayRed) throw errorDeRed();
           return pdfDePrueba('certificado firmado');
         },
+        // La orden sin firma: el servidor arma la vista previa y lo dice.
+        'GET /portal/ordenes/o1/pdf': (pedido) {
+          if (!hayRed) throw errorDeRed();
+          return Response<dynamic>(
+            requestOptions: pedido,
+            statusCode: 200,
+            headers: Headers.fromMap({
+              'x-firma-estado': ['SIN_FIRMA'],
+            }),
+            data: pdfDePrueba('orden sin firma'),
+          );
+        },
       });
     });
 
@@ -94,6 +106,44 @@ void main() {
       expect(
         certificado.ruta,
         endsWith('certificado_c1_${huellaDe(certificado.bytes)}.pdf'),
+      );
+    });
+
+    test('la orden por su ruta; sin firma, la vista previa lo dice y también '
+        'se guarda', () async {
+      final orden = await servicio().obtener(TipoDocumentoFirmado.orden, 'o1');
+
+      expect(api.claves.single, 'GET /portal/ordenes/o1/pdf');
+      expect(orden.sinFirma, isTrue);
+      expect(guardados(), ['orden_o1_${huellaDe(orden.bytes)}.pdf']);
+
+      // La receta firmada no trae la cabecera: no es una vista previa.
+      final receta = await servicio().obtener(
+        TipoDocumentoFirmado.receta,
+        'r1',
+      );
+      expect(receta.sinFirma, isFalse);
+
+      // Sin red, la última vista previa guardada de esa orden.
+      hayRed = false;
+      final sinRed = await servicio().obtener(TipoDocumentoFirmado.orden, 'o1');
+      expect(sinRed.sinConexion, isTrue);
+      expect(sinRed.bytes, orden.bytes);
+    });
+
+    test('firmada después, la vista previa guardada no se hace pasar por la '
+        'firmada', () async {
+      await servicio().obtener(TipoDocumentoFirmado.orden, 'o1');
+      hayRed = false;
+
+      // Con la huella del PDF firmado no sirve la copia de la vista previa.
+      await expectLater(
+        servicio().obtener(
+          TipoDocumentoFirmado.orden,
+          'o1',
+          sha256: huellaDePrueba,
+        ),
+        throwsA(isA<DioException>()),
       );
     });
 
@@ -270,6 +320,37 @@ void main() {
       );
     });
 
+    test('si la clínica entrega el PDF solo firmado, el mensaje del '
+        'servidor', () async {
+      api.rutas['GET /portal/ordenes/o1/pdf'] = (pedido) => throw DioException(
+        requestOptions: pedido,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(
+          requestOptions: pedido,
+          statusCode: 409,
+          data: utf8.encode(
+            jsonEncode({
+              'status': 409,
+              'message': 'El PDF de este documento aún no está disponible.',
+            }),
+          ),
+        ),
+      );
+
+      Object? error;
+      try {
+        await servicio().obtener(TipoDocumentoFirmado.orden, 'o1');
+      } catch (e) {
+        error = e;
+      }
+
+      expect(
+        mensajeDeError(error!),
+        'El PDF de este documento aún no está disponible.',
+      );
+      expect(guardados(), isEmpty);
+    });
+
     test('un identificador raro no toca la red ni el disco', () async {
       await expectLater(
         servicio().obtener(TipoDocumentoFirmado.receta, '../../secreto'),
@@ -296,8 +377,19 @@ void main() {
         'Certificado de reposo CR7Q2MXK9P.pdf',
       );
       expect(
+        nombreDelPdf(
+          TipoDocumentoFirmado.orden,
+          Orden.desdeJson(ordenJson(tipo: 'IMAGEN')),
+        ),
+        'Orden de imagen G2KKBTJTBK.pdf',
+      );
+      expect(
         nombreDelPdf(TipoDocumentoFirmado.receta, const Receta(id: 'r7')),
         'Receta r7.pdf',
+      );
+      expect(
+        nombreDelDocumento(TipoDocumentoFirmado.orden),
+        'Orden de exámenes',
       );
     });
   });
@@ -316,6 +408,7 @@ void main() {
       TipoDocumentoFirmado tipo = TipoDocumentoFirmado.receta,
       String id = 'r1',
       String nombre = 'Receta UC7F6DB5UU.pdf',
+      bool firmado = true,
       bool asentar = true,
     }) async {
       await montarPantalla(
@@ -323,7 +416,8 @@ void main() {
         VisorPdfPage(
           tipo: tipo,
           id: id,
-          sha256: huellaDePrueba,
+          sha256: firmado ? huellaDePrueba : null,
+          firmado: firmado,
           nombreArchivo: nombre,
           servicio: servicio,
           salida: salida,
@@ -349,6 +443,61 @@ void main() {
       expect(find.text('Guardar en el teléfono'), findsOneWidget);
       expect(find.text('Compartir'), findsOneWidget);
       expect(find.textContaining('Sin conexión'), findsNothing);
+      expect(find.byKey(const Key('aviso-vista-previa')), findsNothing);
+    });
+
+    testWidgets('sin firma, la vista previa lo dice arriba', (tester) async {
+      await montar(
+        tester,
+        tipo: TipoDocumentoFirmado.orden,
+        id: 'o1',
+        nombre: 'Orden de laboratorio G2KKBTJTBK.pdf',
+        firmado: false,
+      );
+
+      expect(find.text('Orden de exámenes'), findsOneWidget);
+      expect(servicio.pedidos.single.sha256, isNull);
+      expect(find.byKey(const Key('aviso-vista-previa')), findsOneWidget);
+      expect(
+        find.text(
+          'Vista previa: el médico todavía no firmó electrónicamente este '
+          'documento.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Guardar en el teléfono'), findsOneWidget);
+    });
+
+    testWidgets('si el servidor dice que es la vista previa, también', (
+      tester,
+    ) async {
+      servicio.responder = (tipo, id) async => PdfGuardado(
+        tipo: tipo,
+        id: id,
+        ruta: '/documentos/receta_r1.pdf',
+        bytes: pdfDePrueba(),
+        sha256: 'ab' * 32,
+        sinFirma: true,
+      );
+
+      await montar(tester);
+
+      expect(find.byKey(const Key('aviso-vista-previa')), findsOneWidget);
+    });
+
+    testWidgets('si el servidor no da el PDF, su mensaje', (tester) async {
+      servicio.responder = (_, _) async => throw errorHttp(
+        409,
+        'El PDF de este documento aún no está disponible.',
+      );
+
+      await montar(tester, firmado: false);
+
+      expect(
+        find.text('El PDF de este documento aún no está disponible.'),
+        findsOneWidget,
+      );
+      expect(find.byType(BarraDeAccion), findsNothing);
     });
 
     testWidgets('mientras baja, lo dice y todavía no ofrece guardar', (

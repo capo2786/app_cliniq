@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../features/agendar/data/portal_service.dart';
 import '../features/avisos/data/avisos_service.dart';
+import '../features/ayuda/data/ayuda_contextual_service.dart';
 import '../features/ayuda/data/ayuda_service.dart';
 import '../features/auth/data/almacen_de_sesion.dart';
 import '../features/auth/data/auth_service.dart';
@@ -173,8 +174,8 @@ class Servicios {
     ApiClient().dio,
   );
 
-  /// Los PDF firmados de recetas y certificados, con su copia en el
-  /// teléfono.
+  /// Los PDF de recetas, órdenes y certificados (el firmado o la vista
+  /// previa), con su copia en el teléfono.
   static DocumentosPdfService get documentosPdf => _documentosPdf;
 
   @visibleForTesting
@@ -200,6 +201,12 @@ class Servicios {
 
   /// Los artículos del centro de ayuda.
   static final AyudaService ayuda = AyudaService(ApiClient().dio, cache);
+
+  /// Los textos de los botones de ayuda («?») de quien entró.
+  static final AyudaContextualService ayudaContextual = AyudaContextualService(
+    ApiClient().dio,
+    cache,
+  );
 
   /// Los tickets de soporte de quien entró.
   static final SoporteService soporte = SoporteService(ApiClient().dio, cache);

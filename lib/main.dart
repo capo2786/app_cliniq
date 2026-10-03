@@ -21,6 +21,7 @@ import 'features/arranque/presentacion/arranque_page.dart';
 import 'features/arranque/presentacion/espera_datos_clinica.dart';
 import 'features/auth/presentacion/login_page.dart';
 import 'features/avisos/providers/campana_cubit.dart';
+import 'features/ayuda/providers/ayuda_contextual_cubit.dart';
 import 'features/auth/providers/auth_bloc.dart';
 import 'features/auth/providers/auth_state.dart';
 import 'features/citas/providers/citas_bloc.dart';
@@ -119,10 +120,10 @@ void repintarTodo() {
 ///
 /// Los blocs que usan varias pantallas —la configuración y los catálogos de
 /// la clínica, la sesión, las citas, las consultas en línea, los
-/// dependientes, el menú, la campana de avisos y las encuestas por
-/// responder— nacen aquí. Una pantalla que se abre por navegación
-/// (agendar, una consulta nueva) crea el suyo para cargar datos frescos en
-/// cada visita.
+/// dependientes, el menú, la campana de avisos, las encuestas por
+/// responder y los textos de los botones de ayuda— nacen aquí. Una
+/// pantalla que se abre por navegación (agendar, una consulta nueva) crea
+/// el suyo para cargar datos frescos en cada visita.
 class CliniqApp extends StatelessWidget {
   /// Los enlaces de los correos que abren la aplicación (`app_links`). Sin
   /// ellos —en las pruebas—, no se escucha ninguno.
@@ -179,6 +180,9 @@ class CliniqApp extends StatelessWidget {
         ),
         BlocProvider<EncuestasCubit>(
           create: (_) => EncuestasCubit(Servicios.encuestas),
+        ),
+        BlocProvider<AyudaContextualCubit>(
+          create: (_) => AyudaContextualCubit(Servicios.ayudaContextual),
         ),
       ],
       child: _DatosDeLaClinicaAlDia(
@@ -315,6 +319,7 @@ class PuertaDeEntrada extends StatelessWidget {
         context.read<MenuCubit>().vaciar();
         context.read<CampanaCubit>().activar(false);
         context.read<EncuestasCubit>().vaciar();
+        context.read<AyudaContextualCubit>().vaciar();
       },
       buildWhen: (antes, ahora) => _destino(antes) != _destino(ahora),
       builder: (context, state) {

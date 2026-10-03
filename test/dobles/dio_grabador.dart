@@ -6,8 +6,9 @@ import 'package:dio/dio.dart';
 ///
 /// La clave es el método y la ruta tal como la arma el servicio
 /// (`'POST /portal/consultas/c1/enviar'`), sin la consulta. La respuesta
-/// es el cuerpo que devolvería la API; para simular un error, la función
-/// lanza un `DioException` (ver `errorHttp` y `errorDeRed` en `dobles.dart`).
+/// es el cuerpo que devolvería la API, o un `Response` entero si importan
+/// sus cabeceras; para simular un error, la función lanza un
+/// `DioException` (ver `errorHttp` y `errorDeRed` en `dobles.dart`).
 class DioGrabador {
   final Map<String, Object? Function(RequestOptions pedido)> rutas;
   final List<RequestOptions> pedidos = [];
@@ -39,11 +40,15 @@ class DioGrabador {
           }
 
           try {
+            final respuesta = responder(pedido);
             manejador.resolve(
               Response<dynamic>(
                 requestOptions: pedido,
-                statusCode: pedido.method == 'POST' ? 201 : 200,
-                data: responder(pedido),
+                statusCode: respuesta is Response
+                    ? respuesta.statusCode
+                    : (pedido.method == 'POST' ? 201 : 200),
+                headers: respuesta is Response ? respuesta.headers : null,
+                data: respuesta is Response ? respuesta.data : respuesta,
               ),
             );
           } on DioException catch (error) {

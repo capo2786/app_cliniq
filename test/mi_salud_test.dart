@@ -103,6 +103,122 @@ void main() {
       expect(orden.urgente, isTrue);
       expect(nombreDelTipoDeOrden(orden.tipo), 'Imagen');
       expect(nombreDelTipoDeOrden(TipoOrden.desdeCodigo('RAYOS')), 'Orden');
+      expect(nombreDeLaOrden(orden.tipo), 'Orden de imagen');
+      expect(nombreDeLaOrden(TipoOrden.laboratorio), 'Orden de laboratorio');
+      expect(nombreDeLaOrden(TipoOrden.otro), 'Orden de exámenes');
+    });
+  });
+
+  group('Receta y orden del contrato de documentos', () {
+    test('la receta: número, modalidad, cantidad en letras y signos de '
+        'alarma', () {
+      final receta = Receta.desdeJson(recetaJson());
+
+      expect(receta.numero, 123);
+      expect(numeroDelDocumento(receta.numero!), 'N.º 000123');
+      expect(receta.modalidad, 'TELEMEDICINA');
+      expect(
+        receta.signosAlarma,
+        'Fiebre de más de 39 °C o dificultad para respirar.',
+      );
+      expect(receta.indicacionesNoFarmacologicas, 'Tomar abundante agua.');
+
+      // La parte de la farmacia y la del paciente de cada medicamento.
+      final item = receta.items.single;
+      expect(item.medicamento, 'Amoxicilina');
+      expect(item.presentacion, '500 mg · Cápsula');
+      expect(item.cantidadEnLetras, 'treinta');
+      expect(item.cantidadADispensar, '30 (treinta)');
+      expect(item.via, 'Oral');
+      expect(item.posologia, '1 cápsula, Cada 8 horas, 10 días');
+    });
+
+    test('una receta vieja, sin esos datos, se lee igual', () {
+      final receta = Receta.desdeJson(recetaJson(vieja: true));
+
+      expect(receta.numero, isNull);
+      expect(receta.modalidad, isEmpty);
+      expect(receta.signosAlarma, isNull);
+      expect(receta.items.single.cantidadEnLetras, isNull);
+      expect(receta.items.single.cantidadADispensar, '30');
+      expect(const ItemReceta(medicamento: 'Paracetamol').presentacion, isNull);
+      expect(
+        const ItemReceta(medicamento: 'Paracetamol').cantidadADispensar,
+        isNull,
+      );
+    });
+
+    test('un número que no es un entero positivo no se enseña', () {
+      for (final numero in [0, -4, 1.5, 'abc', null]) {
+        expect(
+          Receta.desdeJson({...recetaJson(), 'numero': numero}).numero,
+          isNull,
+          reason: '$numero',
+        );
+      }
+      expect(Receta.desdeJson({...recetaJson(), 'numero': '77'}).numero, 77);
+    });
+
+    test('la orden: número, modalidad, firma, área de cada examen, '
+        'indicaciones clínicas y preparación', () {
+      final orden = Orden.desdeJson(
+        ordenJson(firmada: true, pdfDisponible: true),
+      );
+
+      expect(orden.numero, 45);
+      expect(orden.modalidad, 'PRESENCIAL');
+      expect(orden.firmado, isTrue);
+      expect(orden.firma!.sha256, huellaDePrueba);
+      expect(orden.pdfDisponible, isTrue);
+      expect(orden.indicacionesClinicas, 'Control de infección respiratoria.');
+      expect(orden.preparacion, 'Ayuno de 8 horas');
+      expect(orden.observaciones, 'Traer resultados al control.');
+      expect(orden.items.map((i) => i.grupo), [
+        'Hematología',
+        'Serología e infecciosas',
+      ]);
+    });
+
+    test('una orden vieja, sin esos datos, se lee igual', () {
+      final orden = Orden.desdeJson(ordenJson(vieja: true));
+
+      expect(orden.numero, isNull);
+      expect(orden.modalidad, isEmpty);
+      expect(orden.firmado, isFalse);
+      expect(orden.firma, isNull);
+      expect(orden.indicacionesClinicas, isNull);
+      expect(orden.preparacion, isNull);
+      expect(orden.items.map((i) => i.grupo), [null, null]);
+      expect(orden.puedeVerPdf, isTrue);
+    });
+
+    test('los exámenes por área, cada una donde aparece su primer examen', () {
+      const items = [
+        ItemOrden(nombre: 'Glucosa', grupo: 'Química sanguínea'),
+        ItemOrden(nombre: 'Biometría', grupo: 'Hematología'),
+        ItemOrden(nombre: 'Otro examen'),
+        ItemOrden(nombre: 'Creatinina', grupo: 'Química sanguínea'),
+      ];
+
+      final grupos = examenesPorArea(items);
+      expect(grupos.map((g) => g.$1), [
+        'Química sanguínea',
+        'Hematología',
+        null,
+      ]);
+      expect(grupos.map((g) => g.$2.map((e) => e.nombre).join(', ')), [
+        'Glucosa, Creatinina',
+        'Biometría',
+        'Otro examen',
+      ]);
+      expect(examenesPorArea(const []), isEmpty);
+    });
+
+    test('la atención a distancia: telemedicina y consulta en línea', () {
+      expect(esAtencionADistancia('TELEMEDICINA'), isTrue);
+      expect(esAtencionADistancia('asincrona'), isTrue);
+      expect(esAtencionADistancia('PRESENCIAL'), isFalse);
+      expect(esAtencionADistancia(''), isFalse);
     });
   });
 
@@ -233,11 +349,13 @@ void main() {
       expect(FirmaElectronica.desdeJson({'sha256': 'abc'})!.sha256, isNull);
     });
 
-    test('sin firmar, en curso o sin PDF no se ofrece «Ver PDF»', () {
+    test('sin firmar o en curso no hay firma; «Ver PDF» mientras esté '
+        'vigente', () {
+      // Sin firma, el servidor da la vista previa: se ofrece igual.
       final sinFirma = Receta.desdeJson(recetaJson());
       expect(sinFirma.firmado, isFalse);
       expect(sinFirma.firma, isNull);
-      expect(sinFirma.puedeVerPdf, isFalse);
+      expect(sinFirma.puedeVerPdf, isTrue);
 
       final enCurso = Receta.desdeJson({
         ...recetaJson(),
@@ -258,7 +376,8 @@ void main() {
         certificadoJson(pdfDisponible: false),
       );
       expect(firmadaSinPdf.firmado, isTrue);
-      expect(firmadaSinPdf.puedeVerPdf, isFalse);
+      // Si el servidor no lo da, el visor enseña su mensaje.
+      expect(firmadaSinPdf.puedeVerPdf, isTrue);
 
       final anulado = CertificadoReposo.desdeJson(
         certificadoJson(estado: 'ANULADA', anuladoMotivo: 'Fechas erradas'),
@@ -454,6 +573,13 @@ void main() {
 
       expect(receta.documento.codigoVerificacion, 'UC7F6DB5UU');
       expect(orden.documento.items, hasLength(2));
+
+      // La copia guarda la respuesta entera: también lo nuevo.
+      hayRed = false;
+      final ordenSinRed = await servicio().orden('u1', 'o1');
+      expect(ordenSinRed.desdeCache, isTrue);
+      expect(ordenSinRed.documento.preparacion, 'Ayuno de 8 horas');
+      hayRed = true;
 
       hayRed = false;
       final sinRed = await servicio().receta('u1', 'r1');

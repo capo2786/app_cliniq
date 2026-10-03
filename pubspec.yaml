@@ -55,12 +55,12 @@ dependencies:
   flutter_inappwebview: ^6.1.5
   permission_handler: ^13.0.2
 
-  # Las recetas y los certificados firmados en PDF, dentro de la aplicación:
-  # pdfx los pinta con el lector del propio sistema (nunca otra aplicación ni
-  # el navegador), flutter_file_dialog abre el diálogo del sistema para
-  # «Guardar en el teléfono», share_plus la hoja de «Compartir» y crypto
-  # calcula la huella sha256 con que se guarda y se comprueba cada copia
-  # (ver «Recetas y certificados firmados» en el README).
+  # Las recetas, las órdenes y los certificados en PDF, dentro de la
+  # aplicación: pdfx los pinta con el lector del propio sistema (nunca otra
+  # aplicación ni el navegador), flutter_file_dialog abre el diálogo del
+  # sistema para «Guardar en el teléfono», share_plus la hoja de «Compartir»
+  # y crypto calcula la huella sha256 con que se guarda y se comprueba cada
+  # copia (ver «Recetas, órdenes y certificados» en el README).
   pdfx: ^2.11.0
   flutter_file_dialog: ^3.3.3
   share_plus: ^13.3.0

@@ -124,10 +124,41 @@ void main() {
         ...articulosJson(),
         {'_id': 'x', 'titulo': 'Oculto', 'publicado': false},
         {'titulo': 'Sin id'},
+        // El texto de un botón de ayuda no es un artículo del centro.
+        {
+          '_id': 'c1',
+          'titulo': 'Mi salud',
+          'clave': 'app.miSalud',
+          'contextual': true,
+        },
         'basura',
       ]);
 
       expect(leidos, hasLength(articulosJson().length));
+    });
+
+    test('«Tu guía» primero, con su artículo principal arriba', () {
+      final leidos = interpretarArticulos([
+        ...articulosJson(),
+        ...guiaDelPacienteJson(),
+      ]);
+      final grupos = agruparArticulos(leidos);
+
+      expect(grupos.map((g) => g.categoria), [
+        'Guía del paciente',
+        'Citas',
+        'Cuenta y acceso',
+        'General',
+        'Ópticas',
+      ]);
+      expect(grupos.first.esGuia, isTrue);
+      expect(grupos[1].esGuia, isFalse);
+      // «Empieza aquí» (guia.paciente) va arriba aunque su orden sea mayor.
+      expect(grupos.first.articulos.map((a) => a.id), ['g1', 'g2']);
+      expect(grupos.first.articulos.first.clave, 'guia.paciente');
+      expect(grupos.first.articulos.first.esInicioDeGuia, isTrue);
+      // Una clave vacía es «sin clave».
+      expect(grupos.first.articulos.last.clave, isNull);
     });
   });
 

@@ -3,10 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../core/catalogos/catalogo_service.dart';
-import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/formato/fechas.dart';
-import '../../../core/presentacion/estilo_de_catalogo.dart';
 import '../../../core/presentacion/widgets/estados.dart';
 import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
@@ -55,6 +52,7 @@ class CertificadoPage extends StatelessWidget {
       )..cargar(),
       child: VistaDeDocumento<CertificadoReposo>(
         titulo: 'Certificado de reposo',
+        claveDeAyuda: 'app.miSalud.certificado',
         cargando: 'Abriendo el certificado…',
         alVerPdf: (context, certificado) => abrirPdfDelDocumento(
           context,
@@ -115,7 +113,7 @@ class CertificadoPage extends StatelessWidget {
           ],
           const SizedBox(height: 22),
           const EtiquetaSeccion('Emitido por'),
-          EmisorYPaciente(documento: certificado),
+          EmisorYPaciente(documento: certificado, conModalidad: false),
           if (certificado.codigoVerificacion.isNotEmpty) ...[
             const SizedBox(height: 12),
             CodigoDeVerificacion(codigo: certificado.codigoVerificacion),
@@ -138,13 +136,7 @@ class _Reposo extends StatelessWidget {
     final desde = certificado.fechaDesde;
     final hasta = certificado.fechaHasta;
     final letras = certificado.diasEnLetras;
-    final modalidad = certificado.modalidad.isEmpty
-        ? null
-        : EstiloDeCatalogo.de(
-            context.catalogos,
-            Catalogos.modalidadCita,
-            certificado.modalidad,
-          ).nombre;
+    final modalidad = nombreDeLaModalidad(context, certificado.modalidad);
     final destinatario = certificado.destinatario;
 
     return TarjetaTranslucida(

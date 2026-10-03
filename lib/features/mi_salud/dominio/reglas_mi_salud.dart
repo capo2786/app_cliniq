@@ -47,6 +47,47 @@ String nombreDelTipoDeOrden(TipoOrden tipo) => switch (tipo) {
   TipoOrden.otro => 'Orden',
 };
 
+/// «Orden de laboratorio», «Orden de imagen» u «Orden de exámenes»: el
+/// título de una orden, como en su PDF.
+String nombreDeLaOrden(TipoOrden tipo) => switch (tipo) {
+  TipoOrden.laboratorio => 'Orden de laboratorio',
+  TipoOrden.imagen => 'Orden de imagen',
+  TipoOrden.otro => 'Orden de exámenes',
+};
+
+/// «N.º 000123»: el número secuencial de un documento, con seis cifras como
+/// en su PDF.
+String numeroDelDocumento(int numero) =>
+    'N.º ${numero.toString().padLeft(6, '0')}';
+
+/// La atención fue a distancia: telemedicina o consulta en línea
+/// (asíncrona). Son códigos del sistema (`MODALIDAD_CITA`). En ellas la
+/// receta se entrega por medios electrónicos y, sin la firma electrónica
+/// del médico, no es válida para dispensar.
+bool esAtencionADistancia(String modalidad) =>
+    const {'TELEMEDICINA', 'ASINCRONA'}.contains(modalidad.toUpperCase());
+
+/// Los exámenes de una orden agrupados por su área («Hematología»,
+/// «Ecografía»), en el orden en que llegan: cada área donde aparece su
+/// primer examen. Los que no traen área (las órdenes viejas, «Otro examen…»)
+/// van en un grupo sin nombre (`null`), en su lugar.
+List<(String?, List<ItemOrden>)> examenesPorArea(List<ItemOrden> items) {
+  final grupos = <(String?, List<ItemOrden>)>[];
+
+  for (final item in items) {
+    final area = item.grupo;
+    final grupo = grupos.where((g) => g.$1 == area).firstOrNull;
+
+    if (grupo == null) {
+      grupos.add((area, [item]));
+    } else {
+      grupo.$2.add(item);
+    }
+  }
+
+  return grupos;
+}
+
 /// «1 examen», «3 exámenes».
 String examenes(int cantidad) =>
     cantidad == 1 ? '1 examen' : '$cantidad exámenes';

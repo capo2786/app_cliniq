@@ -31,6 +31,7 @@ import 'pasos/paso_modalidad.dart';
 import 'pasos/paso_motivo.dart';
 import 'pasos/paso_paciente.dart';
 import 'pasos/paso_resumen.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Agendar (o reprogramar) una cita, paso a paso.
 ///
@@ -116,6 +117,10 @@ class _VistaAgendar extends StatelessWidget {
               title: Text(
                 state.reprogramando ? 'Reprogramar cita' : 'Agendar cita',
               ),
+              actions: const [
+                BotonAyuda(clave: 'app.agendar'),
+                SizedBox(width: 6),
+              ],
             ),
             body: FondoDegradado(
               child: !puedeAgendar

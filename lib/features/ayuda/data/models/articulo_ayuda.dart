@@ -16,28 +16,43 @@ class ArticuloAyuda extends Equatable {
 
   final int orden;
 
+  /// La clave del artículo, si tiene: la del texto de un botón de ayuda o,
+  /// en el artículo principal de una guía de usuario, `guia.<rol>`
+  /// (`guia.paciente`).
+  final String? clave;
+
   const ArticuloAyuda({
     required this.id,
     required this.titulo,
     required this.categoria,
     required this.contenido,
     this.orden = 0,
+    this.clave,
   });
 
   /// La categoría con que se agrupa; sin una, «General» (como el panel).
   String get grupo => categoria.trim().isEmpty ? 'General' : categoria.trim();
 
-  /// Lee un artículo, o `null` si no tiene identificador ni título, o si
-  /// viene sin publicar (el servidor no los manda a un paciente, pero el
-  /// panel los filtra igual).
+  /// Es el artículo principal («Empieza aquí») de una guía de usuario.
+  bool get esInicioDeGuia => clave?.startsWith('guia.') ?? false;
+
+  /// Lee un artículo, o `null` si no tiene identificador ni título, si
+  /// viene sin publicar o si es solo el texto de un botón de ayuda
+  /// (`contextual`). El servidor no manda ninguno de los dos a un paciente,
+  /// pero se filtran igual, como en el panel.
   static ArticuloAyuda? desdeJson(Object? json) {
-    if (json is! Map || json['publicado'] == false) return null;
+    if (json is! Map ||
+        json['publicado'] == false ||
+        json['contextual'] == true) {
+      return null;
+    }
 
     final id = json['_id']?.toString().trim() ?? '';
     final titulo = json['titulo']?.toString().trim() ?? '';
     if (id.isEmpty || titulo.isEmpty) return null;
 
     final orden = json['orden'];
+    final clave = json['clave']?.toString().trim() ?? '';
 
     return ArticuloAyuda(
       id: id,
@@ -45,11 +60,12 @@ class ArticuloAyuda extends Equatable {
       categoria: json['categoria']?.toString().trim() ?? '',
       contenido: json['contenido']?.toString() ?? '',
       orden: orden is num ? orden.toInt() : 0,
+      clave: clave.isEmpty ? null : clave,
     );
   }
 
   @override
-  List<Object?> get props => [id, titulo, categoria, contenido, orden];
+  List<Object?> get props => [id, titulo, categoria, contenido, orden, clave];
 }
 
 /// Lee la lista de artículos, saltando lo que no se pueda leer.
@@ -62,7 +78,10 @@ List<ArticuloAyuda> interpretarArticulos(Object? datos) {
     if (articulo != null) {
       articulos.add(articulo);
     } else {
-      debugPrint('Cliniq · artículo de ayuda ilegible o sin publicar');
+      debugPrint(
+        'Cliniq · artículo de ayuda ilegible, sin publicar o solo '
+        'contextual',
+      );
     }
   }
 

@@ -63,12 +63,19 @@ class GrupoDeArticulos extends Equatable {
 
   const GrupoDeArticulos(this.categoria, this.articulos);
 
+  /// Es una guía de usuario («Guía del paciente»): la categoría tiene el
+  /// artículo principal de una guía (clave `guia.<rol>`). El servidor manda
+  /// solo las guías de los roles de quien entró.
+  bool get esGuia => articulos.any((a) => a.esInicioDeGuia);
+
   @override
   List<Object?> get props => [categoria, articulos];
 }
 
-/// Agrupa por categoría, en orden alfabético (sin distinguir tildes), y cada
-/// grupo por el orden del administrador y el título. Como en el panel.
+/// Agrupa por categoría. Primero las guías de usuario («Tu guía»), con su
+/// artículo principal arriba; después las demás categorías en orden
+/// alfabético (sin distinguir tildes). Cada grupo, por el orden del
+/// administrador y el título, como en el panel.
 List<GrupoDeArticulos> agruparArticulos(List<ArticuloAyuda> articulos) {
   final grupos = <String, List<ArticuloAyuda>>{};
 
@@ -79,17 +86,28 @@ List<GrupoDeArticulos> agruparArticulos(List<ArticuloAyuda> articulos) {
   int porTexto(String a, String b) =>
       normalizarBusqueda(a).compareTo(normalizarBusqueda(b));
 
-  final categorias = grupos.keys.toList()..sort(porTexto);
+  bool esGuia(String categoria) =>
+      grupos[categoria]!.any((a) => a.esInicioDeGuia);
+
+  final categorias = grupos.keys.toList()
+    ..sort((a, b) {
+      final guiaA = esGuia(a);
+      if (guiaA != esGuia(b)) return guiaA ? -1 : 1;
+      return porTexto(a, b);
+    });
 
   return [
     for (final categoria in categorias)
       GrupoDeArticulos(
         categoria,
-        grupos[categoria]!..sort(
-          (a, b) => a.orden != b.orden
+        grupos[categoria]!..sort((a, b) {
+          if (a.esInicioDeGuia != b.esInicioDeGuia) {
+            return a.esInicioDeGuia ? -1 : 1;
+          }
+          return a.orden != b.orden
               ? a.orden.compareTo(b.orden)
-              : porTexto(a.titulo, b.titulo),
-        ),
+              : porTexto(a.titulo, b.titulo);
+        }),
       ),
   ];
 }

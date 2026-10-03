@@ -32,6 +32,7 @@ import '../../navegacion/dominio/destinos.dart';
 import 'widgets/proxima_cita.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../avisos/presentacion/widgets/boton_campana.dart';
+import '../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// La portada: quién eres, cuál es tu próxima cita y los accesos rápidos.
 ///
@@ -135,6 +136,7 @@ class _InicioPageState extends State<InicioPage> {
           ],
         ),
         actions: const [
+          BotonAyuda(clave: 'app.inicio'),
           BotonCampana(),
           BotonCerrarSesion(),
           SizedBox(width: 6),

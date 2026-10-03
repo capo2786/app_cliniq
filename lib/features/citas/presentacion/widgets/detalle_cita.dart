@@ -18,6 +18,7 @@ import 'cancelar_cita.dart';
 import 'hoja_calendario.dart';
 import 'tarjeta_cita.dart';
 import 'videoconsulta.dart';
+import '../../../ayuda/presentacion/widgets/boton_ayuda.dart';
 
 /// Abre el detalle de una cita en una hoja inferior.
 Future<void> mostrarDetalleCita(BuildContext context, Cita cita) {
@@ -201,7 +202,12 @@ class DetalleCita extends StatelessWidget {
           // historial mientras tanto.
           if (sala case EstadoSala.porAbrir || EstadoSala.abierta) ...[
             const SizedBox(height: 16),
-            const EtiquetaSeccion('Videoconsulta'),
+            const Row(
+              children: [
+                Expanded(child: EtiquetaSeccion('Videoconsulta')),
+                BotonAyuda(clave: 'app.videoconsulta', enLinea: true),
+              ],
+            ),
             BotonVideoconsulta(cita: cita),
           ],
           const SizedBox(height: 22),
@@ -217,17 +223,39 @@ class DetalleCita extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  BotonPrincipal(
-                    texto: 'Reprogramar',
-                    icono: Icons.edit_calendar_rounded,
-                    onPressed: hayRed ? () => _reprogramar(context) : null,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BotonPrincipal(
+                          texto: 'Reprogramar',
+                          icono: Icons.edit_calendar_rounded,
+                          onPressed: hayRed
+                              ? () => _reprogramar(context)
+                              : null,
+                        ),
+                      ),
+                      const BotonAyuda(
+                        clave: 'app.misCitas.reprogramar',
+                        enLinea: true,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
-                  BotonSecundario(
-                    texto: 'Cancelar cita',
-                    icono: Icons.event_busy_rounded,
-                    color: AppColors.peligroSuave,
-                    onPressed: hayRed ? () => _cancelar(context) : null,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: BotonSecundario(
+                          texto: 'Cancelar cita',
+                          icono: Icons.event_busy_rounded,
+                          color: AppColors.peligroSuave,
+                          onPressed: hayRed ? () => _cancelar(context) : null,
+                        ),
+                      ),
+                      const BotonAyuda(
+                        clave: 'app.misCitas.cancelar',
+                        enLinea: true,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 10),
                   Text(

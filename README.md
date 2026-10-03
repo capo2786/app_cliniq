@@ -108,7 +108,8 @@ arranca con valores inventados.**
 | Especialidades y ciudades | `ESPECIALIDAD`, `CIUDAD` | Orden de los filtros de agendar |
 | Sexo, documento, tipo de sangre | `SEXO`, `TIPO_DOCUMENTO`, `TIPO_SANGRE` (las etiquetas; los códigos son los de siempre) | Formularios, perfil y Mi salud |
 | Soporte | `CATEGORIA_TICKET` (las de la clínica), `SEVERIDAD_TICKET` (las activas, en su orden), `ESTADO_TICKET` | Ticket nuevo, mis tickets y la conversación |
-| Artículos de ayuda | `GET /ayuda` (el servidor ya reemplaza las `{{variables}}`) | Centro de ayuda |
+| Artículos de ayuda y guía de usuario | `GET /ayuda` (el servidor ya reemplaza las `{{variables}}` y filtra por los roles de quien entra; el artículo principal de cada guía lleva la clave `guia.<rol>`) | Centro de ayuda, con «Tu guía» primero |
+| Textos de los botones de ayuda («?») | `GET /ayuda/contextual` (clave → título, texto y la guía completa; ver «Botones de ayuda») | La barra de cada pantalla y junto a las acciones que no se entienden solas |
 | Documentos legales | `GET /legal/documentos` (clave, slug, versión, título), `mis-aceptaciones` y el texto de cada uno, `GET /legal/documentos/:slug` (Markdown con los datos de la clínica ya sustituidos) | Aceptación, perfil y registro; se leen dentro de la aplicación, con copia para leerlos sin red |
 | Menú | `GET /menus/mi-menu?plataforma=APP` | La barra de abajo (4 enlaces + «Perfil»), los accesos rápidos y la campana de avisos (si trae `/notificaciones`) |
 
@@ -165,7 +166,7 @@ antes de tocarla.
 | Paquete | Para qué |
 | --- | --- |
 | `flutter_secure_storage` | Llavero: sesión, perfil guardado, credenciales de la huella y la clave de la caché |
-| `hive_ce_flutter` | Caché cifrada: la configuración, los catálogos, los documentos legales y su texto, el menú, las citas y los dependientes para abrir sin conexión |
+| `hive_ce_flutter` | Caché cifrada: la configuración, los catálogos, los documentos legales y su texto, el menú, las citas, los dependientes, Mi salud y los textos de los botones de ayuda para abrir sin conexión |
 
 ### Dispositivo y seguridad
 
@@ -177,11 +178,11 @@ antes de tocarla.
 | `app_links` ^7.2.1 | Recibir los enlaces de los correos que abren la aplicación (App Links en Android, Universal Links en iOS) y llevarlos a su pantalla (ver «Enlaces de los correos») |
 | `flutter_svg` | Pintar el logotipo de la clínica cuando llega en SVG (`clinica.logo`) |
 
-### Recetas y certificados firmados en PDF
+### Recetas, órdenes y certificados en PDF
 
 | Paquete | Para qué |
 | --- | --- |
-| `pdfx` ^2.11.0 | Ver el PDF firmado **dentro de la aplicación** (`PdfViewPinch`: páginas una bajo otra, se amplían con los dedos). Usa el lector de PDF del propio sistema (`PdfRenderer` en Android, PDFKit en iOS): nada se abre en otra aplicación ni en el navegador |
+| `pdfx` ^2.11.0 | Ver el PDF (el firmado o la vista previa) **dentro de la aplicación** (`PdfViewPinch`: páginas una bajo otra, se amplían con los dedos). Usa el lector de PDF del propio sistema (`PdfRenderer` en Android, PDFKit en iOS): nada se abre en otra aplicación ni en el navegador |
 | `flutter_file_dialog` ^3.3.3 | «Guardar en el teléfono»: el diálogo del sistema para elegir dónde (en Android, el de documentos; en iOS, el de Archivos). Sin permisos de almacenamiento |
 | `share_plus` ^13.3.0 | «Compartir»: la hoja de compartir del sistema, solo si la persona la pide |
 | `crypto` | La huella sha256 del PDF: con ella se nombra la copia del teléfono y se comprueba que es el documento firmado |
@@ -421,9 +422,11 @@ lib/
     agendar/                  el agendamiento paso a paso y el cálculo de horarios
     dependientes/             personas a cargo, con la validación de cédula
     perfil/                   datos personales y clínicos, seguridad, documentos
-    mi_salud/                 la historia clínica que ve el paciente: recetas, órdenes,
-                              certificados de reposo, la firma electrónica y el visor de PDF
-    ayuda/                    centro de ayuda: búsqueda, categorías y artículos en Markdown nativo
+    mi_salud/                 la historia clínica que ve el paciente: recetas (en sus dos
+                              partes), órdenes, certificados de reposo, la firma electrónica
+                              y el visor de PDF
+    ayuda/                    centro de ayuda («Tu guía» primero, búsqueda, categorías y
+                              artículos en Markdown nativo) y los botones de ayuda («?»)
     soporte/                  mis tickets, ticket nuevo y la conversación con soporte
 test/                         pruebas (ver abajo)
 tool/generar_iconos_test.dart genera los PNG del icono y del arranque
@@ -507,7 +510,7 @@ de la campana y los enlaces de los textos (`abrirRuta`, en
 | `/portal/encuesta/:citaId` | La encuesta de la cita |
 | `/legal/:slug` | El documento legal |
 | `/mi-salud` | Mi salud (también desde los avisos «Tu receta está lista» y «Tu certificado de reposo está listo») |
-| `/ayuda`, `/soporte`, `/soporte/tickets/:id` | El centro de ayuda, soporte y el ticket |
+| `/ayuda`, `/soporte`, `/soporte/tickets/:id` | El centro de ayuda, soporte y el ticket (dentro de un artículo, `/ayuda?articulo=<id>` abre ese artículo) |
 
 La consulta y el fragmento de la ruta se ignoran. Una ruta del menú que la
 aplicación no sabe abrir no se enseña (ni en la barra ni en los accesos); un
@@ -979,10 +982,15 @@ red se enseña esa copia; sin copia, el error con «Reintentar».
   por consulta, diagnósticos, indicaciones, recetas, órdenes, certificados
   de reposo y adjuntos. Cada receta, orden y certificado se abre en su
   pantalla (`/portal/recetas/:id`, `/portal/ordenes/:id`,
-  `/portal/certificados/:id`) con su código de verificación. Las fechas
-  clínicas son hora congelada. Ver «Recetas y certificados firmados».
+  `/portal/certificados/:id`) con su número, la modalidad de la atención y
+  su código de verificación. Las fechas clínicas son hora congelada. Ver
+  «Recetas, órdenes y certificados».
 - **Centro de ayuda** (`GET /ayuda?q=`): el servidor busca; sin red se busca
-  con la misma regla sobre la copia. El Markdown del artículo se pinta con
+  con la misma regla sobre la copia. Primero va **«Tu guía»**: la guía de
+  usuario de quien entra (el servidor manda solo la de sus roles; se
+  reconoce por el artículo principal, de clave `guia.<rol>`, que va
+  arriba), teñida; después las demás categorías. Los artículos
+  `contextual` (los textos de los «?») no se listan. El Markdown del artículo se pinta con
   widgets (párrafos, títulos, negrita, listas y enlaces). Un enlace nunca
   saca de la aplicación: las rutas de ayuda, soporte y Mi salud abren su
   pantalla, las de otros módulos van al enrutador (`abrirRuta`), la web se
@@ -996,13 +1004,31 @@ red se enseña esa copia; sin copia, el error con «Reintentar».
   salen de las cabeceras de la misma descarga; una imagen se ve en el visor
   de la aplicación y un PDF, con el visor del teléfono.
 
-## Recetas y certificados firmados
+## Recetas, órdenes y certificados
 
-El médico firma la receta o el certificado de reposo en su equipo, con su
-certificado `.p12` (que nunca sale de ahí), y el servidor guarda el PDF
-firmado en MinIO con su sha256. La aplicación lee de cada documento
-`firmado`, `pdfDisponible` y `firma` (quién firmó —el nombre del
-certificado—, cuándo, el emisor y la huella del PDF).
+El médico firma la receta, la orden o el certificado de reposo con su
+certificado `.p12` (en el servidor, durante la petición; nunca se guarda),
+y el servidor guarda el PDF firmado en MinIO con su sha256. La aplicación
+lee de cada documento `firmado`, `pdfDisponible` y `firma` (quién firmó
+—el nombre del certificado—, cuándo, el emisor y la huella del PDF), y
+también `numero` (el secuencial de la clínica, «N.º 000123») y
+`modalidad` (código de `MODALIDAD_CITA`, con el nombre de su catálogo).
+Todo es opcional: los documentos viejos se leen y se enseñan igual.
+
+- **La receta, en sus dos partes** (`RecetaPage`), como la receta
+  ecuatoriana: **«Para la farmacia»** (cada medicamento por su nombre
+  genérico, la concentración, la forma farmacéutica y la cantidad en
+  números y en letras, `cantidad` y `cantidadEnLetras`) y **«Cómo
+  tomarlo»** (dosis, frecuencia, duración, vía e indicaciones de cada
+  uno, las recomendaciones y los **signos de alarma**, `signosAlarma`,
+  con el número de emergencias de la clínica). Si la atención fue a
+  distancia (telemedicina o consulta en línea) y la receta no está
+  firmada, avisa que así no es válida para dispensar.
+- **La orden** (`OrdenPage`): «Orden de laboratorio», «de imagen» o «de
+  exámenes», la prioridad, **cómo prepararse** (`preparacion`), los
+  exámenes agrupados por área (`grupo` de cada ítem, el área del catálogo
+  de exámenes) con sus indicaciones, las **indicaciones clínicas**
+  (`indicacionesClinicas`) y las observaciones.
 
 - **Certificado de reposo** (`CertificadoPage`): los días en número y en
   letras, desde y hasta (días sueltos; sin `fechaHasta`, desde + días − 1),
@@ -1022,20 +1048,28 @@ certificado—, cuándo, el emisor y la huella del PDF).
   electrónicamente por <nombre> el <día> a las <hora>» (el instante real,
   en la hora de la clínica) con el emisor del certificado. Una reserva en
   curso (`EN_CURSO`) no es una firma y no se enseña.
-- **«Ver PDF»**, solo con `pdfDisponible` y si el documento no está anulado:
-  abajo en la receta y el certificado (en la `BarraDeAccion`) y en su fila
+- **«Ver PDF»**, en todo documento que no esté anulado: abajo en la
+  receta, la orden y el certificado (en la `BarraDeAccion`) y en su fila
   de Mi salud. Abre `VisorPdfPage`, que baja
-  `GET /portal/{recetas|certificados}/:id/pdf` con la sesión y lo pinta
-  **dentro de la aplicación** con `pdfx`. Nunca otra aplicación ni el
-  navegador. Abajo, «Guardar en el teléfono» (el diálogo del sistema) y
-  «Compartir» (la hoja del sistema), con un nombre legible («Receta
-  UC7F6DB5UU.pdf»).
+  `GET /portal/{recetas|ordenes|certificados}/:id/pdf` con la sesión y lo
+  pinta **dentro de la aplicación** con `pdfx`. Nunca otra aplicación ni
+  el navegador. Firmado, el servidor da el PDF guardado; **sin firma, la
+  vista previa** (el mismo diseño con el recuadro «Documento sin firma
+  electrónica»), y el visor lo dice arriba (el documento no está firmado
+  o el servidor respondió `X-Firma-Estado: SIN_FIRMA`). Si el servidor no
+  lo da (la clínica lo entrega solo firmado), se enseña **su mensaje**.
+  Abajo, «Guardar en el teléfono» (el diálogo del sistema) y «Compartir»
+  (la hoja del sistema), con un nombre legible («Receta UC7F6DB5UU.pdf»,
+  «Orden de laboratorio G2KKBTJTBK.pdf»).
 - **La copia en el teléfono** (`DocumentosPdfService`): cada PDF bajado se
   guarda en la carpeta de documentos de la aplicación,
   `cliniq_documentos/<tipo>_<id>_<sha256>.pdf`. El servidor nunca regenera
   un PDF firmado, así que la copia sirve siempre: con la huella del
   documento se abre la copia sin pedir nada; sin red, la última copia de
-  ese documento, y la pantalla lo dice. Lo que se baja tiene que empezar
+  ese documento, y la pantalla lo dice. La vista previa sin firma se
+  vuelve a pedir cada vez (y su copia es la última que dio el servidor);
+  una vez firmado, con la huella nueva, la copia de la vista previa ya no
+  sirve y nunca se hace pasar por la firmada. Lo que se baja tiene que empezar
   como un PDF y, si se conoce la huella, coincidir con ella; si no, no se
   guarda ni se enseña. Cada copia se comprueba al abrirla contra la huella
   de su nombre, y una dañada se borra.
@@ -1050,6 +1084,41 @@ certificado—, cuándo, el emisor y la huella del PDF).
   entra en la copia de seguridad del teléfono (iCloud) mientras la sesión
   sigue abierta; si la clínica no lo quiere, la alternativa es la carpeta
   de soporte de la aplicación marcada fuera de la copia.
+
+## Botones de ayuda
+
+Cada pantalla y cada acción que no se entiende sola lleva un **«?»**
+(`BotonAyuda(clave: '…')`, en `features/ayuda/presentacion/widgets/`): en
+la barra de arriba o, con `enLinea`, junto a la acción. Al tocarlo se abre
+una hoja con el título, el texto en Markdown nativo (sus enlaces no sacan
+de la aplicación) y, si la hay, **«Ver la guía completa»**, que abre ese
+artículo en el centro de ayuda (`CentroAyudaPage(articuloInicial:)`).
+
+- **Los textos los escribe la clínica** en el panel (artículos de ayuda
+  con clave) y llegan de `GET /ayuda/contextual`: clave →
+  `{titulo, texto, articuloId?}`, solo los de los roles de quien entró y
+  con las variables ya sustituidas. **Sin texto para una clave, su botón
+  no se enseña**: la aplicación no trae ninguno escrito.
+- `AyudaContextualCubit` (en `main.dart`) los carga **una vez por
+  sesión** desde el tablero: primero la copia guardada (los «?» aparecen
+  desde el primer cuadro, también sin red), después la del servidor. Si
+  el servidor no responde, se queda la copia y se reintenta al volver a la
+  aplicación. Se guardan por persona en la caché cifrada y se borran al
+  cerrar sesión. Una respuesta que no es un mapa no pisa la copia buena.
+
+| Clave | Dónde |
+| --- | --- |
+| `app.inicio` | Barra del inicio |
+| `app.agendar` | Barra de agendar (y de reprogramar) |
+| `app.agendar.primerTurno` | Junto a «El primer turno disponible» (paso del médico) |
+| `app.agendar.modalidad` | Junto al texto del paso de la modalidad |
+| `app.misCitas` | Barra de Mis citas |
+| `app.misCitas.reprogramar`, `app.misCitas.cancelar` | Junto a «Reprogramar» y «Cancelar cita» en el detalle de la cita |
+| `app.videoconsulta` | Barra de la pantalla de la videoconsulta y junto a «Videoconsulta» en el detalle de la cita |
+| `app.consultas`, `app.consultas.nueva` | Barra de Consultas en línea y de la consulta nueva |
+| `app.miSalud` | Barra de Mi salud |
+| `app.miSalud.receta`, `app.miSalud.orden`, `app.miSalud.certificado` | Barra de la receta, la orden y el certificado |
+| `app.dependientes`, `app.perfil`, `app.arco`, `app.soporte`, `app.avisos`, `app.ayuda` | Barra de su pantalla |
 
 ## Videoconsulta
 
@@ -1150,13 +1219,14 @@ cita no está entre las de la persona, se entra igual y el servidor decide.
 - Durante quince segundos después de una caída, `CorteRapidoSinRed` corta las
   peticiones sin esperar el plazo: la pantalla cae a lo guardado al
   instante.
-- Los PDF firmados de recetas y certificados quedan en la carpeta de
-  documentos de la aplicación y se abren sin red (ver «Recetas y
-  certificados firmados»). El logotipo de la clínica, en la caché cifrada
+- Los PDF de recetas, órdenes y certificados quedan en la carpeta de
+  documentos de la aplicación y se abren sin red (ver «Recetas, órdenes
+  y certificados»). Los textos de los botones de ayuda, en la caché
+  cifrada, por persona (ver «Botones de ayuda»). El logotipo de la clínica, en la caché cifrada
   con el prefijo `configuracion`.
 - Al cerrar sesión se borra lo de la persona (citas, consultas,
-  dependientes, el menú, archivos descargados, los PDF firmados,
-  recordatorios) y se conservan la configuración, el logotipo, los
+  dependientes, el menú, archivos descargados, los PDF, los textos de
+  ayuda, recordatorios) y se conservan la configuración, el logotipo, los
   catálogos y los documentos legales, que son de la clínica.
 
 ## Recordatorios
@@ -1212,15 +1282,15 @@ fvm flutter test
 | --- | --- |
 | `configuracion_test.dart` | `GET /configuracion/publica`: pública, copia sin red, sin copia no hay valores, lectura estricta, la zona horaria |
 | `logo_clinica_test.dart` | `clinica.logo` como dirección absoluta (y el data URL de antes; lo demás, el de marca), bajarlo sin la sesión, la copia de la clínica que sobrevive al cierre de sesión, la dirección nueva, sin red, lo que no es imagen, y cómo se pinta |
-| `documentos_pdf_test.dart` | El PDF firmado: la descarga con la sesión, la copia por tipo, id y huella, abrirla sin pedir nada, sin red, la huella que no coincide, lo que no es PDF, la copia dañada, la versión nueva, el borrado al cerrar sesión (también lo temporal), el error del servidor en bytes; el visor con dobles: pintar dentro de la aplicación, guardar, compartir, sin conexión y «Reintentar» |
+| `documentos_pdf_test.dart` | El PDF: la descarga con la sesión, la copia por tipo, id y huella, la orden y su vista previa sin firma (`X-Firma-Estado`), que nunca se hace pasar por la firmada, abrirla sin pedir nada, sin red, la huella que no coincide, lo que no es PDF, la copia dañada, la versión nueva, el borrado al cerrar sesión (también lo temporal), el error del servidor en bytes (y el 409 de la clínica que entrega solo firmado); el visor con dobles: pintar dentro de la aplicación, el aviso de la vista previa, el mensaje del servidor, guardar, compartir, sin conexión y «Reintentar» |
 | `catalogos_test.dart` | `GET /catalogos/lote`: todas las claves, elementos completos, lo del servidor manda, copia sin red, sin listas de respaldo, iconos y colores, la espera con «Reintentar» |
 | `menu_test.dart` | El menú: aplanado por orden, copia por persona, el enrutador (rutas con parámetros, consulta y fragmento, lo que no es del paciente), la barra, los accesos y la campana, «Muy pronto», externos en la pantalla de páginas web y lo que no se sabe abrir, oculto |
 | `legal_test.dart` | `GET /legal/documentos`, títulos y slugs de la API, sin nada escrito |
 | `privacidad_test.dart` | ARCO: el servicio y su copia, el detalle y sus límites, vencida, el orden, el plazo en palabras, los derechos activos del catálogo, el plazo de la configuración, la lista, el vacío, el error y la solicitud nueva (y su rechazo) |
 | `encuestas_test.dart` | Las pendientes como citas, su copia, responder (comentario, 409), el aviso del inicio y su texto, la encuesta (formulario, no disponible, sin lista, lo que falta, gracias, la siguiente, ya respondida, el error del servidor), la pantalla y el aviso en el tablero |
 | `avisos_test.dart` | La campana: el servicio y su copia, el contador (encendido, latidos, en segundo plano, sin red, apagado), la lista (leer, leer todos, borrar y deshacer, ver más), la fecha relativa, la pantalla, «Tu receta está lista» que abre Mi salud y la campana en el tablero según el menú |
-| `mi_salud_test.dart` | Mi salud: la lectura (también los certificados de reposo y la firma, en sus dos formas), el embarazo, los nombres de los códigos, la copia sin red por persona, el cubit y el documento |
-| `mi_salud_page_test.dart` | La pantalla y el detalle de la receta, la orden y el certificado: la firma, «Ver PDF» (desde el documento y desde su fila), el diagnóstico reservado o autorizado, anulado, sin firma o sin PDF |
+| `mi_salud_test.dart` | Mi salud: la lectura (también los certificados de reposo y la firma, en sus dos formas; el número, la modalidad, la cantidad en letras y los signos de alarma de la receta; la firma, el área, las indicaciones clínicas y la preparación de la orden; y los documentos viejos sin nada de eso), los exámenes por área, la atención a distancia, el embarazo, los nombres de los códigos, la copia sin red por persona, el cubit y el documento |
+| `mi_salud_page_test.dart` | La pantalla y el detalle de la receta **en dos bloques** («Para la farmacia» y «Cómo tomarlo»), la receta vieja, el aviso de la receta a distancia sin firma, la orden (número, preparación, áreas, firma y su PDF) y el certificado: la firma, «Ver PDF» (desde el documento y desde su fila; sin firma, la vista previa; si el servidor no lo da, su mensaje), el diagnóstico reservado o autorizado, anulado |
 | `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
 | `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |
@@ -1256,6 +1326,9 @@ fvm flutter test
 | `campo_dinamico_test.dart` | Cada tipo de pregunta y el visor de imágenes |
 | `videoconsulta_test.dart` | La ventana de la sala de la configuración (y la pastilla «Sala abierta»), pedirla (dominio, sala, token, cierre), los 409/503, la cabecera (médico y hora de fin), el botón, la ventana encima de la cita (la cita sigue debajo; colgar, el botón atrás y Jitsi vuelven a ella), los permisos (reintentar, ajustes), «Conectando…», la sala que no carga con «Reintentar», el teclado, y la pantalla de `/portal/videoconsulta/:citaId` que la abre sola una vez |
 | `sala_embebida_test.dart` | La dirección de la sala y los ajustes de Jitsi (solo claves de sus listas blancas, `test/dobles/listas_blancas_jitsi.dart`), lo que se hace con cada navegación, permiso de la página y error del WebView, los eventos de la página y el guion, y cómo quedan la cámara y el micrófono |
+| `ayuda_test.dart`, `ayuda_page_test.dart` | El centro de ayuda: el Markdown, la búsqueda (también sin red), las categorías con «Tu guía» primero, los contextuales fuera, el artículo inicial (y el que no está), los enlaces sin salir de la aplicación y `/ayuda?articulo=` |
+| `ayuda_contextual_test.dart` | Los botones de ayuda: la lectura de `GET /ayuda/contextual`, la copia por persona (y que una respuesta rota no la pisa), el cubit (la copia y después el servidor, una vez por sesión, sin red, el cierre de sesión, la respuesta tardía de la cuenta anterior) y el `BotonAyuda` **con texto y sin texto** (la hoja, sin guía, sin cubit, cuando llegan los textos y «Ver la guía completa») |
+| `botones_de_ayuda_test.dart` | Las claves `app.*` en sus pantallas: el tablero que las carga una vez (y el inicio sin textos), Mi salud y sus documentos, el centro de ayuda y el detalle de la cita |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |
 | `recorrido_consultas_test.dart` | Videoconsulta, consultas en línea de punta a punta y retomar un borrador, también con el texto agrandado |
 
@@ -1284,8 +1357,9 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
   primera cierra; un `tel:` o `mailto:` de la página abre el marcador o el
   correo; un enlace a otra aplicación (WhatsApp, la tienda) no hace nada; en
   la lista de recientes de Android no aparece ninguna tarea nueva.
-- **Recetas y certificados firmados, en el teléfono** (Android e iOS, con
-  una receta y un certificado firmados desde el panel):
+- **Recetas, órdenes y certificados, en el teléfono** (Android e iOS, con
+  una receta, una orden y un certificado firmados desde el panel, y una
+  receta sin firmar para la vista previa):
   - «Ver PDF» abre el PDF dentro de la aplicación, bajo la cabecera de
     Cliniq: ninguna otra aplicación, ni el navegador, ni una tarea nueva en
     las recientes de Android; se amplía con los dedos, se pasa de página y
@@ -1338,6 +1412,23 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
     corta la cámara en segundo plano: se reanuda al volver);
   - en iOS, que el `pod install` tome las macros de `permission_handler`
     (si faltan, la cámara se da por negada sin preguntar).
+- **Documentos y ayuda, contra el servidor nuevo**: los endpoints y
+  campos del contrato de documentos (`numero`, `modalidad`,
+  `signosAlarma`, `cantidadEnLetras`, la firma y los campos nuevos de la
+  orden, `GET /portal/ordenes/:id/pdf`, la vista previa con
+  `X-Firma-Estado`) y `GET /ayuda/contextual` se programaron contra la
+  forma del contrato y se probaron con dobles. Falta probarlos de punta a
+  punta cuando el API esté desplegado; con el API de hoy, una receta sin
+  firma responde «El PDF de este documento aún no está disponible.» al
+  tocar «Ver PDF» y no hay «?» (sin textos).
+- **Vigencia de la receta**: el PDF dice «Válida hasta DD/MM/AAAA»; la
+  pantalla todavía no, porque el portal no manda la fecha y calcularla
+  aquí (`clinico.vigenciaRecetaDias`, que cambia con los antimicrobianos)
+  sería inventarla. Tampoco las alergias ni el aviso de receta especial,
+  que el portal no manda en la receta.
+- **Botones de ayuda, en el teléfono**: que el «?» quepa en la barra de
+  cada pantalla junto a la campana y cerrar sesión con el texto
+  agrandado, y que la hoja se lea bien con un texto largo.
 - **Avisos push y pagos**: enchufar las costuras. Sin push, la respuesta del
   médico a una consulta llega por correo y se ve al abrir la aplicación.
 - **Mi salud**: los adjuntos de las atenciones cerradas
