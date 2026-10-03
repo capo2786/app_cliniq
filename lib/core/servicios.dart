@@ -174,8 +174,8 @@ class Servicios {
     ApiClient().dio,
   );
 
-  /// Los PDF firmados de recetas y certificados, con su copia en el
-  /// teléfono.
+  /// Los PDF de recetas, órdenes y certificados (el firmado o la vista
+  /// previa), con su copia en el teléfono.
   static DocumentosPdfService get documentosPdf => _documentosPdf;
 
   @visibleForTesting
