@@ -196,9 +196,17 @@ void main() {
       expect(find.textContaining('°C'), findsNothing);
       expect(find.textContaining('mg/dL'), findsNothing);
       expect(find.textContaining('SpO'), findsNothing);
-      // La tarjeta honesta lleva a registrarlas con los aparatos.
-      expect(find.byKey(const Key('escaner-tarjeta-honesta')), findsOneWidget);
       expect(find.text('En rango (60–100)'), findsOneWidget);
+      // Con buena calidad, 31 s y pocas correcciones, la variabilidad
+      // calculada en el teléfono también va en tarjetas.
+      expect(find.byKey(const Key('escaner-vfc')), findsOneWidget);
+      // La tarjeta honesta lleva a registrarlas con los aparatos.
+      await tester.scrollUntilVisible(
+        find.byKey(const Key('escaner-tarjeta-honesta')),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.byKey(const Key('escaner-tarjeta-honesta')), findsOneWidget);
       // Sin cita ni consulta abierta, no hay a quién enviarla.
       expect(find.byKey(const Key('escaner-sin-destino')), findsOneWidget);
       expect(fuente.abierta, isFalse);

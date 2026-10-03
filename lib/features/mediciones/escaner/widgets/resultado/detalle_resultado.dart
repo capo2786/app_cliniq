@@ -54,26 +54,38 @@ class DetalleDeLaMedicion extends StatelessWidget {
           style: TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
         ),
         const SizedBox(height: 10),
-        // Tres por fila (dos en pantallas muy angostas).
-        LayoutBuilder(
-          builder: (context, limites) {
-            final porFila = limites.maxWidth < 300 ? 2 : 3;
-            final ancho = (limites.maxWidth - 8 * (porFila - 1)) / porFila;
-            return Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final (rotulo, valor) in datos)
-                  _DatoPequeno(rotulo: rotulo, valor: valor, ancho: ancho),
-              ],
-            );
-          },
-        ),
+        DatosPequenos(datos),
         const SizedBox(height: 14),
         GraficasDelDetalle(detalle: d, frValida: frValida),
       ],
     );
   }
+}
+
+/// Datos en tarjetas pequeñas, tres por fila (dos en pantallas muy
+/// angostas): «Intervalo medio · 758 ms». Los usan el detalle del escáner y
+/// el de una medición guardada.
+class DatosPequenos extends StatelessWidget {
+  /// El rótulo y el valor de cada uno.
+  final List<(String, String)> datos;
+
+  const DatosPequenos(this.datos, {super.key});
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, limites) {
+      final porFila = limites.maxWidth < 300 ? 2 : 3;
+      final ancho = (limites.maxWidth - 8 * (porFila - 1)) / porFila;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          for (final (rotulo, valor) in datos)
+            _DatoPequeno(rotulo: rotulo, valor: valor, ancho: ancho),
+        ],
+      );
+    },
+  );
 }
 
 class _DatoPequeno extends StatelessWidget {

@@ -13,6 +13,7 @@ import '../../dominio/destinos_medico.dart';
 import '../../dominio/reglas_mediciones.dart';
 import '../escaner_cubit.dart';
 import '../motor_signos_camara.dart';
+import '../valores_del_resultado.dart';
 import 'pasos_comunes.dart';
 import 'resultado/detalle_resultado.dart';
 import 'resultado/tarjetas_resultado.dart';
@@ -165,7 +166,7 @@ class PasoResultado extends StatelessWidget {
           style: const TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
         ),
         const SizedBox(height: 12),
-        TarjetasResultado(resultado: r),
+        TarjetasResultado(valores: ValoresDelResultado.deResultado(r)),
         const SizedBox(height: 10),
         TarjetaRegistrarAparatos(alRegistrar: alRegistrar),
         if (r.nivel == NivelCalidad.baja) ...[
