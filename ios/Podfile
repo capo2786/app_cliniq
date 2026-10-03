@@ -1,7 +1,9 @@
 # La videoconsulta va en un WKWebView: WebRTC funciona desde iOS 14.3, y
 # desde iOS 15 la aplicación decide sola si la página usa la cámara y el
-# micrófono (sin que la página vuelva a preguntar). Queda en 15.1.
-platform :ios, '15.1'
+# micrófono (sin que la página vuelva a preguntar). El rostro del escáner
+# usa ML Kit (google_mlkit_commons y google_mlkit_face_detection), que pide
+# iOS 15.5 o más. Queda en 15.5.
+platform :ios, '15.5'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'

@@ -74,6 +74,12 @@ dependencies:
   camera: ^0.12.1
   fftea: ^1.5.0+1
   fl_chart: ^1.2.0
+  # El rostro del escáner: ML Kit de Google, gratis y en el teléfono, con el
+  # modelo empaquetado (funciona sin red desde el primer uso). Las imágenes
+  # nunca salen del teléfono; ML Kit puede enviar a Google métricas
+  # anónimas de uso de la librería, nunca imágenes. Si falla, el escáner
+  # sigue con el detector por color de piel.
+  google_mlkit_face_detection: ^0.15.1
 
 dev_dependencies:
   flutter_test:
