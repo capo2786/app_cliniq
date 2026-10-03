@@ -288,9 +288,9 @@ void main() {
     test('el modo dedo del escáner: opcional y apagado por defecto', () {
       expect(configDePrueba().telemedicina.escanerDedoActivo, isFalse);
       expect(
-        configDePrueba(
-          telemedicina: {'escanerDedoActivo': true},
-        ).telemedicina.escanerDedoActivo,
+        configDePrueba(telemedicina: {'escanerDedoActivo': true})
+            .telemedicina
+            .escanerDedoActivo,
         isTrue,
       );
 

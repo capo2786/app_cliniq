@@ -1,6 +1,7 @@
 // lib/features/mediciones/escaner/escaner_page.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/configuracion/en_contexto.dart';
@@ -15,12 +16,14 @@ import '../../citas/providers/citas_bloc.dart';
 import '../../consultas/providers/consultas_bloc.dart';
 import '../data/cola_mediciones.dart';
 import '../dominio/destinos_medico.dart';
+import '../presentacion/registrar_medicion_page.dart';
 import 'analizador_de_medicion.dart';
 import 'aviso_experimental.dart';
 import 'escaner_cubit.dart';
 import 'fuente_camara.dart';
 import 'fuente_de_cuadros.dart';
 import 'motor_signos_camara.dart';
+import 'serie_senal.dart';
 import 'widgets/paso_aviso.dart';
 import 'widgets/paso_midiendo.dart';
 import 'widgets/paso_resultado.dart';
@@ -32,10 +35,11 @@ export 'widgets/pasos_comunes.dart' show lineaDePrivacidad;
 /// El escáner experimental de signos vitales.
 ///
 /// Mide la frecuencia cardiaca (y, con buena calidad, la respiratoria
-/// aproximada) con la cámara: la yema sobre la cámara trasera con el flash
-/// (recomendado) o el rostro frente a la frontal (beta). **Nunca** presión,
-/// saturación, temperatura ni glucosa: esas no se pueden medir con la
-/// cámara y se registran desde los aparatos de casa.
+/// aproximada) con la cámara: el rostro frente a la frontal, a pantalla
+/// completa con la malla de ML Kit, o (si la clínica lo enciende) la yema
+/// sobre la cámara trasera con el flash. **Nunca** presión, saturación,
+/// temperatura ni glucosa: esas no se pueden medir con la cámara y se
+/// registran desde los aparatos de casa.
 ///
 /// La primera vez enseña el aviso de función experimental. El resultado se
 /// guarda en «Mis signos vitales» o se envía al médico (adjunto a la
@@ -97,6 +101,7 @@ class EscanerPage extends StatelessWidget {
         destinoFijo: destino,
         pacienteId: pacienteId,
         pacienteNombre: pacienteNombre,
+        cola: cola,
       ),
     );
   }
@@ -106,11 +111,13 @@ class _VistaEscaner extends StatefulWidget {
   final DestinoMedico? destinoFijo;
   final String? pacienteId;
   final String? pacienteNombre;
+  final ColaMediciones? cola;
 
   const _VistaEscaner({
     required this.destinoFijo,
     required this.pacienteId,
     required this.pacienteNombre,
+    required this.cola,
   });
 
   @override
@@ -140,6 +147,19 @@ class _VistaEscanerState extends State<_VistaEscaner>
     }
   }
 
+  /// «Registrar» lo que la cámara no mide (la presión, la saturación), con
+  /// los aparatos de casa.
+  Future<void> _registrar(BuildContext context) => Navigator.of(context).push(
+    MaterialPageRoute<bool>(
+      builder: (_) => RegistrarMedicionPage(
+        pacienteId: widget.pacienteId,
+        pacienteNombre: widget.pacienteNombre,
+        destino: widget.destinoFijo,
+        cola: widget.cola,
+      ),
+    ),
+  );
+
   /// Las opciones de «Enviar a mi médico».
   List<DestinoMedico> _destinos(BuildContext context) {
     final fijo = widget.destinoFijo;
@@ -158,12 +178,35 @@ class _VistaEscanerState extends State<_VistaEscaner>
     }
   }
 
+  /// El toque al arrancar (o seguir) la cuenta del rostro y el de
+  /// terminar la medición.
+  static bool _vibrar(EscanerState antes, EscanerState ahora) =>
+      (antes.paso == PasoEscaner.midiendo &&
+          ahora.paso == PasoEscaner.analizando) ||
+      (ahora.paso == PasoEscaner.midiendo &&
+          ahora.modo == ModoEscaner.rostro &&
+          antes.fase != FaseMedicion.midiendo &&
+          ahora.fase == FaseMedicion.midiendo);
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<EscanerCubit, EscanerState>(
+    return BlocConsumer<EscanerCubit, EscanerState>(
+      listenWhen: _vibrar,
+      listener: (context, state) => state.paso == PasoEscaner.analizando
+          ? HapticFeedback.mediumImpact()
+          : HapticFeedback.lightImpact(),
       builder: (context, state) {
         final cubit = context.read<EscanerCubit>();
         final guardado = state.paso == PasoEscaner.guardado;
+        final pantallaCompleta =
+            state.paso == PasoEscaner.midiendo &&
+            state.modo == ModoEscaner.rostro;
+
+        Future<void> cerrar() async {
+          final navegador = Navigator.of(context);
+          await cubit.cancelar();
+          navegador.pop(guardado);
+        }
 
         return PopScope(
           canPop:
@@ -172,61 +215,68 @@ class _VistaEscanerState extends State<_VistaEscaner>
           onPopInvokedWithResult: (salio, _) {
             if (!salio && state.paso == PasoEscaner.midiendo) cubit.cancelar();
           },
-          child: Scaffold(
-            backgroundColor: AppColors.fondo,
-            appBar: AppBar(
-              title: const Text('Escáner experimental'),
-              leading: IconButton(
-                tooltip: 'Cerrar',
-                icon: const Icon(Icons.close_rounded),
-                onPressed: () async {
-                  final navegador = Navigator.of(context);
-                  await cubit.cancelar();
-                  navegador.pop(guardado);
-                },
-              ),
-              actions: const [
-                BotonAyuda(clave: 'app.escaner'),
-                SizedBox(width: 6),
-              ],
-            ),
-            body: FondoDegradado(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                child: KeyedSubtree(
-                  key: ValueKey(state.paso),
-                  child: switch (state.paso) {
-                    PasoEscaner.cargando ||
-                    PasoEscaner.abriendo => const Center(
-                      child: CargandoCentro(mensaje: 'Preparando la cámara…'),
+          child: pantallaCompleta
+              ? AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: SystemUiOverlayStyle.light,
+                  child: Scaffold(
+                    backgroundColor: AppColors.lente,
+                    body: PasoMidiendo(state: state, alCerrar: cerrar),
+                  ),
+                )
+              : Scaffold(
+                  backgroundColor: AppColors.fondo,
+                  appBar: AppBar(
+                    title: const Text('Escáner experimental'),
+                    leading: IconButton(
+                      tooltip: 'Cerrar',
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: cerrar,
                     ),
-                    PasoEscaner.aviso => const PasoAviso(),
-                    PasoEscaner.modo => PasoElegirModo(
-                      pacienteNombre: widget.pacienteNombre,
-                    ),
-                    PasoEscaner.instrucciones => PasoInstrucciones(
-                      modo: state.modo,
-                      segundos: state.segundos,
-                    ),
-                    PasoEscaner.midiendo => PasoMidiendo(state: state),
-                    PasoEscaner.analizando => const Center(
-                      child: CargandoCentro(mensaje: 'Calculando tu pulso…'),
-                    ),
-                    PasoEscaner.resultado => PasoResultado(
-                      state: state,
-                      destinos: _destinos(context),
-                    ),
-                    PasoEscaner.fallo => PasoFallo(state: state),
-                    PasoEscaner.guardado => PasoGuardado(state: state),
-                  },
+                    actions: const [
+                      BotonAyuda(clave: 'app.escaner'),
+                      SizedBox(width: 6),
+                    ],
+                  ),
+                  body: FondoDegradado(child: _paso(context, state, cerrar)),
                 ),
-              ),
-            ),
-          ),
         );
       },
     );
   }
-}
 
-/// Un cuerpo desplazable con el botón abajo.
+  Widget _paso(BuildContext context, EscanerState state, VoidCallback cerrar) =>
+      AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        child: KeyedSubtree(
+          key: ValueKey(state.paso),
+          child: switch (state.paso) {
+            PasoEscaner.cargando || PasoEscaner.abriendo => const Center(
+              child: CargandoCentro(mensaje: 'Preparando la cámara…'),
+            ),
+            PasoEscaner.aviso => const PasoAviso(),
+            PasoEscaner.modo => PasoElegirModo(
+              pacienteNombre: widget.pacienteNombre,
+            ),
+            PasoEscaner.instrucciones => PasoInstrucciones(
+              modo: state.modo,
+              segundos: state.segundos,
+              dedoActivo: state.dedoActivo,
+            ),
+            PasoEscaner.midiendo => PasoMidiendo(
+              state: state,
+              alCerrar: cerrar,
+            ),
+            PasoEscaner.analizando => const Center(
+              child: CargandoCentro(mensaje: 'Calculando tu pulso…'),
+            ),
+            PasoEscaner.resultado => PasoResultado(
+              state: state,
+              destinos: _destinos(context),
+              alRegistrar: () => _registrar(context),
+            ),
+            PasoEscaner.fallo => PasoFallo(state: state),
+            PasoEscaner.guardado => PasoGuardado(state: state),
+          },
+        ),
+      );
+}

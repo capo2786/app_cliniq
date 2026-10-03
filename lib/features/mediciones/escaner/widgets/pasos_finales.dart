@@ -40,13 +40,14 @@ class PasoFallo extends StatelessWidget {
               onPressed: cubit.abrirAjustes,
             ),
           ],
-          TextButton(
-            onPressed: cubit.volverAModos,
-            child: const Text(
-              'Cambiar de modo',
-              style: TextStyle(color: AppColors.textoSecundario),
+          if (state.dedoActivo)
+            TextButton(
+              onPressed: cubit.volverAModos,
+              child: const Text(
+                'Cambiar de modo',
+                style: TextStyle(color: AppColors.textoSecundario),
+              ),
             ),
-          ),
         ],
       ),
       children: [

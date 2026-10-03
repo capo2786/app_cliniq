@@ -132,6 +132,8 @@ void main() {
       fuente.emitir(cuadrosDeDedo(serie));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
+      // Las tarjetas del resultado entran y sus números suben.
+      await tester.pump(const Duration(seconds: 2));
     }
 
     testWidgets('la primera vez: el aviso, con el número de emergencias', (
@@ -147,9 +149,21 @@ void main() {
       await tester.tap(find.byKey(const Key('escaner-entiendo')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.byKey(const Key('modo-dedo')), findsOneWidget);
-      expect(find.text('Recomendado'), findsOneWidget);
-      expect(find.text('Beta'), findsOneWidget);
+      // Con el dedo encendido por la clínica: primero el rostro.
+      final rostro = find.text('Con tu rostro (recomendado)');
+      final dedo = find.text('Con el dedo (alternativo)');
+      expect(rostro, findsOneWidget);
+      expect(dedo, findsOneWidget);
+      expect(
+        tester.getTopLeft(rostro).dy,
+        lessThan(tester.getTopLeft(dedo).dy),
+      );
+      expect(
+        find.text(
+          'Cubre con la yema la lente que está junto a la luz que se enciende.',
+        ),
+        findsOneWidget,
+      );
       expect(await AvisoDelEscaner(cache).aceptado('u1'), isTrue);
     });
 
@@ -168,11 +182,23 @@ void main() {
       expect(find.text('Calidad buena'), findsOneWidget);
       expect(find.text('Calculado en el teléfono'), findsOneWidget);
       expect(find.text('Experimental · referencial'), findsOneWidget);
-      // Nunca presión, saturación, temperatura ni glucosa con la cámara.
+      // Nunca presión, saturación, temperatura ni glucosa con la cámara:
+      // ni una unidad de esas en las tarjetas de valores (el % del detalle
+      // es la calidad y el pNN50, que sí salen de la señal).
       expect(find.textContaining('mmHg'), findsNothing);
-      expect(find.textContaining('%'), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('escaner-tarjetas')),
+          matching: find.textContaining('%'),
+        ),
+        findsNothing,
+      );
       expect(find.textContaining('°C'), findsNothing);
       expect(find.textContaining('mg/dL'), findsNothing);
+      expect(find.textContaining('SpO'), findsNothing);
+      // La tarjeta honesta lleva a registrarlas con los aparatos.
+      expect(find.byKey(const Key('escaner-tarjeta-honesta')), findsOneWidget);
+      expect(find.text('En rango (60–100)'), findsOneWidget);
       // Sin cita ni consulta abierta, no hay a quién enviarla.
       expect(find.byKey(const Key('escaner-sin-destino')), findsOneWidget);
       expect(fuente.abierta, isFalse);
@@ -217,7 +243,10 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
 
-      expect(find.text('74 lpm'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('escaner-fc'))).data,
+        '74',
+      );
       expect(find.byKey(const Key('escaner-fr')), findsOneWidget);
       expect(find.byKey(const Key('escaner-vfc')), findsOneWidget);
       expect(
@@ -307,18 +336,20 @@ void main() {
       expect(find.byKey(const Key('escaner-fc')), findsNothing);
     });
 
-    testWidgets('rostro: la vista de la cámara con el óvalo y el consejo', (
-      tester,
-    ) async {
+    testWidgets('rostro: a pantalla completa con las esquinas, la guía y '
+        '«Cancelar»', (tester) async {
       await abrir(tester);
       await tester.tap(find.byKey(const Key('modo-rostro')));
       await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('CON EL ROSTRO (BETA)'), findsOneWidget);
+      expect(find.text('CON TU ROSTRO'), findsOneWidget);
       await tester.tap(find.byKey(const Key('escaner-empezar')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.byKey(const Key('vista-previa-falsa')), findsOneWidget);
+      expect(find.byKey(const Key('escaner-esquinas')), findsOneWidget);
+      expect(find.text('Signos vitales · Experimental'), findsOneWidget);
+      expect(find.text('Escáner experimental'), findsNothing); // sin barra
       fuente.emitir(
         cuadrosDeRostro(
           Sintetizador(26).rostro(lpm: 72, segundos: 3),
@@ -326,7 +357,9 @@ void main() {
         ),
       );
       await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Pon tu cara dentro del marco'), findsOneWidget);
+      expect(find.text('Preparando…'), findsOneWidget);
       expect(fuente.abiertas.single.name, 'rostro');
 
       await tester.tap(find.byKey(const Key('escaner-cancelar')));

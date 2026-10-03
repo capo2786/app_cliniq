@@ -6,14 +6,19 @@
 /// que responde lo que la prueba decide.
 library;
 
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:app_cliniq/features/mediciones/escaner/extractor_de_cuadros.dart';
+import 'package:app_cliniq/features/mediciones/escaner/fuente_de_cuadros.dart';
 import 'package:app_cliniq/features/mediciones/escaner/rostro/cuadro_de_camara.dart';
 import 'package:app_cliniq/features/mediciones/escaner/rostro/detector_de_rostro.dart';
 import 'package:app_cliniq/features/mediciones/escaner/rostro/geometria.dart';
+import 'package:app_cliniq/features/mediciones/escaner/rostro/procesador_de_rostro.dart';
 import 'package:app_cliniq/features/mediciones/escaner/rostro/rostro_detectado.dart';
+import 'package:app_cliniq/features/mediciones/escaner/serie_senal.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// Un rostro de frente, con la caja de [ancho] píxeles centrada en
 /// ([cx], [cy]) y alta 1,25 veces el ancho. Los puntos van redondeados a
@@ -156,4 +161,108 @@ class DetectorFalso implements DetectorDeRostro {
 
   @override
   Future<void> cerrar() async => cierres++;
+}
+
+/// Una cara pintada una sola vez (qué píxel es piel, pelo o fondo) para
+/// sacar muchos cuadros rápido cambiando solo el color de la piel, con un
+/// temblor fijo por píxel (así el promedio no se queda en enteros).
+class PlantillaDeRostro {
+  final RostroDetectado rostro;
+  final Uint8List _clase; // 0 fondo, 1 pelo, 2 piel
+  final Float64List _temblor;
+
+  PlantillaDeRostro._(this.rostro, this._clase, this._temblor);
+
+  factory PlantillaDeRostro(RostroDetectado rostro) {
+    final ancho = rostro.anchoImagen.round();
+    final alto = rostro.altoImagen.round();
+    final muestra = imagenDeRostro(rostro);
+    final bytes = muestra.planos.first.bytes;
+    final clase = Uint8List(ancho * alto);
+    for (var i = 0; i < clase.length; i++) {
+      final r = bytes[i * 4 + 2];
+      clase[i] = r == pielSintetica.r ? 2 : (r == pelo.r ? 1 : 0);
+    }
+    final azar = math.Random(5);
+    return PlantillaDeRostro._(
+      rostro,
+      clase,
+      Float64List.fromList([
+        for (var i = 0; i < clase.length; i++) azar.nextDouble() - 0.5,
+      ]),
+    );
+  }
+
+  /// El cuadro con la piel de color [piel].
+  ImagenCruda imagen(Rgb piel) {
+    final bytes = Uint8List(_clase.length * 4);
+    for (var i = 0; i < _clase.length; i++) {
+      final c = switch (_clase[i]) {
+        2 => piel,
+        1 => pelo,
+        _ => fondoAzul,
+      };
+      final d = _clase[i] == 2 ? _temblor[i] : 0.0;
+      bytes[i * 4] = (c.b + d).round().clamp(0, 255);
+      bytes[i * 4 + 1] = (c.g + d).round().clamp(0, 255);
+      bytes[i * 4 + 2] = (c.r + d).round().clamp(0, 255);
+      bytes[i * 4 + 3] = 255;
+    }
+    final ancho = rostro.anchoImagen.round();
+    return ImagenCruda(
+      formato: FormatoImagen.bgra8888,
+      ancho: ancho,
+      alto: rostro.altoImagen.round(),
+      planos: [PlanoCrudo(bytes, bytesPorFila: ancho * 4, bytesPorPixel: 4)],
+    );
+  }
+}
+
+/// Una fuente de cuadros falsa que sí pasa por el procesador del rostro de
+/// verdad: la prueba le da imágenes sintéticas y el detector (falso) dice
+/// dónde está la cara.
+class FuenteDeImagenesFalsa implements FuenteDeCuadros {
+  final CrearDetector? crearDetector;
+  final StreamController<CuadroPpg> _salida =
+      StreamController<CuadroPpg>.broadcast(sync: true);
+  ProcesadorDeRostro? _procesador;
+  final List<ModoEscaner> abiertas = [];
+  bool abierta = false;
+
+  FuenteDeImagenesFalsa({this.crearDetector});
+
+  @override
+  Stream<CuadroPpg> get cuadros => _salida.stream;
+
+  @override
+  Future<void> abrir(ModoEscaner modo) async {
+    abiertas.add(modo);
+    abierta = true;
+    _procesador = ProcesadorDeRostro(crearDetector: crearDetector);
+  }
+
+  void emitir(Iterable<CuadroDeCamara> cuadros) {
+    for (final c in cuadros) {
+      final procesador = _procesador;
+      if (procesador == null) return;
+      _salida.add(procesador.procesar(c));
+    }
+  }
+
+  @override
+  Widget vistaPrevia(BuildContext context) => const ColoredBox(
+    key: Key('vista-previa-falsa'),
+    color: Color(0x00000000),
+  );
+
+  @override
+  Future<void> cerrar() async {
+    abierta = false;
+    final procesador = _procesador;
+    _procesador = null;
+    await procesador?.cerrar();
+  }
+
+  @override
+  Future<bool> abrirAjustes() async => true;
 }

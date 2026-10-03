@@ -14,14 +14,26 @@ import '../../dominio/reglas_mediciones.dart';
 import '../escaner_cubit.dart';
 import '../motor_signos_camara.dart';
 import 'pasos_comunes.dart';
+import 'resultado/detalle_resultado.dart';
+import 'resultado/tarjetas_resultado.dart';
 
-/// El resultado: la FC con su calidad, la FR si aplica, quién lo calculó,
-/// el momento y «Guardar», «Enviar a mi médico» o «Descartar».
+/// El resultado: las tarjetas con la FC, la FR y la variabilidad si
+/// vienen, y la calidad; la tarjeta honesta de la presión y la saturación;
+/// quién lo calculó; el momento; el detalle con sus gráficas; y «Guardar»,
+/// «Enviar a mi médico» o «Descartar».
 class PasoResultado extends StatelessWidget {
   final EscanerState state;
   final List<DestinoMedico> destinos;
 
-  const PasoResultado({super.key, required this.state, required this.destinos});
+  /// Abre «Registrar» (la tarjeta de la presión y la saturación).
+  final VoidCallback alRegistrar;
+
+  const PasoResultado({
+    super.key,
+    required this.state,
+    required this.destinos,
+    required this.alRegistrar,
+  });
 
   Future<void> _enviarAlMedico(BuildContext context) async {
     final cubit = context.read<EscanerCubit>();
@@ -80,7 +92,6 @@ class PasoResultado extends StatelessWidget {
   Widget build(BuildContext context) {
     final cubit = context.read<EscanerCubit>();
     final r = state.resultado!;
-    final color = colorDeCalidad(r.calidad);
     final contextos = contextosDelTipo(TipoMedicion.fc);
 
     return CuerpoConBoton(
@@ -104,6 +115,17 @@ class PasoResultado extends StatelessWidget {
                 ? null
                 : () => _enviarAlMedico(context),
           ),
+          if (destinos.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 6),
+              child: Text(
+                'Para enviarla a tu médico necesitas una cita de telemedicina '
+                'próxima o una consulta en línea abierta.',
+                key: Key('escaner-sin-destino'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
+              ),
+            ),
           TextButton(
             key: const Key('escaner-descartar'),
             onPressed: state.guardando ? null : cubit.descartar,
@@ -115,79 +137,37 @@ class PasoResultado extends StatelessWidget {
         ],
       ),
       children: [
-        TarjetaTranslucida(
-          tinte: color,
-          child: Column(
-            children: [
-              Text(
-                '${r.fc} lpm',
-                key: const Key('escaner-fc'),
-                style: const TextStyle(
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Tu resultado',
+                style: TextStyle(
                   color: AppColors.texto,
-                  fontSize: 46,
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const Text(
-                'Pulso (frecuencia cardiaca)',
-                style: TextStyle(color: AppColors.textoSuave, fontSize: 13),
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                alignment: WrapAlignment.center,
-                children: [
-                  Pastilla(
-                    key: const Key('escaner-nivel'),
-                    texto: nombreDelNivel(r.nivel),
-                    color: color,
-                    icono: Icons.signal_cellular_alt_rounded,
-                  ),
-                  const Pastilla(
-                    texto: 'Experimental · referencial',
-                    color: AppColors.alerta,
-                    icono: Icons.science_outlined,
-                  ),
-                ],
-              ),
-              if (r.fr != null) ...[
-                const SizedBox(height: 14),
-                Text(
-                  'Respiraciones: ${r.fr} por minuto (aproximado)',
-                  key: const Key('escaner-fr'),
-                  style: const TextStyle(
-                    color: AppColors.texto,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-              if (r.vfc != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  'Variabilidad del pulso: SDNN ${r.vfc!.sdnn.round()} ms · '
-                  'RMSSD ${r.vfc!.rmssd.round()} ms',
-                  key: const Key('escaner-vfc'),
-                  style: const TextStyle(
-                    color: AppColors.textoSecundario,
-                    fontSize: 12.5,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 10),
-              Text(
-                r.origen == OrigenAnalisis.servidor
-                    ? 'Analizado en el servidor (experimental)'
-                    : 'Calculado en el teléfono',
-                key: const Key('escaner-origen'),
-                style: const TextStyle(
-                  color: AppColors.textoTenue,
-                  fontSize: 11.5,
-                ),
-              ),
-            ],
-          ),
+            ),
+            const Pastilla(
+              texto: 'Experimental · referencial',
+              color: AppColors.alerta,
+              icono: Icons.science_outlined,
+            ),
+          ],
         ),
+        const SizedBox(height: 4),
+        Text(
+          r.origen == OrigenAnalisis.servidor
+              ? 'Analizado en el servidor (experimental)'
+              : 'Calculado en el teléfono',
+          key: const Key('escaner-origen'),
+          style: const TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
+        ),
+        const SizedBox(height: 12),
+        TarjetasResultado(resultado: r),
+        const SizedBox(height: 10),
+        TarjetaRegistrarAparatos(alRegistrar: alRegistrar),
         if (r.nivel == NivelCalidad.baja) ...[
           const SizedBox(height: 12),
           const RecuadroAviso.alerta(
@@ -215,18 +195,13 @@ class PasoResultado extends StatelessWidget {
               ),
           ],
         ),
-        if (destinos.isEmpty) ...[
-          const SizedBox(height: 14),
-          const Text(
-            'Para enviarla a tu médico necesitas una cita de telemedicina '
-            'próxima o una consulta en línea abierta.',
-            key: Key('escaner-sin-destino'),
-            style: TextStyle(color: AppColors.textoTenue, fontSize: 12),
-          ),
-        ],
         if (state.errorAlGuardar != null) ...[
           const SizedBox(height: 12),
           RecuadroAviso.error(state.errorAlGuardar!),
+        ],
+        if (r.detalle != null) ...[
+          const SizedBox(height: 22),
+          DetalleDeLaMedicion(detalle: r.detalle!, frValida: r.fr != null),
         ],
         const LineaPrivacidad(),
       ],
