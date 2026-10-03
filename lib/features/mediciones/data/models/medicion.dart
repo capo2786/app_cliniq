@@ -3,6 +3,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/fechas/instante.dart';
+import '../../dominio/detalle_medicion.dart';
 
 /*
  * Las mediciones del paciente, con la forma de `/portal/mediciones` (ver
@@ -13,6 +14,11 @@ import '../../../../core/fechas/instante.dart';
  * se enseñan en la hora de la clínica. Los códigos (tipo, método, contexto)
  * son del sistema y no cambian; sus nombres están en
  * `dominio/reglas_mediciones.dart`.
+ *
+ * El pulso medido con la cámara puede llevar su `detalle` (las gráficas y
+ * los datos del escáner, solo números, en el formato v1 de
+ * `dominio/formato_detalle.dart`). Las listas no lo traen: dicen
+ * `tieneDetalle` y el detalle se pide con `GET /portal/mediciones/:id`.
  */
 
 String? _texto(Object? valor) {
@@ -146,6 +152,13 @@ class Medicion extends Equatable {
 
   final DateTime? creadoEn;
 
+  /// El detalle del escáner, si llegó (solo en la medición completa).
+  final DetalleMedicion? detalle;
+
+  /// El servidor guarda un detalle de esta medición (las listas lo dicen
+  /// sin traerlo).
+  final bool tieneDetalle;
+
   const Medicion({
     required this.id,
     required this.tipo,
@@ -163,9 +176,14 @@ class Medicion extends Equatable {
     this.experimental = false,
     this.usadaEnAtencionId,
     this.creadoEn,
+    this.detalle,
+    this.tieneDetalle = false,
   });
 
   bool get usada => usadaEnAtencionId != null;
+
+  /// Se mandó a un médico (adjunta a una cita o a una consulta).
+  bool get enviadaAlMedico => citaId != null || consultaId != null;
 
   /// Lee una medición de la API; `null` si le falta lo indispensable (un
   /// tipo o un método que esta versión no conoce, sin valor o sin fecha).
@@ -184,6 +202,7 @@ class Medicion extends Equatable {
     }
 
     final calidad = _numero(json['calidad'])?.toDouble();
+    final detalle = DetalleMedicion.desdeJson(json['detalle']);
     return Medicion(
       id: id,
       pacienteId: _texto(json['pacienteId']) ?? '',
@@ -201,6 +220,11 @@ class Medicion extends Equatable {
       experimental: json['experimental'] == true || metodo.esCamara,
       usadaEnAtencionId: _texto(json['usadaEnAtencionId']),
       creadoEn: leerInstante(json['creadoEn']),
+      detalle: detalle,
+      tieneDetalle:
+          json['tieneDetalle'] == true ||
+          detalle != null ||
+          json['detalle'] is Map,
     );
   }
 
@@ -222,6 +246,8 @@ class Medicion extends Equatable {
     experimental,
     usadaEnAtencionId,
     creadoEn,
+    detalle,
+    tieneDetalle,
   ];
 }
 
@@ -242,6 +268,9 @@ class MedicionNueva extends Equatable {
   final String? citaId;
   final String? consultaId;
 
+  /// Solo en el pulso de la cámara: el detalle del escáner.
+  final DetalleMedicion? detalle;
+
   const MedicionNueva({
     required this.tipo,
     required this.valor,
@@ -253,7 +282,11 @@ class MedicionNueva extends Equatable {
     this.notas,
     this.citaId,
     this.consultaId,
+    this.detalle,
   });
+
+  /// El servidor guarda el detalle solo en el pulso medido con la cámara.
+  bool get admiteDetalle => tipo == TipoMedicion.fc && metodo.esCamara;
 
   /// La misma medición, adjunta a una cita o a una consulta en línea.
   MedicionNueva adjuntaA({String? citaId, String? consultaId}) => MedicionNueva(
@@ -267,6 +300,7 @@ class MedicionNueva extends Equatable {
     medidoEn: medidoEn,
     citaId: citaId,
     consultaId: consultaId,
+    detalle: detalle,
   );
 
   Map<String, dynamic> aJson() => {
@@ -280,6 +314,7 @@ class MedicionNueva extends Equatable {
     'medidoEn': aTextoInstante(medidoEn),
     'citaId': ?citaId,
     'consultaId': ?consultaId,
+    'detalle': ?(admiteDetalle ? detalle?.aJson() : null),
   };
 
   /// Lee una medición de la cola del teléfono (la forma de [aJson]).
@@ -305,6 +340,8 @@ class MedicionNueva extends Equatable {
       medidoEn: medidoEn,
       citaId: _texto(json['citaId']),
       consultaId: _texto(json['consultaId']),
+      // Un detalle roto en la cola no impide enviar la medición.
+      detalle: DetalleMedicion.desdeJson(json['detalle']),
     );
   }
 
@@ -320,5 +357,6 @@ class MedicionNueva extends Equatable {
     medidoEn,
     citaId,
     consultaId,
+    detalle,
   ];
 }

@@ -118,6 +118,14 @@ void main() {
           mediciones.every((m) => m['tipo'] == 'FC' || m['tipo'] == 'FR'),
           isTrue,
         );
+        // El detalle va con el pulso, en el formato v1; la FR no lo lleva.
+        final detalle = mediciones.first['detalle'] as Map;
+        expect(detalle['v'], 1);
+        expect((detalle['onda'] as Map)['valores'], isNotEmpty);
+        expect(
+          mediciones.skip(1).every((m) => !(m as Map).containsKey('detalle')),
+          isTrue,
+        );
         await cubit.close();
       },
     );
@@ -158,6 +166,14 @@ void main() {
       await cubit.guardar();
       expect(cubit.state.registro, isA<RegistroPendiente>());
       expect(cache.leer('mediciones-pendientes:u1'), completion(isNotNull));
+      // La cola guarda el pulso con su detalle.
+      final cola = ColaMediciones(cache, MedicionesService(api.dio, cache));
+      final pendiente = (await cola.pendientes('u1')).single;
+      expect(pendiente.mediciones.first.detalle, isNotNull);
+      expect(
+        pendiente.mediciones.first.detalle!.latidos,
+        cubit.state.resultado!.detalle!.latidos,
+      );
       await cubit.close();
     });
 

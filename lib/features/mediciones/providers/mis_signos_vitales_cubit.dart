@@ -276,7 +276,7 @@ class MisSignosVitalesCubit extends Cubit<MisSignosVitalesState> {
     if (state.eliminandoId != null) return;
     emit(state.copiarCon(eliminandoId: id));
     try {
-      await _servicio.eliminar(id);
+      await _servicio.eliminar(id, uid: _uid);
       if (isClosed) return;
       emit(
         state.copiarCon(
