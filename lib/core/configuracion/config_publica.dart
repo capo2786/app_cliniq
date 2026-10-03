@@ -282,20 +282,55 @@ class ReglasTelemedicina extends Equatable {
   final int diasSeguimiento;
   final int maxArchivosConsulta;
 
+  /// Si el paciente registra en la aplicación los valores de sus aparatos
+  /// de casa («Mis signos vitales»). Un servidor que no lo manda no tiene el
+  /// módulo: entonces no se ofrece.
+  final bool medicionesPacienteActiva;
+
+  /// Si el administrador encendió el escáner experimental con la cámara.
+  /// Viene apagado por defecto y, si no llega, está apagado.
+  final bool escanerCamaraActivo;
+
+  /// Cuántos segundos dura cada medición con la cámara (20 a 60), o `null`
+  /// si no llegó: sin ese número el escáner no se ofrece.
+  final int? escanerSegundos;
+
   const ReglasTelemedicina({
     required this.minutosAntes,
     required this.minutosDespues,
     required this.horasRespuesta,
     required this.diasSeguimiento,
     required this.maxArchivosConsulta,
+    this.medicionesPacienteActiva = false,
+    this.escanerCamaraActivo = false,
+    this.escanerSegundos,
   });
 
+  /// El escáner se ofrece si está encendido y se sabe cuánto dura.
+  bool get escanerDisponible =>
+      medicionesPacienteActiva &&
+      escanerCamaraActivo &&
+      escanerSegundos != null;
+
+  /*
+   * Los tres campos de las mediciones son opcionales porque un servidor
+   * anterior no los conoce: sin ellos, el módulo no se ofrece (nunca se
+   * enciende por suposición). Si llegan, se leen estrictos, como el resto.
+   */
   factory ReglasTelemedicina._leer(_Lector l) => ReglasTelemedicina(
     minutosAntes: l.entero('minutosAntes'),
     minutosDespues: l.entero('minutosDespues'),
     horasRespuesta: l.entero('horasRespuesta', minimo: 1),
     diasSeguimiento: l.entero('diasSeguimiento'),
     maxArchivosConsulta: l.entero('maxArchivosConsulta'),
+    medicionesPacienteActiva:
+        l.booleanoOpcional('medicionesPacienteActiva') ?? false,
+    escanerCamaraActivo: l.booleanoOpcional('escanerCamaraActivo') ?? false,
+    escanerSegundos: l.enteroOpcional(
+      'escanerSegundos',
+      minimo: 20,
+      maximo: 60,
+    ),
   );
 
   @override
@@ -305,6 +340,9 @@ class ReglasTelemedicina extends Equatable {
     horasRespuesta,
     diasSeguimiento,
     maxArchivosConsulta,
+    medicionesPacienteActiva,
+    escanerCamaraActivo,
+    escanerSegundos,
   ];
 }
 
@@ -524,6 +562,21 @@ class _Lector {
 
     return numero;
   }
+
+  /// Un entero entre [minimo] y [maximo], o `null` si no llegó.
+  int? enteroOpcional(String campo, {int minimo = 0, int? maximo}) {
+    final valor = _datos[campo];
+    if (valor == null) return null;
+
+    final numero = entero(campo, minimo: minimo);
+    if (maximo != null && numero > maximo) _falta(campo, valor);
+
+    return numero;
+  }
+
+  /// Un sí o no, o `null` si no llegó.
+  bool? booleanoOpcional(String campo) =>
+      _datos[campo] == null ? null : booleano(campo);
 
   bool booleano(String campo) {
     final valor = _datos[campo];
