@@ -11,6 +11,8 @@ import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
 import 'package:app_cliniq/features/avisos/data/avisos_service.dart';
 import 'package:app_cliniq/features/avisos/providers/campana_cubit.dart';
+import 'package:app_cliniq/features/ayuda/data/ayuda_contextual_service.dart';
+import 'package:app_cliniq/features/ayuda/providers/ayuda_contextual_cubit.dart';
 import 'package:app_cliniq/features/citas/data/citas_service.dart';
 import 'package:app_cliniq/features/citas/providers/citas_bloc.dart';
 import 'package:app_cliniq/features/consultas/providers/consultas_bloc.dart';
@@ -79,6 +81,10 @@ Future<void> montarTablero(
           ),
           BlocProvider(
             create: (_) => EncuestasCubit(EncuestasService(dio, cache)),
+          ),
+          BlocProvider(
+            create: (_) =>
+                AyudaContextualCubit(AyudaContextualService(dio, cache)),
           ),
         ],
         child: MaterialApp(theme: temaCliniq(), home: const DashboardPage()),

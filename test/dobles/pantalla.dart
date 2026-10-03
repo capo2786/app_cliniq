@@ -14,6 +14,11 @@ import 'package:app_cliniq/features/auth/data/almacen_de_sesion.dart';
 import 'package:app_cliniq/features/auth/data/models/usuario.dart';
 import 'package:app_cliniq/features/auth/providers/auth_bloc.dart';
 import 'package:app_cliniq/features/auth/providers/auth_state.dart';
+import 'package:app_cliniq/features/ayuda/data/ayuda_contextual_service.dart';
+import 'package:app_cliniq/features/ayuda/data/models/ayuda_de_accion.dart';
+import 'package:app_cliniq/features/ayuda/providers/ayuda_contextual_cubit.dart';
+import 'package:app_cliniq/core/storage/cache_local.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,12 +47,17 @@ Usuario pacienteDePrueba({List<String>? permisos}) => Usuario({
 
 /// Pinta [pagina] con la sesión de [usuario] abierta, en un teléfono de
 /// tamaño normal. Devuelve el `AuthBloc`, por si la prueba lo necesita.
+///
+/// Con [ayuda], los textos de los botones de ayuda ya cargados (como los
+/// deja `GET /ayuda/contextual`); sin él, no hay textos y los botones no se
+/// enseñan.
 Future<AuthBloc> montarPantalla(
   WidgetTester tester,
   Widget pagina, {
   Usuario? usuario,
   ConfigPublica? config,
   CatalogosState? catalogos,
+  Map<String, AyudaDeAccion>? ayuda,
 }) async {
   tester.view.physicalSize = const Size(1080, 2400);
   tester.view.devicePixelRatio = 2.75;
@@ -63,12 +73,23 @@ Future<AuthBloc> montarPantalla(
   )..emit(AuthAutenticado(usuario ?? pacienteDePrueba()));
   addTearDown(auth.close);
 
+  final textos = ayuda == null
+      ? null
+      : AyudaContextualCubit(
+          AyudaContextualService(Dio(), CacheEnMemoria()),
+          inicial: AyudaContextualState(uid: 'u1', mapa: ayuda, alDia: true),
+        );
+  if (textos != null) addTearDown(textos.close);
+
   await tester.pumpWidget(
     conDatosDeLaClinica(
       config: config,
       catalogos: catalogos,
-      BlocProvider.value(
-        value: auth,
+      MultiBlocProvider(
+        providers: [
+          BlocProvider.value(value: auth),
+          if (textos != null) BlocProvider.value(value: textos),
+        ],
         child: MaterialApp(theme: temaCliniq(), home: pagina),
       ),
     ),
