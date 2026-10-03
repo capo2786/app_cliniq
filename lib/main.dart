@@ -32,6 +32,7 @@ import 'features/dependientes/providers/dependientes_bloc.dart';
 import 'features/encuestas/providers/encuestas_cubit.dart';
 import 'features/inicio/presentacion/dashboard_page.dart';
 import 'features/legal/presentacion/aceptacion_legal_page.dart';
+import 'features/mediciones/presentacion/envio_de_pendientes.dart';
 import 'features/navegacion/presentacion/receptor_de_enlaces.dart';
 import 'features/navegacion/providers/menu_cubit.dart';
 
@@ -216,7 +217,12 @@ class CliniqApp extends StatelessWidget {
                 home: EsperaDatosDeLaClinica(
                   child: ReceptorDeEnlaces(
                     enlaces: enlacesEntrantes,
-                    child: const PuertaDeEntrada(),
+                    // Las mediciones registradas sin red salen al volver.
+                    child: EnvioDeMedicionesPendientes(
+                      cola: Servicios.colaMediciones,
+                      red: Servicios.red,
+                      child: const PuertaDeEntrada(),
+                    ),
                   ),
                 ),
               ),

@@ -80,6 +80,9 @@ Map<String, dynamic> configJson({
     'horasRespuesta': 48,
     'diasSeguimiento': 7,
     'maxArchivosConsulta': 30,
+    'medicionesPacienteActiva': true,
+    'escanerCamaraActivo': false,
+    'escanerSegundos': 30,
   }, telemedicina),
   'archivos': _mezclar({
     'tamanoMaximoMb': 20,

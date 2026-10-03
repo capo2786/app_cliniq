@@ -66,6 +66,15 @@ dependencies:
   share_plus: ^13.3.0
   crypto: ^3.0.7
 
+  # Mediciones del paciente y el escáner experimental de signos vitales
+  # (ver «Mis signos vitales» y «Escáner experimental» en el README). La
+  # cámara entrega los cuadros y enciende el flash; fftea es la FFT (Dart
+  # puro) del procesamiento de la señal; fl_chart dibuja la evolución.
+  # Ninguno hace red: todo el escáner ocurre en el teléfono.
+  camera: ^0.12.1
+  fftea: ^1.5.0+1
+  fl_chart: ^1.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

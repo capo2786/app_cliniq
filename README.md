@@ -92,6 +92,7 @@ arranca con valores inventados.**
 | Rejilla de horarios | `agenda.pasoMinutos`, `minutosAnticipacionReserva`, `diasHorizonteReserva`, `horaInicioTarde`, `horaInicioNoche`, `duracionPresencial/Telemedicina/Asincrona` | Agendar |
 | Ventana de la sala de video | `telemedicina.minutosAntes`, `minutosDespues` | Botón de la videoconsulta, «Sala abierta» |
 | Consultas en línea | `telemedicina.horasRespuesta`, `diasSeguimiento`, `maxArchivosConsulta` | Textos y tope de archivos |
+| Mediciones del paciente | `telemedicina.medicionesPacienteActiva`, `escanerCamaraActivo` (apagado por defecto), `escanerSegundos` (20–60) | «Mis signos vitales» y el escáner experimental; sin los campos (un servidor anterior), no se ofrecen |
 | Archivos | `archivos.tamanoMaximoMb`, `archivos.tipos` | Selectores y validación antes de subir |
 | Seguridad | `seguridad.passwordMinimo`, `bloqueoMinutos`, `otpMinutos`, `resetMinutos`, `reenvioSegundos` | Acceso, código, recuperación, cambiar contraseña, registro («Reenviar enlace») y contraseña nueva |
 | Validar la cédula con el módulo 10 | `general.validarCedula` | Dependientes y registro |
@@ -203,6 +204,23 @@ antes de tocarla.
 | `flutter_inappwebview` ^6.1.5 | La sala de Jitsi de la clínica en un WebView de la propia aplicación: navegación limitada a la sala, la cámara y el micrófono solo para el servidor de video, un guion al cargar y los eventos de la página. También las páginas de fuera (enlaces externos del menú, enlaces web de los artículos y de los documentos), en la pantalla de páginas web. Solo Android e iOS |
 | `permission_handler` ^13.0.2 | Pedir la cámara y el micrófono antes de abrir la sala, y abrir los ajustes del teléfono si ya no se puede preguntar |
 
+### Mis signos vitales y escáner experimental
+
+| Paquete | Para qué | Tamaño aproximado |
+| --- | --- | --- |
+| `camera` ^0.12.1 | Los cuadros de la cámara (YUV420 o NV21 en Android, BGRA en iOS) y el flash como linterna en el modo dedo (`FlashMode.torch`). En Android trae CameraX 1.6 (`camera_android_camerax`); en iOS usa AVFoundation del sistema (`camera_avfoundation`, iOS 13+) | ~1–2 MB en Android (CameraX), ~0,2 MB en iOS |
+| `fftea` ^1.5.0+1 | La FFT del procesamiento de la señal (Dart puro, MIT). El filtro Butterworth es propio (biquads de 20 líneas, probados): `iirjdart` es de 2022 y no admite Dart 3 | <50 KB |
+| `fl_chart` ^1.2.0 | El gráfico de la evolución del pulso y de la presión en «Mis signos vitales» (Dart puro) | ~0,3 MB |
+
+Ninguno hace red: el escáner entero ocurre en el teléfono. **No se usa
+`google_mlkit_face_detection`**, aunque el contrato lo nombraba: el SDK de ML
+Kit, según los términos de Google, puede contactar a sus servidores
+(métricas de uso y actualizaciones) y el dueño pidió que el escáner no use
+dependencias que hagan red; además sumaba ~7 MB en Android y obligaba a
+subir iOS a 15.5. En su lugar, el modo rostro mide la piel dentro del óvalo
+que la persona ve en pantalla (ver «Escáner experimental»). Si más adelante
+se acepta ML Kit, entra detrás de `ExtractorDeRostro` sin tocar el resto.
+
 ### Fechas y recordatorios
 
 | Paquete | Para qué |
@@ -257,6 +275,12 @@ El identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
   el `FileProvider` que trae `share_plus` en su manifiesto.
   `flutter_file_dialog` pide `minSdk` 24, que es el de Flutter.
 
+- **Escáner experimental.** Usa la misma `CAMERA` con el paquete `camera`:
+  la trasera con el flash como linterna (`FlashMode.torch`, sin permiso
+  aparte) o la frontal. `android.hardware.camera.flash` se declara **no
+  obligatorio**: un teléfono sin flash instala igual y el escáner le propone
+  el modo rostro. El permiso se pide al empezar a medir.
+
 - `MainActivity` extiende **`FlutterFragmentActivity`**: `local_auth` la
   necesita para mostrar el diálogo de huella. Con la de la plantilla, el
   botón de la huella no hace nada.
@@ -273,7 +297,9 @@ El identificador es `ec.cliniq.sage.app` y el nombre visible, «Cliniq».
 
 **iOS** (`ios/Runner/Info.plist`): descripciones de uso de Face ID
 (`NSFaceIDUsageDescription`), de la cámara (`NSCameraUsageDescription`: la
-videoconsulta y las fotos de los adjuntos), del micrófono
+videoconsulta, las fotos de los adjuntos y, si la clínica lo activa, el
+escáner experimental, cuyas imágenes se procesan en el teléfono y no se
+guardan ni se envían), del micrófono
 (`NSMicrophoneUsageDescription`: la videoconsulta) y de la fototeca
 (`NSPhotoLibraryUsageDescription`), en español, y solo orientación vertical
 en teléfono. La plataforma mínima es **iOS 15.1** (`platform :ios, '15.1'` en
@@ -425,6 +451,10 @@ lib/
     mi_salud/                 la historia clínica que ve el paciente: recetas (en sus dos
                               partes), órdenes, certificados de reposo, la firma electrónica
                               y el visor de PDF
+    mediciones/               «Mis signos vitales» (lista, evolución, Registrar, la cola sin
+                              red) y el escáner experimental: escaner/ (cámara, extracción,
+                              motor, cubit y pasos) y dominio/procesamiento_ppg.dart con
+                              dominio/ppg/ (el cálculo puro de la FC, la FR y la calidad)
     ayuda/                    centro de ayuda («Tu guía» primero, búsqueda, categorías y
                               artículos en Markdown nativo) y los botones de ayuda («?»)
     soporte/                  mis tickets, ticket nuevo y la conversación con soporte
@@ -510,6 +540,7 @@ de la campana y los enlaces de los textos (`abrirRuta`, en
 | `/portal/encuesta/:citaId` | La encuesta de la cita |
 | `/legal/:slug` | El documento legal |
 | `/mi-salud` | Mi salud (también desde los avisos «Tu receta está lista» y «Tu certificado de reposo está listo») |
+| `/portal/mediciones` | Mis signos vitales |
 | `/ayuda`, `/soporte`, `/soporte/tickets/:id` | El centro de ayuda, soporte y el ticket (dentro de un artículo, `/ayuda?articulo=<id>` abre ese artículo) |
 
 La consulta y el fragmento de la ruta se ignoran. Una ruta del menú que la
@@ -1085,6 +1116,199 @@ Todo es opcional: los documentos viejos se leen y se enseñan igual.
   sigue abierta; si la clínica no lo quiere, la alternativa es la carpeta
   de soporte de la aplicación marcada fuera de la copia.
 
+## Mis signos vitales
+
+Lo que el paciente mide en casa, para que su médico lo vea en la consulta
+(`/portal/mediciones`; `lib/features/mediciones/`). Se entra desde **Mi
+salud** (del titular o del dependiente elegido), desde el **detalle de una
+cita de telemedicina pendiente** («Mis signos vitales para esta cita»),
+desde una **consulta en línea abierta** («Compartir mis signos vitales») y
+por la ruta `/portal/mediciones` (el administrador la puede poner en el
+menú). Todo depende de `telemedicina.medicionesPacienteActiva`: apagado, no
+hay accesos ni «Registrar».
+
+- **La lista**, por día en la hora de la clínica, la más reciente arriba:
+  el valor con su unidad, el tipo, la hora y el momento, y sus insignias:
+  «Cámara · experimental», «Aparato de casa» o «A mano»; la calidad de las
+  de la cámara (buena, regular o baja); «Enviada a tu médico» y «Usada en
+  una atención». Lo propio que el médico no usó se puede borrar (pregunta
+  antes; el servidor lo comprueba). «Ver mediciones anteriores» pide la
+  página siguiente.
+- **La evolución**: un gráfico simple (`fl_chart`) de la presión (sistólica
+  y diastólica) y del pulso, si hay dos puntos o más, con las 30 últimas.
+- **«Registrar»**: el tipo (presión, pulso, saturación, temperatura,
+  glucosa, peso o respiraciones), el valor —la presión con la alta y la
+  baja—, cómo se midió (con un aparato; el pulso y las respiraciones,
+  también contando a mano), el momento (en reposo o tras actividad; en
+  ayunas o después de comer para la glucosa) y la hora, que por defecto es
+  ahora (de los últimos 30 días, en la hora de la clínica). Se valida con
+  los rangos del servidor (FC 30–220, FR 6–60, PA 60–260 / 30–160 con la
+  sistólica mayor, SpO2 70–100, temperatura 34–43, glucosa 20–600, peso
+  1–400) y la unidad la fija el servidor. Abierto desde una cita o una
+  consulta, ofrece «Compartir con mi médico» (`citaId` o `consultaId`).
+- **«Medir con la cámara (experimental)»**, solo si
+  `telemedicina.escanerCamaraActivo` (ver «Escáner experimental»).
+- **Sin red** (`ColaMediciones`): registrar intenta enviar; sin conexión,
+  el envío queda en la caché cifrada (`mediciones-pendientes:<uid>`) y se
+  enseña como «Pendiente de enviar». Sale solo al entrar, al volver a la
+  aplicación, al recuperar la red (`EnvioDeMedicionesPendientes`, en
+  `main.dart`) y al abrir la pantalla. Si el servidor lo rechaza (400: un
+  valor fuera de rango, más de 30 días; 409: la cámara apagada), queda
+  marcado con su mensaje, no se reintenta y la persona lo descarta. Lo
+  pendiente es de la persona: se borra al cerrar sesión, como todo lo
+  personal. Nunca se inventa nada: lo pendiente son números que la persona
+  escribió o midió, y no se hacen pasar por guardados en la clínica.
+- **El servicio** (`MedicionesService`): `GET /portal/mediciones` (el
+  titular sin `pacienteId`; un dependiente, con el suyo), con copia de la
+  primera página para verla sin red; `POST` con hasta 10 mediciones;
+  `DELETE /portal/mediciones/:id`. El contrato dice «paginadas» sin fijar
+  la forma: se leen `{items, total, page, limit}` (o `pagina`/`limite`),
+  `{items, hayMas}` y una lista sola, y la página siguiente se pide con el
+  nombre de parámetro que use el servidor.
+
+## Escáner experimental
+
+Mide la **frecuencia cardiaca** con la cámara y, con buena calidad, la
+**frecuencia respiratoria aproximada**. **Nunca presión, saturación,
+temperatura ni glucosa**: sin hardware específico no son confiables y se
+registran desde los aparatos de casa (el aviso lo explica). Lo enciende el
+administrador (`telemedicina.escanerCamaraActivo`, apagado por defecto) y
+dura `telemedicina.escanerSegundos` (30 por defecto). **No es un
+dispositivo médico**: se rotula experimental y referencial, y el médico
+decide si usa el valor (queda marcado su origen).
+
+- **La primera vez**, el aviso: «Función experimental: no es un dispositivo
+  médico. Los valores son referenciales; no la uses para decidir
+  tratamientos. Ante síntomas de alarma llama al
+  {{clinica.telefonoEmergencia}}», con «Entiendo», recordado en la caché
+  cifrada por persona (`escaner-aviso:<uid>`).
+- **Modos**: **Dedo (recomendado)**, la yema sobre la cámara trasera y el
+  flash encendido, sin apretar (con ilustración), o **Rostro (beta)**, la
+  cámara frontal con la cara dentro de un óvalo, buena luz y quieto.
+- **Mientras mide**: la onda en vivo, la cuenta regresiva y la calidad en
+  vivo con el consejo del momento («Cubre bien la cámara y el flash con la
+  yema», «Apoya el dedo sin apretar», «Quédate quieto», «Más luz»,
+  «Coloca tu rostro dentro del óvalo»). Si la calidad se queda por debajo
+  de 0,3 durante 8 segundos, se detiene con un consejo y «Reintentar». Si
+  la cámara deja de enviar cuadros 5 segundos o la aplicación pasa a
+  segundo plano, también. La cuenta va con el tiempo de los propios
+  cuadros.
+- **El resultado**: «78 lpm» con la calidad (buena desde 0,7, regular desde
+  0,4, baja por debajo; por debajo de 0,3 no se da ningún valor: «No
+  pudimos medir esta vez» con un consejo), la FR si la calidad es ≥ 0,6 y
+  hay un pico respiratorio claro, el momento (en reposo o tras actividad) y
+  quién lo calculó: «Calculado en el teléfono» o «Analizado en el servidor
+  (experimental)». Después, «Guardar en mis signos vitales», «Enviar a mi
+  médico» (adjunta la medición a la **próxima cita de telemedicina** o a
+  una **consulta en línea abierta** de ese paciente, la que la persona
+  elija; abierto desde una cita o una consulta, a esa) o «Descartar». Se
+  guardan `FC` (y `FR` si salió) con el método `CAMARA_DEDO` o
+  `CAMARA_ROSTRO`, la calidad y el motor en las notas («motor: interno-ppg
+  v1»).
+- **Privacidad** (LOPDP), dicho en una línea en cada paso: **ninguna imagen
+  se guarda ni se envía**. `FuenteCamara` reduce cada cuadro, en el
+  momento, a unos pocos promedios (`CuadroPpg`) y lo suelta; los números se
+  juntan solo mientras dura la medición y se borran al terminar, cancelar o
+  descartar. Al servidor solo llegan números: el resultado y, para el
+  análisis experimental, la serie de promedios por cuadro.
+
+### Cómo funciona
+
+```
+cámara ─► FuenteCamara ─► CuadroPpg ─► SerieSenal ─► MotorSignosCamara ─► ResultadoEscaner
+          (camera)        (números)    (números)     MotorInterno, o el servidor
+```
+
+- **La fuente** (`FuenteDeCuadros`, inyectable): la de verdad,
+  `FuenteCamara`, abre la trasera con la linterna (y fija la exposición y el
+  enfoque al encenderla) o la frontal, en la resolución más baja a 30
+  cuadros por segundo; las pruebas usan `FuenteFalsa` con señales
+  sintéticas.
+- **La extracción** (`extractor_de_cuadros.dart`, pura): en el dedo, el
+  promedio del rojo y de la luminancia Y del centro de la imagen, la
+  cobertura (la fracción de puntos rojos y brillantes, como se ve la yema
+  con el flash detrás) y la saturación (rojos quemados). En el rostro, la
+  frente y las dos mejillas dentro del óvalo de la pantalla y, de ahí, solo
+  los puntos de **piel** por su color (YCbCr); qué puntos son piel se decide
+  cada 15 cuadros. Si hay poca piel, «Coloca tu rostro dentro del óvalo».
+- **La serie** (`SerieSenal`) separa la extracción del cálculo y se escribe
+  como `{metodo, t (ms), canales: {y, r} | {r, g, b}}`.
+- **El cálculo** (`dominio/procesamiento_ppg.dart` y `dominio/ppg/`, puro y
+  probado): remuestrear a 30 Hz; quitar la tendencia (*smoothness priors*,
+  Tarvainen 2002); pasa banda Butterworth de 0,7 a 3,5 Hz (orden 4 por lado,
+  de ida y vuelta, biquads propios); recortar artefactos (3,5 desviaciones
+  robustas); FC por el pico del espectro (Welch con `fftea`, segmentos de
+  12 s con Hann) contrastada con el conteo de picos; calidad (SQI) por la
+  prominencia del pico (fundamental y primer armónico sobre la banda), el
+  acuerdo entre los dos métodos, la regularidad de los intervalos y, en el
+  dedo, la cobertura y la saturación; FR por la línea base y la amplitud de
+  los latidos en 0,1–0,5 Hz, solo si la calidad es ≥ 0,6, si la modulación
+  es apreciable, si las dos coinciden y si el pico es claro. El rostro pasa
+  antes por **POS** (Wang et al., 2017). Con el rojo quemado, el dedo mide
+  con la luminancia.
+- **El motor** (`MotorSignosCamara`): el de la aplicación es
+  `MotorInterno` («interno-ppg v1» en el dedo, «interno-pos v1» en el
+  rostro). La interfaz recibe solo la serie de números, así que el cálculo
+  se puede cambiar sin tocar las pantallas.
+- **El análisis en el servidor (experimental)** (`AnalisisEnServidor`,
+  `AnalizadorDeMedicion`): al terminar, si hay red y la serie dura de 10 a
+  90 s, se manda la serie a `POST /portal/mediciones/analizar` y se enseña
+  el resultado del servidor (`fc`, `fr?`, `vfc?` con SDNN y RMSSD,
+  `calidad`, `motor`, `advertencias`), con las mismas reglas de la
+  aplicación (sin valor por debajo de 0,3, sin FR por debajo de 0,6). Si
+  falla, no hay red o tarda más de 10 s, queda el cálculo del teléfono, y
+  la pantalla lo dice. El servidor no guarda nada; lo que se guarda es lo
+  que la persona confirma, con su motor en las notas.
+
+### Precisión con señales sintéticas
+
+`test/procesamiento_ppg_test.dart` genera una PPG realista (fundamental con
+dos armónicos y variabilidad latido a latido, ~30 cuadros por segundo con
+temblor y cuadros perdidos) a 60, 72 y 110 lpm, con 20 semillas por caso:
+
+| Caso | Error máximo de la FC | Calidad mínima |
+| --- | --- | --- |
+| Limpia | ±0,7 lpm (exigido: ±3) | ≥ 0,7 (buena) |
+| Ruido moderado (σ igual a la amplitud del pulso) | ±1,4 lpm (exigido: ±5) | ≥ 0,6 |
+| Deriva diez veces el pulso | ±0,7 lpm | ≥ 0,7 |
+| Tres movimientos bruscos | ±0,9 lpm (exigido: ±5) | — |
+| Señal plana / solo ruido | sin FC | < 0,1 / < 0,4 |
+
+La FR, con respiración a 10, 15 y 20 rpm: ±2 rpm; sin respiración en la
+señal (limpia, con ruido o con deriva) nunca se da. POS acierta (±5 lpm)
+con una luz que parpadea a 1,6 Hz que engaña al canal verde solo.
+
+### Cómo probarlo en un teléfono (pendiente)
+
+No hubo teléfono para probar la cámara real. Para validarlo (Android e iOS,
+en release):
+
+1. Encender el escáner en el panel (Configuración › Telemedicina).
+2. **Con un oxímetro de pulso de dedo** en una mano y el teléfono en la
+   otra: medir **en reposo** (sentado 5 minutos) y **tras actividad** (dos
+   minutos de sentadillas o subir escaleras), cinco veces cada uno, en el
+   modo dedo y en el rostro. Anotar la FC del oxímetro al terminar cada
+   medición. Lo esperable: en el dedo, dentro de ±5 lpm la mayoría de las
+   veces con calidad buena; en el rostro, más dispersión, sobre todo con
+   poca luz. Repetir con piel clara y oscura, con luz de día y de noche.
+3. Que la calidad baje y aparezca el consejo al: levantar el dedo («Cubre
+   bien la cámara…»), apretar fuerte («Apoya el dedo sin apretar»), mover la
+   mano o la cabeza («Quédate quieto»), apagar la luz en el modo rostro
+   («Más luz») y sacar la cara del óvalo.
+4. Que el flash se encienda en el modo dedo y **se apague** al terminar,
+   cancelar, salir de la pantalla o pasar la aplicación a segundo plano.
+5. El permiso: negarlo una vez («Reintentar») y para siempre («Abrir
+   ajustes»).
+6. Que nada quede en el teléfono: ningún archivo nuevo en la carpeta de la
+   aplicación (`adb shell run-as ec.cliniq.sage.app ls -R`) y, con un proxy
+   (Charles, mitmproxy), que solo salgan números (el `POST
+   /portal/mediciones` y, si hay red, `POST /portal/mediciones/analizar`).
+7. En el modo rostro, que la frente y las mejillas caigan dentro del óvalo
+   en la orientación del sensor de cada teléfono (si la cobertura de piel
+   sale baja con la cara bien puesta, revisar la rotación en
+   `aPixelDelSensor`).
+8. La temperatura del teléfono y la batería en tres mediciones seguidas.
+
 ## Botones de ayuda
 
 Cada pantalla y cada acción que no se entiende sola lleva un **«?»**
@@ -1117,6 +1341,8 @@ artículo en el centro de ayuda (`CentroAyudaPage(articuloInicial:)`).
 | `app.videoconsulta` | Barra de la pantalla de la videoconsulta y junto a «Videoconsulta» en el detalle de la cita |
 | `app.consultas`, `app.consultas.nueva` | Barra de Consultas en línea y de la consulta nueva |
 | `app.miSalud` | Barra de Mi salud |
+| `app.mediciones` | Barra de «Mis signos vitales» |
+| `app.escaner` | Barra del escáner experimental |
 | `app.miSalud.receta`, `app.miSalud.orden`, `app.miSalud.certificado` | Barra de la receta, la orden y el certificado |
 | `app.dependientes`, `app.perfil`, `app.arco`, `app.soporte`, `app.avisos`, `app.ayuda` | Barra de su pantalla |
 
@@ -1219,6 +1445,10 @@ cita no está entre las de la persona, se entra igual y el servidor decide.
 - Durante quince segundos después de una caída, `CorteRapidoSinRed` corta las
   peticiones sin esperar el plazo: la pantalla cae a lo guardado al
   instante.
+- Las mediciones registradas sin red quedan en la caché cifrada
+  (`mediciones-pendientes:<uid>`), se enseñan como «Pendiente de enviar» y
+  salen solas al entrar, al volver a la aplicación y al recuperar la red
+  (ver «Mis signos vitales»).
 - Los PDF de recetas, órdenes y certificados quedan en la carpeta de
   documentos de la aplicación y se abren sin red (ver «Recetas, órdenes
   y certificados»). Los textos de los botones de ayuda, en la caché
@@ -1331,6 +1561,14 @@ fvm flutter test
 | `botones_de_ayuda_test.dart` | Las claves `app.*` en sus pantallas: el tablero que las carga una vez (y el inicio sin textos), Mi salud y sus documentos, el centro de ayuda y el detalle de la cita |
 | `recorrido_app_test.dart` | La aplicación entera contra una API de mentira, también con el texto agrandado |
 | `recorrido_consultas_test.dart` | Videoconsulta, consultas en línea de punta a punta y retomar un borrador, también con el texto agrandado |
+| `procesamiento_ppg_test.dart` | El procesamiento de la PPG con señales sintéticas: remuestreo, tendencia, el filtro Butterworth (ganancias, fase cero, arranque), el espectro (Welch, Parseval, armónicos, bordes), el conteo de picos, la FC a 60, 72 y 110 lpm limpia, con ruido, deriva y movimientos, la señal plana y el solo ruido (calidad baja), la cobertura y la saturación del dedo, la FR (y que no se invente) y POS |
+| `extractor_de_cuadros_test.dart` | De la imagen a los números: YUV420, NV21 y BGRA, la yema, la saturación, la piel del rostro, la rotación del sensor y la serie con su JSON (solo números) |
+| `motor_signos_camara_test.dart` | El motor del teléfono (dedo, luminancia, rostro, sin dedo, en vivo y sus consejos), el análisis del servidor (lectura, reglas, con red, falla, plazo, sin red, serie corta) y a dónde se envía al médico |
+| `escaner_cubit_test.dart` | El escáner con una fuente falsa: el aviso recordado, medir y guardar, enviar al médico, sin red, el 409 de la cámara apagada, la calidad baja, el permiso y salir de la aplicación a mitad |
+| `escaner_page_test.dart` | Las pantallas del escáner: el aviso con el número de emergencias, los modos, la medición, el resultado (sin presión ni SpO2), el del servidor, el plan B, enviar al médico, sin la yema y el rostro con su óvalo |
+| `mediciones_datos_test.dart` | El modelo, las reglas (rangos, hora, calidad), `/portal/mediciones` (paginación, copia sin red, POST y DELETE) y la cola sin red en la caché |
+| `mis_signos_vitales_page_test.dart` | «Mis signos vitales» (insignias, evolución, «?», el escáner según la configuración, borrar, error), «Registrar» (el pulso, la presión, sin red, desde una cita) y el acceso desde la cita |
+| `envio_pendientes_test.dart` | Lo registrado sin red sale al entrar y al volver la red |
 
 Las pruebas de blocs nunca esperan un tiempo fijo: esperan el estado que
 les interesa, y el sondeo del detalle recibe los latidos de la prueba. La
@@ -1431,6 +1669,20 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
   agrandado, y que la hoja se lea bien con un texto largo.
 - **Avisos push y pagos**: enchufar las costuras. Sin push, la respuesta del
   médico a una consulta llega por correo y se ve al abrir la aplicación.
+- **El escáner, en el teléfono**: ver «Cómo probarlo en un teléfono» en
+  «Escáner experimental» (comparar con un oxímetro de pulso en reposo y
+  tras actividad).
+- **Mediciones, contra el servidor nuevo**: `/portal/mediciones` y
+  `/portal/mediciones/analizar` se programaron contra la forma del
+  contrato y se probaron con dobles. Falta probarlos de punta a punta y
+  confirmar con el API: la forma de la paginación (se aceptan `page`/`limit`
+  y `pagina`/`limite`), la respuesta del `POST` y los umbrales de calidad
+  (buena ≥ 0,7, regular ≥ 0,4), que el panel debe pintar igual. Un `POST`
+  que llegó al servidor pero cuya respuesta se perdió se reenviará desde la
+  cola (el contrato no trae una clave de idempotencia).
+- **ML Kit para el rostro**: no se usó (ver «Mis signos vitales y escáner
+  experimental» en Dependencias). Si el dueño lo acepta, entra detrás de
+  `ExtractorDeRostro`.
 - **Mi salud**: los adjuntos de las atenciones cerradas
   (`GET /portal/mi-salud`, sección 6 del contrato de telemedicina) todavía
   no se enseñan; `ArchivoMeta`, el visor y `abrirArchivo` ya sirven para eso.

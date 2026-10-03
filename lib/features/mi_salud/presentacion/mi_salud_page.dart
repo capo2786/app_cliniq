@@ -20,6 +20,7 @@ import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../consultas/presentacion/widgets/adjuntos.dart';
 import '../../dependientes/data/dependientes_service.dart';
+import '../../mediciones/presentacion/widgets/accesos_signos_vitales.dart';
 import '../data/mi_salud_service.dart';
 import '../data/models/mi_salud.dart';
 import '../dominio/reglas_mi_salud.dart';
@@ -192,6 +193,10 @@ class _VistaMiSaludState extends State<_VistaMiSalud> {
                       const SizedBox(height: 22),
                       _Mediciones(signos: datos.ultimosSignos!),
                     ],
+                    AccesoSignosVitales(
+                      pacienteId: state.para.isEmpty ? null : state.para,
+                      nombre: state.para.isEmpty ? null : datos.paciente.nombre,
+                    ),
                     const SizedBox(height: 22),
                     const EtiquetaSeccion('Consultas'),
                     if (atenciones.isEmpty)

@@ -10,6 +10,8 @@ import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../agendar/presentacion/agendar_page.dart';
+import '../../../mediciones/dominio/destinos_medico.dart';
+import '../../../mediciones/presentacion/widgets/accesos_signos_vitales.dart';
 import '../../data/models/cita.dart';
 import '../../dominio/reglas_citas.dart';
 import '../../dominio/videoconsulta.dart';
@@ -209,6 +211,16 @@ class DetalleCita extends StatelessWidget {
               ],
             ),
             BotonVideoconsulta(cita: cita),
+          ],
+          if (cita.pendiente && cita.tipo == TipoCita.telemedicina) ...[
+            const SizedBox(height: 16),
+            BotonSignosVitales(
+              key: const Key('cita-signos-vitales'),
+              texto: 'Mis signos vitales para esta cita',
+              destino: DestinoMedico.deCita(cita),
+              pacienteId: cita.paraDependiente ? cita.pacienteId : null,
+              pacienteNombre: cita.paraDependiente ? cita.pacienteNombre : null,
+            ),
           ],
           const SizedBox(height: 22),
           if (cambiable)

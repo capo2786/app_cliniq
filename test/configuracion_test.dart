@@ -236,6 +236,55 @@ void main() {
       expect(() => ConfigPublica.desdeJson(json), throwsFormatException);
     });
 
+    test(
+      'las mediciones y el escáner: apagados si el servidor no los manda',
+      () {
+        final porDefecto = configDePrueba().telemedicina;
+        expect(porDefecto.medicionesPacienteActiva, isTrue);
+        expect(porDefecto.escanerCamaraActivo, isFalse);
+        expect(porDefecto.escanerSegundos, 30);
+        expect(porDefecto.escanerDisponible, isFalse);
+
+        final encendido = configDePrueba(
+          telemedicina: {'escanerCamaraActivo': true, 'escanerSegundos': '45'},
+        ).telemedicina;
+        expect(encendido.escanerDisponible, isTrue);
+        expect(encendido.escanerSegundos, 45);
+
+        // Un servidor anterior: sin los campos, nada se enciende por
+        // suposición.
+        final json = configJson();
+        (json['telemedicina'] as Map)
+          ..remove('medicionesPacienteActiva')
+          ..remove('escanerCamaraActivo')
+          ..remove('escanerSegundos');
+        final anterior = ConfigPublica.desdeJson(json).telemedicina;
+        expect(anterior.medicionesPacienteActiva, isFalse);
+        expect(anterior.escanerCamaraActivo, isFalse);
+        expect(anterior.escanerSegundos, isNull);
+
+        // Encendido pero sin duración: no se ofrece.
+        final sinDuracion = configJson(
+          telemedicina: {'escanerCamaraActivo': true},
+        );
+        (sinDuracion['telemedicina'] as Map).remove('escanerSegundos');
+        expect(
+          ConfigPublica.desdeJson(sinDuracion).telemedicina.escanerDisponible,
+          isFalse,
+        );
+
+        // Si llegan, se leen estrictos.
+        expect(
+          () => configDePrueba(telemedicina: {'escanerSegundos': 90}),
+          throwsFormatException,
+        );
+        expect(
+          () => configDePrueba(telemedicina: {'escanerCamaraActivo': 'quizá'}),
+          throwsFormatException,
+        );
+      },
+    );
+
     test('los colores de marca son opcionales: si no son un color, no hay', () {
       expect(configDePrueba().clinica.colorPrimario, isNull);
       expect(

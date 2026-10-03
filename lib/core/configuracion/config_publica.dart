@@ -282,13 +282,28 @@ class ReglasTelemedicina extends Equatable {
   final int diasSeguimiento;
   final int maxArchivosConsulta;
 
+  /// Mediciones del paciente («Mis signos vitales») y el escáner
+  /// experimental con su duración (20–60 s). Son opcionales porque un
+  /// servidor anterior no los manda: sin ellos el módulo no se ofrece.
+  final bool medicionesPacienteActiva;
+  final bool escanerCamaraActivo;
+  final int? escanerSegundos;
+
   const ReglasTelemedicina({
     required this.minutosAntes,
     required this.minutosDespues,
     required this.horasRespuesta,
     required this.diasSeguimiento,
     required this.maxArchivosConsulta,
+    this.medicionesPacienteActiva = false,
+    this.escanerCamaraActivo = false,
+    this.escanerSegundos,
   });
+
+  bool get escanerDisponible =>
+      medicionesPacienteActiva &&
+      escanerCamaraActivo &&
+      escanerSegundos != null;
 
   factory ReglasTelemedicina._leer(_Lector l) => ReglasTelemedicina(
     minutosAntes: l.entero('minutosAntes'),
@@ -296,6 +311,14 @@ class ReglasTelemedicina extends Equatable {
     horasRespuesta: l.entero('horasRespuesta', minimo: 1),
     diasSeguimiento: l.entero('diasSeguimiento'),
     maxArchivosConsulta: l.entero('maxArchivosConsulta'),
+    medicionesPacienteActiva:
+        l.booleanoOpcional('medicionesPacienteActiva') ?? false,
+    escanerCamaraActivo: l.booleanoOpcional('escanerCamaraActivo') ?? false,
+    escanerSegundos: l.enteroOpcional(
+      'escanerSegundos',
+      minimo: 20,
+      maximo: 60,
+    ),
   );
 
   @override
@@ -305,6 +328,9 @@ class ReglasTelemedicina extends Equatable {
     horasRespuesta,
     diasSeguimiento,
     maxArchivosConsulta,
+    medicionesPacienteActiva,
+    escanerCamaraActivo,
+    escanerSegundos,
   ];
 }
 
@@ -524,6 +550,18 @@ class _Lector {
 
     return numero;
   }
+
+  /// Un entero entre [minimo] y [maximo], o `null` si no llegó.
+  int? enteroOpcional(String campo, {int minimo = 0, int? maximo}) {
+    final valor = _datos[campo];
+    if (valor == null) return null;
+    final numero = entero(campo, minimo: minimo);
+    if (maximo != null && numero > maximo) _falta(campo, valor);
+    return numero;
+  }
+
+  bool? booleanoOpcional(String campo) =>
+      _datos[campo] == null ? null : booleano(campo);
 
   bool booleano(String campo) {
     final valor = _datos[campo];

@@ -17,6 +17,8 @@ import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
 import '../../auth/providers/auth_bloc.dart';
+import '../../mediciones/dominio/destinos_medico.dart';
+import '../../mediciones/presentacion/widgets/accesos_signos_vitales.dart';
 import '../data/models/campo_formulario.dart';
 import '../data/models/consulta.dart';
 import '../dominio/reglas_consultas.dart';
@@ -296,6 +298,18 @@ class _VistaDetalleState extends State<_VistaDetalle>
           _Encabezado(detalle: detalle, ahora: ahora),
           const SizedBox(height: 12),
           _EstadoYPlazo(detalle: detalle, ahora: ahora),
+          if (detalle.estado.enCurso) ...[
+            const SizedBox(height: 12),
+            BotonSignosVitales(
+              key: const Key('consulta-signos-vitales'),
+              texto: 'Compartir mis signos vitales',
+              destino: DestinoMedico.deConsulta(detalle),
+              pacienteId: detalle.paraDependiente ? detalle.pacienteId : null,
+              pacienteNombre: detalle.paraDependiente
+                  ? detalle.pacienteNombre
+                  : null,
+            ),
+          ],
           const SizedBox(height: 22),
           const EtiquetaSeccion('Tu consulta'),
           _LoQueSeConto(detalle: detalle),
