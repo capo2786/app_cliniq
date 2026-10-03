@@ -10,6 +10,8 @@ import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../agendar/presentacion/agendar_page.dart';
+import '../../../mediciones/dominio/destinos_medico.dart';
+import '../../../mediciones/presentacion/mis_signos_vitales_page.dart';
 import '../../data/models/cita.dart';
 import '../../dominio/reglas_citas.dart';
 import '../../dominio/videoconsulta.dart';
@@ -209,6 +211,34 @@ class DetalleCita extends StatelessWidget {
               ],
             ),
             BotonVideoconsulta(cita: cita),
+          ],
+          if (cita.pendiente &&
+              cita.tipo == TipoCita.telemedicina &&
+              config.telemedicina.medicionesPacienteActiva) ...[
+            const SizedBox(height: 16),
+            const EtiquetaSeccion('Tus signos vitales'),
+            BotonSecundario(
+              key: const Key('cita-signos-vitales'),
+              texto: 'Mis signos vitales',
+              icono: Icons.monitor_heart_outlined,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => MisSignosVitalesPage(
+                    pacienteId: cita.paraDependiente ? cita.pacienteId : null,
+                    pacienteNombre: cita.paraDependiente
+                        ? cita.pacienteNombre
+                        : null,
+                    destino: DestinoMedico.deCita(cita),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Antes de la cita, registra tu presión, tu pulso u otros '
+              'valores de tus aparatos de casa para que tu médico los vea.',
+              style: TextStyle(color: AppColors.textoTenue, fontSize: 11.5),
+            ),
           ],
           const SizedBox(height: 22),
           if (cambiable)

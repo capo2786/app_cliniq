@@ -347,6 +347,10 @@ void main() {
     });
     expect(find.text('Tomás Pérez'), findsWidgets);
     expect(find.text('Ana María Pérez'), findsNothing);
+    // Debajo de la ficha y del acceso a sus signos vitales.
+    expect(find.text('Signos vitales de Tomás Pérez'), findsOneWidget);
+    await tester.drag(find.byType(ListView).first, const Offset(0, -400));
+    await tester.pumpAndSettle();
     expect(find.text('Aún no hay consultas registradas'), findsOneWidget);
   });
 

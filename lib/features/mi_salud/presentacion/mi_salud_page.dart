@@ -20,6 +20,7 @@ import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../consultas/presentacion/widgets/adjuntos.dart';
 import '../../dependientes/data/dependientes_service.dart';
+import '../../mediciones/presentacion/mis_signos_vitales_page.dart';
 import '../data/mi_salud_service.dart';
 import '../data/models/mi_salud.dart';
 import '../dominio/reglas_mi_salud.dart';
@@ -192,6 +193,18 @@ class _VistaMiSaludState extends State<_VistaMiSalud> {
                       const SizedBox(height: 22),
                       _Mediciones(signos: datos.ultimosSignos!),
                     ],
+                    if (context
+                        .config
+                        .telemedicina
+                        .medicionesPacienteActiva) ...[
+                      const SizedBox(height: 14),
+                      _AccesoSignosVitales(
+                        pacienteId: state.para.isEmpty ? null : state.para,
+                        nombre: state.para.isEmpty
+                            ? null
+                            : datos.paciente.nombre,
+                      ),
+                    ],
                     const SizedBox(height: 22),
                     const EtiquetaSeccion('Consultas'),
                     if (atenciones.isEmpty)
@@ -218,6 +231,69 @@ class _VistaMiSaludState extends State<_VistaMiSalud> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// «Mis signos vitales»: lo que la persona (o su dependiente) registra en
+/// casa y, si la clínica lo activa, con el escáner experimental.
+class _AccesoSignosVitales extends StatelessWidget {
+  final String? pacienteId;
+  final String? nombre;
+
+  const _AccesoSignosVitales({required this.pacienteId, required this.nombre});
+
+  @override
+  Widget build(BuildContext context) {
+    return TarjetaTranslucida(
+      key: const Key('mi-salud-signos-vitales'),
+      tinte: AppColors.peligroSuave,
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => MisSignosVitalesPage(
+            pacienteId: pacienteId,
+            pacienteNombre: nombre,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.monitor_heart_outlined,
+            color: AppColors.peligroSuave,
+            size: 28,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  nombre == null
+                      ? 'Mis signos vitales'
+                      : 'Signos vitales de $nombre',
+                  style: const TextStyle(
+                    color: AppColors.texto,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Registra la presión, el pulso, la glucosa o el peso de '
+                  'tus aparatos de casa.',
+                  style: TextStyle(
+                    color: AppColors.textoSecundario,
+                    fontSize: 12.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.textoTenue),
+        ],
       ),
     );
   }

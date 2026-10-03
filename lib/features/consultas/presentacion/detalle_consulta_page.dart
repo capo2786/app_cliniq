@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/configuracion/config_publica_cubit.dart';
+import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/formato/fechas.dart';
 import '../../../core/presentacion/avisos.dart';
 import '../../../core/presentacion/margenes.dart';
@@ -17,6 +18,8 @@ import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
 import '../../auth/providers/auth_bloc.dart';
+import '../../mediciones/dominio/destinos_medico.dart';
+import '../../mediciones/presentacion/mis_signos_vitales_page.dart';
 import '../data/models/campo_formulario.dart';
 import '../data/models/consulta.dart';
 import '../dominio/reglas_consultas.dart';
@@ -296,6 +299,28 @@ class _VistaDetalleState extends State<_VistaDetalle>
           _Encabezado(detalle: detalle, ahora: ahora),
           const SizedBox(height: 12),
           _EstadoYPlazo(detalle: detalle, ahora: ahora),
+          if (detalle.estado.enCurso &&
+              context.config.telemedicina.medicionesPacienteActiva) ...[
+            const SizedBox(height: 12),
+            BotonSecundario(
+              key: const Key('consulta-signos-vitales'),
+              texto: 'Compartir mis signos vitales',
+              icono: Icons.monitor_heart_outlined,
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => MisSignosVitalesPage(
+                    pacienteId: detalle.paraDependiente
+                        ? detalle.pacienteId
+                        : null,
+                    pacienteNombre: detalle.paraDependiente
+                        ? detalle.pacienteNombre
+                        : null,
+                    destino: DestinoMedico.deConsulta(detalle),
+                  ),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 22),
           const EtiquetaSeccion('Tu consulta'),
           _LoQueSeConto(detalle: detalle),

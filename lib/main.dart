@@ -32,6 +32,7 @@ import 'features/dependientes/providers/dependientes_bloc.dart';
 import 'features/encuestas/providers/encuestas_cubit.dart';
 import 'features/inicio/presentacion/dashboard_page.dart';
 import 'features/legal/presentacion/aceptacion_legal_page.dart';
+import 'features/mediciones/data/cola_mediciones.dart';
 import 'features/navegacion/presentacion/receptor_de_enlaces.dart';
 import 'features/navegacion/providers/menu_cubit.dart';
 
@@ -183,6 +184,11 @@ class CliniqApp extends StatelessWidget {
         ),
         BlocProvider<AyudaContextualCubit>(
           create: (_) => AyudaContextualCubit(Servicios.ayudaContextual),
+        ),
+        // La cola sin red de las mediciones: el tablero la vacía al abrir,
+        // al volver a la aplicación y al recuperar la red.
+        RepositoryProvider<ColaMediciones>.value(
+          value: Servicios.colaMediciones,
         ),
       ],
       child: _DatosDeLaClinicaAlDia(
