@@ -58,8 +58,10 @@ bool _cercaDeSusVecinos(
 class MetricasRr {
   final int intervalos;
 
-  /// El intervalo medio.
+  /// El intervalo medio, el más corto y el más largo.
   final double medio;
+  final double minimo;
+  final double maximo;
 
   /// La desviación típica de los intervalos.
   final double sdnn;
@@ -78,6 +80,8 @@ class MetricasRr {
   const MetricasRr({
     required this.intervalos,
     required this.medio,
+    required this.minimo,
+    required this.maximo,
     required this.sdnn,
     required this.rmssd,
     required this.pnn50,
@@ -97,6 +101,8 @@ class MetricasRr {
     return MetricasRr(
       intervalos: rr.length,
       medio: mediaDe(rr),
+      minimo: rr.reduce(math.min),
+      maximo: rr.reduce(math.max),
       sdnn: sdnn,
       rmssd: math.sqrt(mediaDe([for (final d in diferencias) d * d])),
       pnn50:

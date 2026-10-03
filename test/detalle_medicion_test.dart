@@ -48,6 +48,7 @@ void main() {
       final rr = [for (var i = 0; i < 10; i++) 800.0 + 10 * i];
       final m = MetricasRr.de(rr)!;
       expect(m.medio, 845);
+      expect((m.minimo, m.maximo), (800, 890));
       expect(m.rmssd, 10);
       expect(m.pnn50, 0);
       expect(m.sd1, closeTo(0, 1e-9));
