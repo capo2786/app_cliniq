@@ -28,7 +28,6 @@ import '../../navegacion/data/menu_service.dart';
 import '../../navegacion/dominio/destinos.dart';
 import '../../navegacion/presentacion/enrutador.dart';
 import '../../navegacion/presentacion/pantallas_nativas.dart';
-import '../../mediciones/data/cola_mediciones.dart';
 import '../../navegacion/providers/menu_cubit.dart';
 import 'inicio_page.dart';
 
@@ -80,7 +79,6 @@ class _DashboardPageState extends State<DashboardPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    Servicios.red.actual.addListener(_alCambiarLaRed);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -96,34 +94,8 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   void dispose() {
-    Servicios.red.actual.removeListener(_alCambiarLaRed);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
-  }
-
-  /// La cola sin red de las mediciones, si la aplicación la da (en
-  /// `main.dart`; un tablero de prueba puede no tenerla).
-  ColaMediciones? get _colaMediciones {
-    try {
-      return context.read<ColaMediciones>();
-    } on ProviderNotFoundException {
-      return null;
-    }
-  }
-
-  /// Envía lo que quedó registrado sin conexión (las mediciones).
-  void _enviarPendientes() {
-    final usuario = context.read<AuthBloc>().usuario;
-    final cola = _colaMediciones;
-    if (usuario != null && cola != null) {
-      unawaited(cola.enviarPendientes(usuario.uid));
-    }
-  }
-
-  /// Al volver la red, sale lo pendiente.
-  void _alCambiarLaRed() {
-    if (!mounted || Servicios.red.actual.value?.hayInternet != true) return;
-    _enviarPendientes();
   }
 
   @override
@@ -163,8 +135,6 @@ class _DashboardPageState extends State<DashboardPage>
     unawaited(context.read<EncuestasCubit>().cargar(usuario.uid));
     // Una vez por sesión; si falló, se reintenta aquí al volver.
     unawaited(context.read<AyudaContextualCubit>().cargar(usuario.uid));
-    // Las mediciones que quedaron en el teléfono sin red.
-    _enviarPendientes();
 
     if (usuario.puede(Permisos.misCitas)) {
       context.read<CitasBloc>().add(CitasSolicitadas(usuario.uid));
