@@ -14,6 +14,8 @@ import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/encuestas/data/encuestas_service.dart';
 import '../features/legal/data/legal_service.dart';
+import '../features/mediciones/data/cola_mediciones.dart';
+import '../features/mediciones/data/mediciones_service.dart';
 import '../features/privacidad/data/arco_service.dart';
 import '../features/mi_salud/data/documentos_pdf_service.dart';
 import '../features/mi_salud/data/mi_salud_service.dart';
@@ -198,6 +200,20 @@ class Servicios {
   /// En el anfitrión de pruebas no hay lector de PDF del sistema.
   @visibleForTesting
   static set pintorParaPruebas(PintorDePdf otro) => _pintorDePdf = otro;
+
+  // ── Mis signos vitales ─────────────────────────────────────────────
+  /// Las mediciones del paciente (`/portal/mediciones`).
+  static final MedicionesService mediciones = MedicionesService(
+    ApiClient().dio,
+    cache,
+  );
+
+  /// La cola sin red de las mediciones: lo registrado sin conexión, en la
+  /// caché cifrada, hasta que vuelva la red.
+  static final ColaMediciones colaMediciones = ColaMediciones(
+    cache,
+    mediciones,
+  );
 
   /// Los artículos del centro de ayuda.
   static final AyudaService ayuda = AyudaService(ApiClient().dio, cache);

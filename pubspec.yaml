@@ -68,11 +68,10 @@ dependencies:
 
   # Mediciones del paciente y el escáner experimental de signos vitales
   # (ver «Mis signos vitales» y «Escáner experimental» en el README). La
-  # cámara entrega los cuadros y enciende el flash; ML Kit encuentra el
-  # rostro en el propio teléfono (modelo incluido, sin red); fftea es la FFT
-  # (Dart puro) del procesamiento de la señal; fl_chart dibuja la evolución.
+  # cámara entrega los cuadros y enciende el flash; fftea es la FFT (Dart
+  # puro) del procesamiento de la señal; fl_chart dibuja la evolución.
+  # Ninguno hace red: todo el escáner ocurre en el teléfono.
   camera: ^0.12.1
-  google_mlkit_face_detection: ^0.15.1
   fftea: ^1.5.0+1
   fl_chart: ^1.2.0
 
