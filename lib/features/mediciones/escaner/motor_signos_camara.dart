@@ -6,7 +6,10 @@ import 'package:equatable/equatable.dart';
 
 import '../dominio/procesamiento_ppg.dart';
 import '../dominio/reglas_mediciones.dart';
+import 'consejos_escaner.dart';
 import 'serie_senal.dart';
+
+export 'consejos_escaner.dart';
 
 /// Dónde se calculó el resultado.
 enum OrigenAnalisis {
@@ -90,22 +93,50 @@ class ResultadoEscaner extends Equatable {
   ];
 }
 
-/// Lo que se sabe mientras se mide: la calidad, el consejo del momento y la
-/// onda para dibujar.
+/// Lo que se sabe mientras se mide: la calidad, el consejo del momento, la
+/// onda para dibujar con sus latidos y la FC de los últimos segundos.
 class LecturaEnVivo extends Equatable {
   /// De 0 a 1, o `null` mientras no hay segundos suficientes.
   final double? calidad;
 
-  /// «Cubre bien la cámara», «Quédate quieto», «Más luz»… o `null`.
+  /// «Cubre bien la cámara», «Quédate quieto», «Busca un lugar con más
+  /// luz»… o `null`.
   final String? consejo;
 
   /// La señal filtrada de los últimos segundos, normalizada a −1…1.
   final List<double> onda;
 
-  const LecturaEnVivo({this.calidad, this.consejo, this.onda = const []});
+  /// Dónde caen en [onda] los latidos detectados (índices).
+  final List<int> latidosEnOnda;
+
+  /// Los latidos de la ventana analizada, en segundos de la serie.
+  final List<double> latidos;
+
+  /// La FC de la ventana (lpm): solo una guía visual mientras se mide; el
+  /// valor final es el del análisis de la medición entera.
+  final double? fc;
+
+  const LecturaEnVivo({
+    this.calidad,
+    this.consejo,
+    this.onda = const [],
+    this.latidosEnOnda = const [],
+    this.latidos = const [],
+    this.fc,
+  });
+
+  /// La FC se puede enseñar: hay valor y la calidad es regular o mejor.
+  bool get fcVisible => fc != null && (calidad ?? 0) >= umbralCalidadRegular;
 
   @override
-  List<Object?> get props => [calidad, consejo, onda];
+  List<Object?> get props => [
+    calidad,
+    consejo,
+    onda,
+    latidosEnOnda,
+    latidos,
+    fc,
+  ];
 }
 
 /// Quien convierte la serie de la cámara en signos vitales.
@@ -123,45 +154,6 @@ abstract class MotorSignosCamara {
 
   /// El resultado de la medición entera.
   ResultadoEscaner analizar(SerieSenal serie);
-}
-
-/// Los consejos del escáner, en un solo lugar.
-class ConsejosEscaner {
-  const ConsejosEscaner._();
-
-  static const cubreLaCamara = 'Cubre bien la cámara y el flash con la yema';
-  static const noAprietes = 'Apoya el dedo sin apretar';
-  static const quedateQuieto = 'Quédate quieto';
-  static const masLuz = 'Más luz';
-  static const rostroEnElOvalo = 'Coloca tu rostro dentro del óvalo';
-
-  /// Qué hacer cuando la medición no salió, según el motivo.
-  static String paraElMotivo(MotivoCalidad? motivo, ModoEscaner modo) =>
-      switch (motivo) {
-        MotivoCalidad.sinCobertura =>
-          'La yema no cubría la cámara. Apoya el dedo índice sobre la cámara '
-              'y el flash a la vez, sin apretar, y no lo muevas.',
-        MotivoCalidad.saturada =>
-          'La imagen salió demasiado brillante. Apoya el dedo sin apretar: '
-              'si aprietas, la sangre no pasa y no se ve el pulso.',
-        MotivoCalidad.movimiento =>
-          modo == ModoEscaner.dedo
-              ? 'Hubo movimiento. Apoya la mano en una mesa y quédate quieto '
-                    'durante toda la medición.'
-              : 'Hubo movimiento. Apoya la espalda, sostén el teléfono con '
-                    'las dos manos y quédate quieto.',
-        MotivoCalidad.pocosCuadros =>
-          'La cámara entregó muy pocas imágenes por segundo. Cierra otras '
-              'aplicaciones y prueba de nuevo.',
-        MotivoCalidad.pocosDatos =>
-          'La medición fue demasiado corta. Inténtalo de nuevo.',
-        MotivoCalidad.senalPlana || null =>
-          modo == ModoEscaner.dedo
-              ? 'No llegamos a ver tu pulso. Cubre por completo la cámara y '
-                    'el flash con la yema, sin apretar.'
-              : 'No llegamos a ver tu pulso. Busca una luz pareja de frente '
-                    '(una ventana), acércate un poco y quédate quieto.',
-      };
 }
 
 /// El motor de la aplicación: `dominio/procesamiento_ppg.dart`, en el
@@ -237,7 +229,7 @@ class MotorInterno implements MotorSignosCamara {
         }
       case ModoEscaner.rostro:
         if (_media(ultimo.cobertura) < 0.35) {
-          consejo = ConsejosEscaner.rostroEnElOvalo;
+          consejo = ConsejosEscaner.rostroEnElMarco;
         } else if (_media(ultimo.luminancia) < 60) {
           consejo = ConsejosEscaner.masLuz;
         }
@@ -261,15 +253,29 @@ class MotorInterno implements MotorSignosCamara {
       };
     }
 
+    final onda = ultimosNormalizados(analisis.senal, segundos: 6);
+    final corte = analisis.senal.length - onda.length;
+    final inicio = ventana.tiempos.first;
     return LecturaEnVivo(
       calidad: calidad,
       consejo: consejo,
-      onda: _normalizar(analisis.senal, segundos: 6),
+      onda: onda,
+      latidosEnOnda: [
+        for (final t in analisis.latidos)
+          if ((t * analisis.fs).round() - corte case final i
+              when i >= 0 && i < onda.length)
+            i,
+      ],
+      latidos: [for (final t in analisis.latidos) inicio + t],
+      fc: analisis.fc,
     );
   }
 
-  /// Los últimos [segundos] de la onda, entre −1 y 1, para dibujarla.
-  static List<double> _normalizar(List<double> senal, {required int segundos}) {
+  /// Los últimos [segundos] de una señal, entre −1 y 1, para dibujarla.
+  static List<double> ultimosNormalizados(
+    List<double> senal, {
+    required num segundos,
+  }) {
     final n = (segundos * frecuenciaAnalisis).round();
     final tramo = senal.length > n ? senal.sublist(senal.length - n) : senal;
     if (tramo.isEmpty) return const [];

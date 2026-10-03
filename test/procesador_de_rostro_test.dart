@@ -34,8 +34,10 @@ void main() {
   final rostro = rostroSintetico();
   final imagen = imagenDeRostro(rostro);
 
-  CuadroDeCamara cuadro(int i) =>
-      CuadroDeCamara(imagen: imagen, momento: Duration(milliseconds: 33 * i));
+  CuadroDeCamara cuadro(int i) => CuadroDeCamara(
+    imagen: imagen,
+    momento: Duration(milliseconds: 33 * i),
+  );
 
   test('detecta como mucho unas 10 veces por segundo', () {
     final detector = DetectorFalso(respuesta: (_) => rostro);
@@ -52,28 +54,29 @@ void main() {
     }
   });
 
-  test('nunca bloquea: con una detección en curso, los cuadros siguen', () async {
-    final detector = _DetectorLento();
-    final procesador = ProcesadorDeRostro(crearDetector: () => detector);
-    for (var i = 0; i < 30; i++) {
-      final c = procesador.procesar(cuadro(i));
-      expect(c.rostro, isNull); // todavía no hay respuesta
-    }
-    expect(detector.pendientes, hasLength(1));
+  test(
+    'nunca bloquea: con una detección en curso, los cuadros siguen',
+    () async {
+      final detector = _DetectorLento();
+      final procesador = ProcesadorDeRostro(crearDetector: () => detector);
+      for (var i = 0; i < 30; i++) {
+        final c = procesador.procesar(cuadro(i));
+        expect(c.rostro, isNull); // todavía no hay respuesta
+      }
+      expect(detector.pendientes, hasLength(1));
 
-    detector.pendientes.single.complete(rostro);
-    await Future<void>.delayed(Duration.zero);
-    final conRostro = procesador.procesar(cuadro(30));
-    expect(conRostro.rostro, same(rostro));
-    expect(detector.pendientes, hasLength(2));
-  });
+      detector.pendientes.single.complete(rostro);
+      await Future<void>.delayed(Duration.zero);
+      final conRostro = procesador.procesar(cuadro(30));
+      expect(conRostro.rostro, same(rostro));
+      expect(detector.pendientes, hasLength(2));
+    },
+  );
 
   test('el promedio sigue en cada cuadro con la última región conocida', () {
     var hayRostro = true;
     final detector = DetectorFalso(
-      respuesta: (c) => hayRostro
-          ? rostroSintetico(momento: c.momento)
-          : null,
+      respuesta: (c) => hayRostro ? rostroSintetico(momento: c.momento) : null,
     );
     final procesador = ProcesadorDeRostro(crearDetector: () => detector);
 
@@ -105,49 +108,55 @@ void main() {
     expect(procesador.procesar(cuadro(50)).rostro, isNull);
   });
 
-  test('dos fallos seguidos de ML Kit: sigue por color de piel, sin cortar',
-      () async {
-    final detector = DetectorFalso(fallar: (_) => true);
-    final procesador = ProcesadorDeRostro(crearDetector: () => detector);
-    var i = 0;
-    while (!procesador.porColorDePiel && i < 30) {
-      procesador.procesar(cuadro(i++));
-      await Future<void>.delayed(Duration.zero);
-    }
-    expect(procesador.porColorDePiel, isTrue);
-    expect(detector.llamadas, hasLength(2));
-    expect(detector.cierres, 1);
+  test(
+    'dos fallos seguidos de ML Kit: sigue por color de piel, sin cortar',
+    () async {
+      final detector = DetectorFalso(fallar: (_) => true);
+      final procesador = ProcesadorDeRostro(crearDetector: () => detector);
+      var i = 0;
+      while (!procesador.porColorDePiel && i < 30) {
+        procesador.procesar(cuadro(i++));
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(procesador.porColorDePiel, isTrue);
+      expect(detector.llamadas, hasLength(2));
+      expect(detector.cierres, 1);
 
-    final c = procesador.procesar(cuadro(i));
-    expect(c.porColorDePiel, isTrue);
-    expect(c.rostro, isNull);
-    // El óvalo del respaldo cae en la cara de la imagen sintética.
-    expect(c.cobertura, greaterThan(0.3));
-    expect(c.rojo, closeTo(pielSintetica.r, 1));
-  });
+      final c = procesador.procesar(cuadro(i));
+      expect(c.porColorDePiel, isTrue);
+      expect(c.rostro, isNull);
+      // El óvalo del respaldo cae en la cara de la imagen sintética.
+      expect(c.cobertura, greaterThan(0.3));
+      expect(c.rojo, closeTo(pielSintetica.r, 1));
+    },
+  );
 
-  test('un fallo suelto no basta: si la siguiente responde, sigue ML Kit',
-      () async {
-    var llamadas = 0;
-    final detector = DetectorFalso(
-      fallar: (_) => ++llamadas == 1,
-      respuesta: (_) => rostro,
-    );
-    final procesador = ProcesadorDeRostro(crearDetector: () => detector);
-    for (var i = 0; i < 20; i++) {
-      procesador.procesar(cuadro(i));
-      await Future<void>.delayed(Duration.zero);
-    }
-    expect(procesador.porColorDePiel, isFalse);
-  });
+  test(
+    'un fallo suelto no basta: si la siguiente responde, sigue ML Kit',
+    () async {
+      var llamadas = 0;
+      final detector = DetectorFalso(
+        fallar: (_) => ++llamadas == 1,
+        respuesta: (_) => rostro,
+      );
+      final procesador = ProcesadorDeRostro(crearDetector: () => detector);
+      for (var i = 0; i < 20; i++) {
+        procesador.procesar(cuadro(i));
+        await Future<void>.delayed(Duration.zero);
+      }
+      expect(procesador.porColorDePiel, isFalse);
+    },
+  );
 
-  test('si el detector no se puede crear, por color de piel desde el inicio',
-      () {
-    final procesador = ProcesadorDeRostro(
-      crearDetector: () => throw UnsupportedError('sin ML Kit'),
-    );
-    expect(procesador.porColorDePiel, isTrue);
-    expect(procesador.procesar(cuadro(0)).porColorDePiel, isTrue);
-    expect(ProcesadorDeRostro().porColorDePiel, isTrue);
-  });
+  test(
+    'si el detector no se puede crear, por color de piel desde el inicio',
+    () {
+      final procesador = ProcesadorDeRostro(
+        crearDetector: () => throw UnsupportedError('sin ML Kit'),
+      );
+      expect(procesador.porColorDePiel, isTrue);
+      expect(procesador.procesar(cuadro(0)).porColorDePiel, isTrue);
+      expect(ProcesadorDeRostro().porColorDePiel, isTrue);
+    },
+  );
 }

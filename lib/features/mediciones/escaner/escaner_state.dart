@@ -5,8 +5,14 @@ import 'package:equatable/equatable.dart';
 import '../data/cola_mediciones.dart';
 import '../data/models/medicion.dart';
 import '../dominio/destinos_medico.dart';
+import '../dominio/procesamiento_ppg.dart';
+import 'control_de_medicion.dart';
 import 'motor_signos_camara.dart';
+import 'rostro/guia_encuadre.dart';
 import 'serie_senal.dart';
+
+export 'control_de_medicion.dart' show FaseMedicion;
+export 'rostro/guia_encuadre.dart' show InstruccionEncuadre;
 
 /// En qué paso va el escáner.
 enum PasoEscaner {
@@ -16,7 +22,7 @@ enum PasoEscaner {
   /// La primera vez: el aviso de función experimental.
   aviso,
 
-  /// Elegir entre dedo y rostro.
+  /// Elegir entre rostro y dedo (solo con el modo dedo encendido).
   modo,
 
   /// Cómo poner el dedo o la cara.
@@ -25,6 +31,7 @@ enum PasoEscaner {
   /// Pidiendo el permiso y encendiendo la cámara.
   abriendo,
 
+  /// La cámara está abierta: preparando, midiendo o en pausa ([FaseMedicion]).
   midiendo,
 
   /// La medición terminó; se calcula (en el teléfono y, si hay red, en el
@@ -44,11 +51,32 @@ class EscanerState extends Equatable {
   final PasoEscaner paso;
   final ModoEscaner modo;
 
+  /// Si la clínica ofrece el modo dedo (`telemedicina.escanerDedoActivo`):
+  /// sin él no hay selector de modo.
+  final bool dedoActivo;
+
   /// Cuánto dura la medición (`telemedicina.escanerSegundos`).
   final int segundos;
   final int segundosRestantes;
 
+  /// Mientras la cámara está abierta.
+  final FaseMedicion fase;
+
+  /// Modo rostro: la instrucción de la guía de encuadre.
+  final InstruccionEncuadre? instruccion;
+
+  /// Modo rostro: ML Kit no está y el rostro se busca por el color de la
+  /// piel (no hay malla).
+  final bool porColorDePiel;
+
   final LecturaEnVivo lectura;
+
+  /// La FC en vivo de cada segundo, para la mini gráfica.
+  final List<PuntoFc> historialFc;
+
+  /// Los latidos detectados hasta ahora.
+  final int latidos;
+
   final ResultadoEscaner? resultado;
 
   /// Por qué no se pudo medir, y qué hacer.
@@ -70,10 +98,16 @@ class EscanerState extends Equatable {
 
   const EscanerState({
     this.paso = PasoEscaner.cargando,
-    this.modo = ModoEscaner.dedo,
+    this.modo = ModoEscaner.rostro,
+    this.dedoActivo = false,
     this.segundos = 30,
     this.segundosRestantes = 30,
+    this.fase = FaseMedicion.preparando,
+    this.instruccion,
+    this.porColorDePiel = false,
     this.lectura = const LecturaEnVivo(),
+    this.historialFc = const [],
+    this.latidos = 0,
     this.resultado,
     this.fallo,
     this.fallaPorPermiso = false,
@@ -93,7 +127,13 @@ class EscanerState extends Equatable {
     PasoEscaner? paso,
     ModoEscaner? modo,
     int? segundosRestantes,
+    FaseMedicion? fase,
+    InstruccionEncuadre? instruccion,
+    bool limpiarInstruccion = false,
+    bool? porColorDePiel,
     LecturaEnVivo? lectura,
+    List<PuntoFc>? historialFc,
+    int? latidos,
     ResultadoEscaner? resultado,
     bool limpiarResultado = false,
     String? fallo,
@@ -111,9 +151,17 @@ class EscanerState extends Equatable {
     return EscanerState(
       paso: paso ?? this.paso,
       modo: modo ?? this.modo,
+      dedoActivo: dedoActivo,
       segundos: segundos,
       segundosRestantes: segundosRestantes ?? this.segundosRestantes,
+      fase: fase ?? this.fase,
+      instruccion: limpiarInstruccion
+          ? null
+          : (instruccion ?? this.instruccion),
+      porColorDePiel: porColorDePiel ?? this.porColorDePiel,
       lectura: lectura ?? this.lectura,
+      historialFc: historialFc ?? this.historialFc,
+      latidos: latidos ?? this.latidos,
       resultado: limpiarResultado ? null : (resultado ?? this.resultado),
       fallo: limpiarFallo ? null : (fallo ?? this.fallo),
       fallaPorPermiso: limpiarFallo
@@ -133,9 +181,15 @@ class EscanerState extends Equatable {
   List<Object?> get props => [
     paso,
     modo,
+    dedoActivo,
     segundos,
     segundosRestantes,
+    fase,
+    instruccion,
+    porColorDePiel,
     lectura,
+    historialFc,
+    latidos,
     resultado,
     fallo,
     fallaPorPermiso,

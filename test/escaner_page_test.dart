@@ -95,11 +95,13 @@ void main() {
       AnalizadorDeMedicion? analizador,
       DestinoMedico? destino,
       bool avisoAceptado = true,
+      bool dedoActivo = true,
     }) async {
       final aviso = AvisoDelEscaner(cache);
       if (avisoAceptado) await aviso.aceptar('u1');
       await montarPantalla(
         tester,
+        config: configDePrueba(telemedicina: {'escanerDedoActivo': dedoActivo}),
         EscanerPage(
           fuente: fuente,
           cola: cola(),
@@ -324,7 +326,7 @@ void main() {
         ),
       );
       await tester.pump();
-      expect(find.text('Coloca tu rostro dentro del óvalo'), findsOneWidget);
+      expect(find.text('Pon tu cara dentro del marco'), findsOneWidget);
       expect(fuente.abiertas.single.name, 'rostro');
 
       await tester.tap(find.byKey(const Key('escaner-cancelar')));

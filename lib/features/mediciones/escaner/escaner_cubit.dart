@@ -2,6 +2,7 @@
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/network/errores.dart';
@@ -10,28 +11,36 @@ import '../data/models/medicion.dart';
 import '../dominio/destinos_medico.dart';
 import 'analizador_de_medicion.dart';
 import 'aviso_experimental.dart';
+import 'control_de_medicion.dart';
+import 'estimador_en_vivo.dart';
 import 'fuente_de_cuadros.dart';
+import 'mediciones_del_resultado.dart';
 import 'motor_signos_camara.dart';
 import 'escaner_state.dart';
+import 'rostro/rostro_detectado.dart';
 import 'serie_senal.dart';
 
 export 'escaner_state.dart';
 
 /// El escáner experimental, paso a paso.
 ///
-/// Los cuadros que llegan de la [FuenteDeCuadros] ya son números; se
-/// juntan en un buffer solo mientras dura la medición y se sueltan al
-/// terminar, al cancelar o al descartar. La cuenta regresiva va con el
-/// tiempo de los propios cuadros (no con un reloj aparte): si la cámara se
-/// atasca, la cuenta se para y, a los [plazoSinCuadros], se avisa.
+/// Los cuadros que llegan de la [FuenteDeCuadros] ya son números; el
+/// [ControlDeMedicion] decide cuáles entran en la serie y lleva la cuenta
+/// con el tiempo de los propios cuadros (no con un reloj aparte): si la
+/// cámara se atasca, la cuenta se para y, a los [plazoSinCuadros], se avisa.
+/// Todo se suelta al terminar, al cancelar o al descartar.
 ///
-/// Mientras mide, cada medio segundo pide al motor la calidad en vivo y el
-/// consejo («Cubre bien la cámara», «Quédate quieto», «Más luz»). Si la
-/// calidad se queda por debajo de [calidadParaSeguir] durante
-/// [segundosDeCalidadBaja], se detiene con un consejo y «Reintentar».
+/// En el modo rostro la cuenta arranca sola con la cara bien encuadrada, se
+/// pausa si se pierde y se detiene si no vuelve; la guía de encuadre dice
+/// qué hacer. La última detección del rostro va en [rostroEnVivo], aparte
+/// del estado, para pintar la malla sin reconstruir toda la pantalla.
+///
+/// Mientras mide, cada segundo el [EstimadorEnVivo] da la calidad, el
+/// consejo, la onda y la FC en vivo. Si la calidad se queda por debajo de
+/// [calidadParaSeguir] durante [segundosDeCalidadBaja], se detiene con un
+/// consejo y «Reintentar».
 class EscanerCubit extends Cubit<EscanerState> {
   final FuenteDeCuadros _fuente;
-  final MotorSignosCamara _motor;
   final AnalizadorDeMedicion _analizador;
   final ColaMediciones _cola;
   final AvisoDelEscaner _aviso;
@@ -45,60 +54,88 @@ class EscanerCubit extends Cubit<EscanerState> {
   static const double calidadParaSeguir = 0.3;
   static const double segundosDeCalidadBaja = 8;
 
-  final List<CuadroPpg> _cuadros = [];
+  ControlDeMedicion? _control;
+  final EstimadorEnVivo _estimador;
   StreamSubscription<CuadroPpg>? _suscripcion;
   Timer? _vigilancia;
   DateTime _ultimoCuadro = DateTime.now();
-  double _ultimaLectura = -1;
   double? _bajaDesde;
   bool _terminando = false;
 
+  /// La última detección del rostro (o `null`): para la malla.
+  final ValueNotifier<RostroDetectado?> rostroEnVivo = ValueNotifier(null);
+
   EscanerCubit({
     required this._fuente,
-    required this._motor,
+    required MotorSignosCamara motor,
     required this._analizador,
     required this._cola,
     required this._aviso,
     required this._uid,
     required int segundos,
     this._pacienteId,
+    bool dedoActivo = false,
     DateTime Function()? ahora,
   }) : _ahora = ahora ?? DateTime.now,
-       super(EscanerState(segundos: segundos, segundosRestantes: segundos));
+       _estimador = EstimadorEnVivo(motor: motor),
+       super(
+         EscanerState(
+           segundos: segundos,
+           segundosRestantes: segundos,
+           dedoActivo: dedoActivo,
+         ),
+       );
 
   /// La fuente, para pintar su vista previa.
   FuenteDeCuadros get fuente => _fuente;
 
-  /// Al abrir: el aviso la primera vez; después, elegir el modo.
+  /// Después del aviso: elegir el modo, o directo al rostro si la clínica
+  /// no ofrece el dedo.
+  EscanerState get _inicio => state.dedoActivo
+      ? state.copiarCon(paso: PasoEscaner.modo)
+      : state.copiarCon(
+          paso: PasoEscaner.instrucciones,
+          modo: ModoEscaner.rostro,
+        );
+
+  /// Al abrir: el aviso la primera vez; después, el inicio.
   Future<void> iniciar() async {
     final aceptado = await _aviso.aceptado(_uid);
     if (isClosed) return;
-    emit(
-      state.copiarCon(paso: aceptado ? PasoEscaner.modo : PasoEscaner.aviso),
-    );
+    emit(aceptado ? _inicio : state.copiarCon(paso: PasoEscaner.aviso));
   }
 
   Future<void> aceptarAviso() async {
     await _aviso.aceptar(_uid);
-    if (!isClosed) emit(state.copiarCon(paso: PasoEscaner.modo));
+    if (!isClosed) emit(_inicio);
   }
 
   void elegirModo(ModoEscaner modo) =>
       emit(state.copiarCon(paso: PasoEscaner.instrucciones, modo: modo));
 
-  /// Vuelve a elegir el modo, soltando lo que hubiera.
+  /// Lo de una medición en vivo, en blanco.
+  EscanerState _enBlanco(EscanerState s) => s.copiarCon(
+    segundosRestantes: s.segundos,
+    fase: FaseMedicion.preparando,
+    limpiarInstruccion: true,
+    porColorDePiel: false,
+    lectura: const LecturaEnVivo(),
+    historialFc: const [],
+    latidos: 0,
+  );
+
+  /// Vuelve al inicio (elegir el modo, o las instrucciones del rostro),
+  /// soltando lo que hubiera.
   Future<void> volverAModos() async {
     await _soltar();
     if (isClosed) return;
     emit(
-      state.copiarCon(
-        paso: PasoEscaner.modo,
+      _enBlanco(_inicio).copiarCon(
         limpiarResultado: true,
         limpiarFallo: true,
         limpiarContexto: true,
         limpiarRegistro: true,
         limpiarError: true,
-        lectura: const LecturaEnVivo(),
       ),
     );
   }
@@ -108,10 +145,8 @@ class EscanerCubit extends Cubit<EscanerState> {
     await _soltar();
     if (isClosed) return;
     emit(
-      state.copiarCon(
+      _enBlanco(state).copiarCon(
         paso: PasoEscaner.abriendo,
-        segundosRestantes: state.segundos,
-        lectura: const LecturaEnVivo(),
         limpiarResultado: true,
         limpiarFallo: true,
         limpiarRegistro: true,
@@ -120,27 +155,24 @@ class EscanerCubit extends Cubit<EscanerState> {
     );
 
     _terminando = false;
+    _control = ControlDeMedicion(
+      segundos: state.segundos,
+      conEncuadre: state.modo == ModoEscaner.rostro,
+    );
     try {
       _suscripcion = _fuente.cuadros.listen(_alCuadro);
       await _fuente.abrir(state.modo);
-    } on ErrorDeCamara catch (error) {
+    } catch (error) {
       await _soltar();
       if (isClosed) return;
+      final camara = error is ErrorDeCamara
+          ? error
+          : const ErrorDeCamara(MotivoErrorCamara.otro);
       emit(
         state.copiarCon(
           paso: PasoEscaner.fallo,
-          fallo: error.mensaje,
-          fallaPorPermiso: error.motivo == MotivoErrorCamara.permisoBloqueado,
-        ),
-      );
-      return;
-    } catch (_) {
-      await _soltar();
-      if (isClosed) return;
-      emit(
-        state.copiarCon(
-          paso: PasoEscaner.fallo,
-          fallo: const ErrorDeCamara(MotivoErrorCamara.otro).mensaje,
+          fallo: camara.mensaje,
+          fallaPorPermiso: camara.motivo == MotivoErrorCamara.permisoBloqueado,
         ),
       );
       return;
@@ -163,27 +195,55 @@ class EscanerCubit extends Cubit<EscanerState> {
 
   void _alCuadro(CuadroPpg cuadro) {
     // Los que llegan mientras la cámara arranca no cuentan.
-    if (isClosed || _terminando || state.paso != PasoEscaner.midiendo) return;
-
-    _ultimoCuadro = DateTime.now();
-    _cuadros.add(cuadro);
-    final transcurrido = cuadro.segundos - _cuadros.first.segundos;
-    final restantes = (state.segundos - transcurrido).ceil().clamp(
-      0,
-      state.segundos,
-    );
-
-    if (transcurrido - _ultimaLectura >= 0.5) {
-      _ultimaLectura = transcurrido;
-      final lectura = _motor.enVivo(SerieSenal.de(state.modo, _cuadros));
-      _vigilarCalidad(lectura, transcurrido);
-      if (isClosed || _terminando) return;
-      emit(state.copiarCon(segundosRestantes: restantes, lectura: lectura));
-    } else if (restantes != state.segundosRestantes) {
-      emit(state.copiarCon(segundosRestantes: restantes));
+    final control = _control;
+    if (isClosed ||
+        _terminando ||
+        control == null ||
+        state.paso != PasoEscaner.midiendo) {
+      return;
     }
 
-    if (transcurrido >= state.segundos) unawaited(_terminar());
+    _ultimoCuadro = DateTime.now();
+    if (!identical(rostroEnVivo.value, cuadro.rostro)) {
+      rostroEnVivo.value = cuadro.rostro;
+    }
+
+    final evento = control.alCuadro(cuadro);
+    if (evento == EventoDeMedicion.perdida) {
+      unawaited(
+        _detener(
+          'Perdimos tu cara durante varios segundos. Sostén el teléfono '
+          'frente a ti, con tu cara dentro del marco, y vuelve a intentarlo.',
+        ),
+      );
+      return;
+    }
+    if (evento == EventoDeMedicion.pausa) _bajaDesde = null;
+
+    var nuevo = state.copiarCon(
+      fase: control.fase,
+      instruccion: control.instruccion,
+      porColorDePiel: cuadro.porColorDePiel,
+      segundosRestantes: control.restantes,
+    );
+    if (control.fase == FaseMedicion.midiendo) {
+      final lectura = _estimador.avanzar(
+        SerieSenal.de(state.modo, control.cuadros),
+        control.medido,
+      );
+      if (lectura != null) {
+        _vigilarCalidad(lectura, control.medido);
+        if (isClosed || _terminando) return;
+        nuevo = nuevo.copiarCon(
+          lectura: lectura,
+          historialFc: _estimador.historial,
+          latidos: _estimador.latidos,
+        );
+      }
+    }
+    if (nuevo != state) emit(nuevo);
+
+    if (evento == EventoDeMedicion.completa) unawaited(_terminar());
   }
 
   void _vigilarCalidad(LecturaEnVivo lectura, double transcurrido) {
@@ -210,7 +270,7 @@ class EscanerCubit extends Cubit<EscanerState> {
     if (_terminando) return;
     _terminando = true;
 
-    final serie = SerieSenal.de(state.modo, _cuadros);
+    final serie = SerieSenal.de(state.modo, _control?.cuadros ?? const []);
     await _soltar();
     if (isClosed) return;
     emit(state.copiarCon(paso: PasoEscaner.analizando, segundosRestantes: 0));
@@ -255,13 +315,7 @@ class EscanerCubit extends Cubit<EscanerState> {
     _terminando = true;
     await _soltar();
     if (isClosed) return;
-    emit(
-      state.copiarCon(
-        paso: PasoEscaner.instrucciones,
-        lectura: const LecturaEnVivo(),
-        segundosRestantes: state.segundos,
-      ),
-    );
+    emit(_enBlanco(state).copiarCon(paso: PasoEscaner.instrucciones));
   }
 
   /// Suelta la cámara y los números de la medición.
@@ -272,9 +326,10 @@ class EscanerCubit extends Cubit<EscanerState> {
     // cancelación termina después; `_terminando` ya descarta lo que llegue.
     unawaited(_suscripcion?.cancel());
     _suscripcion = null;
-    _cuadros.clear();
-    _ultimaLectura = -1;
+    _control = null;
+    _estimador.reiniciar();
     _bajaDesde = null;
+    rostroEnVivo.value = null;
     await _fuente.cerrar();
   }
 
@@ -283,28 +338,6 @@ class EscanerCubit extends Cubit<EscanerState> {
         ? state.copiarCon(limpiarContexto: true)
         : state.copiarCon(contexto: contexto),
   );
-
-  /// Las mediciones del resultado: la FC y, si salió, la FR, con el método
-  /// de la cámara, la calidad y el motor en las notas.
-  List<MedicionNueva> _mediciones(ResultadoEscaner r, DestinoMedico? destino) {
-    final medidoEn = _ahora().toUtc();
-    MedicionNueva una(TipoMedicion tipo, int valor) => MedicionNueva(
-      tipo: tipo,
-      valor: valor,
-      metodo: r.modo.metodo,
-      calidad: double.parse(r.calidad.toStringAsFixed(2)),
-      contexto: state.contexto,
-      notas: r.notas,
-      medidoEn: medidoEn,
-      citaId: destino?.citaId,
-      consultaId: destino?.consultaId,
-    );
-
-    return [
-      una(TipoMedicion.fc, r.fc!),
-      if (r.fr != null) una(TipoMedicion.fr, r.fr!),
-    ];
-  }
 
   /// «Guardar en mis signos vitales» o, con [destino], «Enviar a mi
   /// médico»: lo mismo, adjunto a la cita o a la consulta.
@@ -317,7 +350,12 @@ class EscanerCubit extends Cubit<EscanerState> {
       final registro = await _cola.registrar(
         _uid,
         pacienteId: _pacienteId,
-        mediciones: _mediciones(resultado, destino),
+        mediciones: medicionesDelResultado(
+          resultado,
+          medidoEn: _ahora(),
+          contexto: state.contexto,
+          destino: destino,
+        ),
       );
       if (isClosed) return;
       emit(
@@ -352,7 +390,8 @@ class EscanerCubit extends Cubit<EscanerState> {
     _terminando = true;
     _vigilancia?.cancel();
     await _suscripcion?.cancel();
-    _cuadros.clear();
+    _control = null;
+    rostroEnVivo.dispose();
     await _fuente.cerrar();
     return super.close();
   }

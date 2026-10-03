@@ -106,7 +106,8 @@ List<Punto>? _frente(RostroDetectado r, double alturaFrente) {
   // Un poco más angosta que las cejas (las sienes tienen pelo) y un poco
   // por encima de ellas.
   final abajo = [
-    for (final p in cejas) Punto(medio + (p.x - medio) * 0.85, p.y - 0.03 * alto),
+    for (final p in cejas)
+      Punto(medio + (p.x - medio) * 0.85, p.y - 0.03 * alto),
   ];
   // Arriba se angosta otro poco: la frente se curva hacia las sienes.
   final arriba = [
@@ -132,9 +133,7 @@ List<Punto>? _frente(RostroDetectado r, double alturaFrente) {
     return null;
   }
 
-  final mejillas = [
-    for (final ojo in ojos) _mejilla(r, ojo!, nariz, labio),
-  ];
+  final mejillas = [for (final ojo in ojos) _mejilla(r, ojo!, nariz, labio)];
   // Cuál queda a la izquierda de la pantalla, por la posición de su ojo.
   final primeroALaIzquierda =
       centroideDe(ojos[0]!).x <= centroideDe(ojos[1]!).x;
@@ -155,17 +154,15 @@ List<Punto> _mejilla(
   final centroNariz = centroideDe(nariz);
   final izquierda = centroOjo.x < centroNariz.x;
   double haciaFuera(double x, double d) => izquierda ? x - d : x + d;
-  bool delLado(Punto p) => izquierda ? p.x < centroNariz.x : p.x > centroNariz.x;
+  bool delLado(Punto p) =>
+      izquierda ? p.x < centroNariz.x : p.x > centroNariz.x;
 
   // El borde inferior del ojo, de afuera hacia adentro, un poco más abajo
   // para no tomar las pestañas.
-  final bajoOjo =
-      [
-        for (final p in ojo)
-          if (p.y >= centroOjo.y) Punto(p.x, p.y + 0.03 * alto),
-      ]..sort(
-        (a, b) => izquierda ? a.x.compareTo(b.x) : b.x.compareTo(a.x),
-      );
+  final bajoOjo = [
+    for (final p in ojo)
+      if (p.y >= centroOjo.y) Punto(p.x, p.y + 0.03 * alto),
+  ]..sort((a, b) => izquierda ? a.x.compareTo(b.x) : b.x.compareTo(a.x));
 
   // El costado de la nariz y la comisura, un poco hacia la mejilla.
   final aleta = nariz.reduce(
@@ -183,11 +180,10 @@ List<Punto> _mejilla(
   // El óvalo de ese lado, entre la altura del ojo y la de la comisura, de
   // abajo hacia arriba y metido hacia la mejilla (el borde trae fondo).
   final ovalo = r.contornos[ContornoRostro.ovalo] ?? const <Punto>[];
-  var borde =
-      [
-        for (final p in ovalo)
-          if (delLado(p) && p.y > centroOjo.y && p.y < esquina.y) p,
-      ]..sort((a, b) => b.y.compareTo(a.y));
+  var borde = [
+    for (final p in ovalo)
+      if (delLado(p) && p.y > centroOjo.y && p.y < esquina.y) p,
+  ]..sort((a, b) => b.y.compareTo(a.y));
   if (borde.length < 2) {
     final x = izquierda
         ? r.caja.izquierda + 0.08 * ancho
@@ -199,7 +195,8 @@ List<Punto> _mejilla(
           ? ContornoRostro.mejillaIzquierda
           : ContornoRostro.mejillaDerecha]
       ?.firstOrNull;
-  final centro = mejilla ?? centroideDe([...bajoOjo, costado, esquina, ...borde]);
+  final centro =
+      mejilla ?? centroideDe([...bajoOjo, costado, esquina, ...borde]);
   final metido = [for (final p in borde) p.hacia(centro, 0.18)];
 
   return [...bajoOjo, costado, esquina, ...metido];

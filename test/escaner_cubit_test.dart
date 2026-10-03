@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
 import 'dobles/mediciones.dart';
+import 'dobles/rostro.dart';
 import 'dobles/senales.dart';
 
 /// Una imagen de un solo color en el formato pedido.
@@ -41,19 +42,21 @@ void main() {
       });
     });
 
-    EscanerCubit nuevo({int segundos = 20}) => EscanerCubit(
-      fuente: fuente,
-      motor: const MotorInterno(),
-      analizador: const AnalizadorDeMedicion(
-        local: MotorInterno(),
-        hayRed: _sinRed,
-      ),
-      cola: ColaMediciones(cache, MedicionesService(api.dio, cache)),
-      aviso: AvisoDelEscaner(cache),
-      uid: 'u1',
-      segundos: segundos,
-      ahora: () => DateTime.utc(2026, 10, 3, 15, 20),
-    );
+    EscanerCubit nuevo({int segundos = 20, bool dedoActivo = true}) =>
+        EscanerCubit(
+          fuente: fuente,
+          motor: const MotorInterno(),
+          analizador: const AnalizadorDeMedicion(
+            local: MotorInterno(),
+            hayRed: _sinRed,
+          ),
+          cola: ColaMediciones(cache, MedicionesService(api.dio, cache)),
+          aviso: AvisoDelEscaner(cache),
+          uid: 'u1',
+          segundos: segundos,
+          dedoActivo: dedoActivo,
+          ahora: () => DateTime.utc(2026, 10, 3, 15, 20),
+        );
 
     test('la primera vez, el aviso; después, recordado en la caché', () async {
       final cubit = nuevo();
@@ -210,6 +213,72 @@ void main() {
       expect(cubit.state.fallaPorPermiso, isTrue);
       await cubit.abrirAjustes();
       expect(fuente.ajustes, 1);
+      await cubit.close();
+    });
+
+    test('sin el modo dedo, después del aviso va directo al rostro', () async {
+      final cubit = nuevo(dedoActivo: false);
+      await cubit.iniciar();
+      expect(cubit.state.paso, PasoEscaner.aviso);
+      await cubit.aceptarAviso();
+      expect(cubit.state.paso, PasoEscaner.instrucciones);
+      expect(cubit.state.modo, ModoEscaner.rostro);
+
+      await cubit.volverAModos();
+      expect(cubit.state.paso, PasoEscaner.instrucciones);
+      await cubit.close();
+    });
+
+    test('rostro: arranca solo con la cara encuadrada, se pausa al perderla '
+        'y se detiene si no vuelve', () async {
+      final cubit = nuevo(segundos: 30, dedoActivo: false);
+      await cubit.iniciar();
+      cubit.elegirModo(ModoEscaner.rostro);
+      await cubit.empezar();
+      expect(cubit.state.paso, PasoEscaner.midiendo);
+      expect(cubit.state.fase, FaseMedicion.preparando);
+
+      final senal = cuadrosDeRostro(
+        Sintetizador(14).rostro(lpm: 72, segundos: 30),
+      );
+      CuadroPpg conCara(int i, {bool cara = true}) => senal[i].conRostro(
+        cara ? rostroSintetico(momento: senal[i].momento) : null,
+      );
+
+      // Sin cara: la guía lo dice y la cuenta no arranca.
+      for (var i = 0; i < 30; i++) {
+        fuente.emitir([conCara(i, cara: false)]);
+      }
+      expect(cubit.state.instruccion, InstruccionEncuadre.sinRostro);
+      expect(cubit.state.fase, FaseMedicion.preparando);
+      expect(cubit.state.segundosRestantes, 30);
+
+      // Con la cara bien puesta, a ~1 s arranca y la malla tiene rostro.
+      for (var i = 30; i < 75; i++) {
+        fuente.emitir([conCara(i)]);
+      }
+      expect(cubit.state.fase, FaseMedicion.midiendo);
+      expect(cubit.state.instruccion, InstruccionEncuadre.perfecto);
+      expect(cubit.rostroEnVivo.value, isNotNull);
+
+      // Más de 2 s sin cara: pausa, y la malla se queda sin rostro.
+      for (var i = 75; i < 150; i++) {
+        fuente.emitir([conCara(i, cara: false)]);
+      }
+      expect(cubit.state.fase, FaseMedicion.pausada);
+      expect(cubit.rostroEnVivo.value, isNull);
+      final enPausa = cubit.state.segundosRestantes;
+
+      // Más de 8 s sin cara: se detiene con un consejo.
+      for (var i = 150; i < 360; i++) {
+        fuente.emitir([conCara(i, cara: false)]);
+        if (cubit.state.paso != PasoEscaner.midiendo) break;
+        expect(cubit.state.segundosRestantes, enPausa);
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(cubit.state.paso, PasoEscaner.fallo);
+      expect(cubit.state.fallo, contains('Perdimos tu cara'));
+      expect(fuente.abierta, isFalse);
       await cubit.close();
     });
 

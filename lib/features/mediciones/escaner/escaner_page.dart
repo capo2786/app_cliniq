@@ -71,7 +71,8 @@ class EscanerPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final uid = context.read<AuthBloc>().usuario?.uid ?? '';
-    final segundos = context.config.telemedicina.escanerSegundos ?? 30;
+    final reglas = context.config.telemedicina;
+    final segundos = reglas.escanerSegundos ?? 30;
     const motor = MotorInterno();
 
     return BlocProvider(
@@ -90,6 +91,7 @@ class EscanerPage extends StatelessWidget {
         uid: uid,
         pacienteId: pacienteId,
         segundos: segundos,
+        dedoActivo: reglas.escanerDedoActivo,
       )..iniciar(),
       child: _VistaEscaner(
         destinoFijo: destino,

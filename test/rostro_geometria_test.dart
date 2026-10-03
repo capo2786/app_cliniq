@@ -112,10 +112,7 @@ void main() {
       expect(Caja.de(const []), isNull);
       expect(areaConSigno(cuadrado), 100);
       expect(centroideDe(cuadrado), const Punto(5, 5));
-      expect(
-        caja.normalizada(20, 40),
-        const Caja(0, 0, 0.5, 0.25),
-      );
+      expect(caja.normalizada(20, 40), const Caja(0, 0, 0.5, 0.25));
     });
 
     test('cubrir la pantalla: escala y recorte centrados', () {
@@ -177,8 +174,10 @@ void main() {
       const puntos = [Punto(0, 0), Punto(4, 0), Punto(4, 0), Punto(0, 3)];
       final ts = triangular(puntos);
       expect(ts, hasLength(1));
-      expect(ts.single.$1 == 2 || ts.single.$2 == 2 || ts.single.$3 == 2,
-          isFalse);
+      expect(
+        ts.single.$1 == 2 || ts.single.$2 == 2 || ts.single.$3 == 2,
+        isFalse,
+      );
     });
 
     test('~130 puntos al azar: válida, sin solapes y de Delaunay', () {
@@ -244,16 +243,18 @@ void main() {
       expect(mayorSalto, lessThan(5));
     });
 
-    test('si cambia la cantidad de puntos, salta directo; limpiar lo olvida',
-        () {
-      final s = SuavizadorDePuntos()
-        ..fijarObjetivo(const [Punto(0, 0)])
-        ..fijarObjetivo(const [Punto(5, 5), Punto(6, 6)]);
-      expect(s.puntos, const [Punto(5, 5), Punto(6, 6)]);
-      s.limpiar();
-      expect(s.vacio, isTrue);
-      s.avanzar(const Duration(milliseconds: 16));
-      expect(s.vacio, isTrue);
-    });
+    test(
+      'si cambia la cantidad de puntos, salta directo; limpiar lo olvida',
+      () {
+        final s = SuavizadorDePuntos()
+          ..fijarObjetivo(const [Punto(0, 0)])
+          ..fijarObjetivo(const [Punto(5, 5), Punto(6, 6)]);
+        expect(s.puntos, const [Punto(5, 5), Punto(6, 6)]);
+        s.limpiar();
+        expect(s.vacio, isTrue);
+        s.avanzar(const Duration(milliseconds: 16));
+        expect(s.vacio, isTrue);
+      },
+    );
   });
 }

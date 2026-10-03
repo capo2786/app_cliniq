@@ -70,7 +70,10 @@ void main() {
       }
       // Ni la nariz ni la boca entran.
       expect(region.contiene(c[ContornoRostro.baseNariz]![1]), isFalse);
-      expect(region.contiene(c[ContornoRostro.labioInferiorAbajo]![4]), isFalse);
+      expect(
+        region.contiene(c[ContornoRostro.labioInferiorAbajo]![4]),
+        isFalse,
+      );
     });
 
     test('sin contornos: rectángulos dentro de la caja', () {
@@ -90,13 +93,15 @@ void main() {
       expect(Caja.de(r.mejillaDerecha)!.centro.x, greaterThan(200));
     });
 
-    test('la rejilla está acotada: el costo por cuadro no crece con la cara',
-        () {
-      final grande = regionDesdeRostro(rostroSintetico(ancho: 440));
-      final total = grande.muestras(porZona: 300).length;
-      expect(total, lessThanOrEqualTo(900));
-      expect(total, greaterThan(300));
-    });
+    test(
+      'la rejilla está acotada: el costo por cuadro no crece con la cara',
+      () {
+        final grande = regionDesdeRostro(rostroSintetico(ancho: 440));
+        final total = grande.muestras(porZona: 300).length;
+        expect(total, lessThanOrEqualTo(900));
+        expect(total, greaterThan(300));
+      },
+    );
   });
 
   group('El promedio de solo la piel', () {
@@ -105,9 +110,7 @@ void main() {
       final imagen = imagenDeRostro(rostro);
       final cuadro = CuadroDeCamara(imagen: imagen, momento: Duration.zero);
       final region = regionDesdeRostro(rostro);
-      final candidatos = [
-        for (final p in region.muestras()) cuadro.pixelDe(p),
-      ];
+      final candidatos = [for (final p in region.muestras()) cuadro.pixelDe(p)];
       final piel = soloPiel(imagen, candidatos);
       // La frente sube hasta el pelo: algunos puntos quedan fuera.
       expect(piel.length, lessThan(candidatos.length));
@@ -177,24 +180,26 @@ void main() {
       );
     });
 
-    test('del punto que ve la persona al píxel del sensor girado y espejado',
-        () {
-      // Un sensor apaisado de 64 × 48 girado 270° (la frontal de Android):
-      // derecha mide 48 × 64.
-      final imagen = imagenBgra(64, 48, (_, _) => pielSintetica);
-      final cuadro = CuadroDeCamara(
-        imagen: imagen,
-        momento: Duration.zero,
-        rotacion: 270,
-        espejar: true,
-      );
-      expect(cuadro.anchoDerecho, 48);
-      expect(cuadro.altoDerecho, 64);
-      // Arriba a la izquierda en pantalla es arriba a la derecha de la
-      // imagen derecha sin espejar: en el sensor, la esquina (63, 47).
-      expect(cuadro.pixelDe(const Punto(0, 0)), (x: 63, y: 47));
-      expect(cuadro.pixelDe(const Punto(47.9, 0)), (x: 63, y: 0));
-    });
+    test(
+      'del punto que ve la persona al píxel del sensor girado y espejado',
+      () {
+        // Un sensor apaisado de 64 × 48 girado 270° (la frontal de Android):
+        // derecha mide 48 × 64.
+        final imagen = imagenBgra(64, 48, (_, _) => pielSintetica);
+        final cuadro = CuadroDeCamara(
+          imagen: imagen,
+          momento: Duration.zero,
+          rotacion: 270,
+          espejar: true,
+        );
+        expect(cuadro.anchoDerecho, 48);
+        expect(cuadro.altoDerecho, 64);
+        // Arriba a la izquierda en pantalla es arriba a la derecha de la
+        // imagen derecha sin espejar: en el sensor, la esquina (63, 47).
+        expect(cuadro.pixelDe(const Punto(0, 0)), (x: 63, y: 47));
+        expect(cuadro.pixelDe(const Punto(47.9, 0)), (x: 63, y: 0));
+      },
+    );
   });
 
   group('Desde ML Kit', () {

@@ -115,10 +115,10 @@ class PasoMidiendo extends StatelessWidget {
             ],
           ),
         ),
-        if (state.lectura.consejo != null) ...[
+        if ((state.instruccion?.texto ?? state.lectura.consejo) != null) ...[
           const SizedBox(height: 12),
           RecuadroAviso.alerta(
-            state.lectura.consejo!,
+            state.instruccion?.texto ?? state.lectura.consejo!,
             key: const Key('escaner-consejo'),
             icono: Icons.tips_and_updates_outlined,
           ),
