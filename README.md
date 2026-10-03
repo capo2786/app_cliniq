@@ -1674,10 +1674,18 @@ fvm flutter test
 | `procesamiento_ppg_test.dart` | El procesamiento de la PPG con señales sintéticas: remuestreo, tendencia, el filtro Butterworth (ganancias, fase cero, arranque), el espectro (Welch, Parseval, armónicos, bordes), el conteo de picos, la FC a 60, 72 y 110 lpm limpia, con ruido, deriva y movimientos, la señal plana y el solo ruido (calidad baja), la cobertura y la saturación del dedo, la FR (y que no se invente) y POS |
 | `extractor_de_cuadros_test.dart` | De la imagen a los números: YUV420, NV21 y BGRA, la yema, la saturación, la piel del rostro, la rotación del sensor y la serie con su JSON (solo números) |
 | `motor_signos_camara_test.dart` | El motor del teléfono (dedo, luminancia, rostro, sin dedo, en vivo y sus consejos), el análisis del servidor (lectura, reglas, con red, falla, plazo, sin red, serie corta) y a dónde se envía al médico |
-| `escaner_cubit_test.dart` | El escáner con una fuente falsa: el aviso recordado, medir y guardar, enviar al médico, sin red, el 409 de la cámara apagada, la calidad baja, el permiso y salir de la aplicación a mitad |
-| `escaner_page_test.dart` | Las pantallas del escáner: el aviso con el número de emergencias, los modos, la medición, el resultado (sin presión ni SpO2), el del servidor, el plan B, enviar al médico, sin la yema y el rostro con su óvalo |
+| `escaner_cubit_test.dart` | El escáner con una fuente falsa: el aviso recordado, sin el modo dedo directo al rostro, medir y guardar, enviar al médico, sin red, el 409 de la cámara apagada, la calidad baja, el permiso, el rostro que arranca solo, se pausa y se pierde, y salir de la aplicación a mitad |
+| `escaner_page_test.dart` | Las pantallas del escáner: el aviso con el número de emergencias, el selector (primero el rostro), la medición, el resultado en tarjetas (sin presión ni SpO2, con la tarjeta honesta y el rango), el del servidor, el plan B, enviar al médico, sin la yema y el rostro a pantalla completa |
+| `escaner_rostro_test.dart` | El rostro de punta a punta con imágenes sintéticas, el procesador de verdad y un detector falso: las esquinas, el barrido y la malla solo con detección (y sin ML Kit), la guía, el arranque solo y la pausa, la FC en vivo con sus latidos, y el resultado con su detalle y las gráficas (y «No hay suficiente señal…») |
+| `rostro_geometria_test.dart` | Punto en polígono, el ajuste que cubre la pantalla, Delaunay (válida, sin solapes y de Delaunay con ~130 puntos, rejillas, repetidos y los contornos de un rostro) y el suavizado |
+| `rostro_region_test.dart` | La frente y las mejillas desde los contornos, el promedio de solo la piel en una imagen sintética, el giro y el espejo de cada plataforma, y la conversión desde y hacia ML Kit |
+| `procesador_de_rostro_test.dart` | El ritmo de la detección (~10 por segundo, sin bloquear), el promedio en cada cuadro con la última región, la detección vieja y el respaldo por color de piel |
+| `guia_encuadre_test.dart` | Cada instrucción de la guía de encuadre, su prioridad y el respaldo sin ML Kit |
+| `medicion_en_vivo_test.dart` | La cuenta (arranque solo, parpadeo, pausa sin el hueco, pérdida) y la FC en vivo con una señal sintética a 72 lpm |
+| `detalle_medicion_test.dart` | pNN50, SD1, SD2 y el intervalo medio, mínimo y máximo con series de RR conocidas, la limpieza, la FC por segundo, el detalle de una medición y los rangos de referencia para adultos |
+| `tendencias_test.dart` | Las tendencias por tipo y periodo, y la pestaña con varios tipos, el cambio de periodo y sin red |
 | `mediciones_datos_test.dart` | El modelo, las reglas (rangos, hora, calidad), `/portal/mediciones` (paginación, copia sin red, POST y DELETE) y la cola sin red en la caché |
-| `mis_signos_vitales_page_test.dart` | «Mis signos vitales» (insignias, evolución, «?», el escáner según la configuración, borrar, error), «Registrar» (el pulso, la presión, sin red, desde una cita) y el acceso desde la cita |
+| `mis_signos_vitales_page_test.dart` | «Mis signos vitales» (las pestañas, insignias, evolución, «?», el escáner según la configuración, borrar, error), «Registrar» (el pulso, la presión, sin red, desde una cita) y el acceso desde la cita |
 | `envio_pendientes_test.dart` | Lo registrado sin red sale al entrar y al volver la red |
 
 Las pruebas de blocs nunca esperan un tiempo fijo: esperan el estado que

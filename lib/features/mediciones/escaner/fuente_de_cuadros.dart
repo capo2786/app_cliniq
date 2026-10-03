@@ -65,7 +65,8 @@ abstract class FuenteDeCuadros {
   Stream<CuadroPpg> get cuadros;
 
   /// Lo que se ve en pantalla mientras se mide: la vista de la cámara
-  /// frontal en el modo rostro (para encajar la cara en el óvalo), o nada.
+  /// frontal en el modo rostro, cubriendo todo el espacio (para encajar la
+  /// cara en el marco), o nada.
   Widget vistaPrevia(BuildContext context);
 
   /// Apaga el flash y suelta la cámara. Se puede llamar más de una vez.

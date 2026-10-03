@@ -12,11 +12,12 @@
 ///   luminancia Y), la **cobertura** (la fracción de puntos rojos y
 ///   brillantes, como se ve la yema con el flash detrás) y la
 ///   **saturación** (la fracción de rojos quemados).
-/// - **Rostro:** la frente y las dos mejillas dentro del óvalo que la
-///   persona ve en pantalla, y de ahí solo los puntos de **piel** (por su
-///   color en YCbCr). Qué puntos son piel se decide cada
-///   [ExtractorDeRostro.cuadrosPorMascara] cuadros y se mantiene entre medio,
-///   para que el conjunto de píxeles no cambie de un cuadro a otro.
+/// - **Rostro, sin ML Kit (respaldo):** la frente y las dos mejillas
+///   dentro de un óvalo fijo en el marco que la persona ve en pantalla, y
+///   de ahí solo los puntos de **piel** (por su color en YCbCr). Qué puntos
+///   son piel se decide cada [ExtractorDeRostro.cuadrosPorMascara] cuadros
+///   y se mantiene entre medio, para que el conjunto de píxeles no cambie
+///   de un cuadro a otro.
 library;
 
 import 'dart:math' as math;
@@ -173,7 +174,7 @@ CuadroPpg reducirDedo(ImagenCruda imagen, Duration momento) {
 /// como la ve la persona.
 typedef Region = ({double x0, double y0, double x1, double y1});
 
-/// El óvalo de la pantalla del rostro, en coordenadas normalizadas de la
+/// El óvalo fijo del respaldo (sin ML Kit), en coordenadas normalizadas de la
 /// imagen derecha: centro y semiejes.
 class Ovalo {
   final double cx;

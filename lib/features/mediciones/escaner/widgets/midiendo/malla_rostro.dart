@@ -117,7 +117,8 @@ class _MallaDelRostroState extends State<MallaDelRostro>
     final lpm = widget.fc ?? MallaDelRostro.ritmoNeutro;
     _fase = (_fase + dt.inMicroseconds / 1e6 * lpm / 60) % 1;
     _suavizador.avanzar(dt);
-    if (_visible || !_suavizador.vacio) setState(() {});
+    // Sin cara no hay nada que mover: solo se repinta mientras se ve.
+    if (_visible) setState(() {});
   }
 
   @override
