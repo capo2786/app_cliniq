@@ -11,11 +11,13 @@ library;
 
 import 'dart:math' as math;
 
+import 'package:equatable/equatable.dart';
+
 import 'correccion_intervalos.dart';
 import 'estadistica.dart';
 
 /// Las medidas de una serie de intervalos (en ms).
-class MetricasRr {
+class MetricasRr extends Equatable {
   final int intervalos;
 
   /// El intervalo medio, el más corto y el más largo.
@@ -93,6 +95,20 @@ class MetricasRr {
 
   /// Pocas correcciones: como mucho el 10 % de los intervalos.
   bool get pocasCorrecciones => corregidos <= 0.1 * intervalos;
+
+  @override
+  List<Object?> get props => [
+    intervalos,
+    medio,
+    minimo,
+    maximo,
+    sdnn,
+    rmssd,
+    pnn50,
+    sd1,
+    sd2,
+    corregidos,
+  ];
 
   static double _desviacionMuestral(List<double> x) {
     if (x.length < 2) return 0;

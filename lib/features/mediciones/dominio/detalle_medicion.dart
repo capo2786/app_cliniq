@@ -8,10 +8,16 @@
 /// calcularlo, y agrega lo que falta: la FC por segundo, los intervalos
 /// corregidos con sus medidas (pNN50, SD1, SD2) y la onda lenta de la
 /// respiración.
+///
+/// Se guarda con el pulso medido con la cámara, solo números, en el formato
+/// v1 de `formato_detalle.dart` ([aJson] y [DetalleMedicion.desdeJson]).
 library;
 
 import 'dart:math' as math;
 
+import 'package:equatable/equatable.dart';
+
+import 'formato_detalle.dart';
 import 'procesamiento_ppg.dart';
 import 'reglas_mediciones.dart';
 
@@ -19,7 +25,7 @@ import 'reglas_mediciones.dart';
 /// relativa (1 en el máximo de la banda).
 typedef PuntoEspectro = ({double lpm, double potencia});
 
-class DetalleMedicion {
+class DetalleMedicion extends Equatable {
   /// Los segundos medidos.
   final double duracion;
 
@@ -125,6 +131,30 @@ class DetalleMedicion {
     );
   }
 
+  /// Lee el detalle guardado (formato v1). Tolerante: si algo no cuadra,
+  /// `null` en vez de lanzar.
+  static DetalleMedicion? desdeJson(Object? json) => detalleDesdeJson(json);
+
+  /// El detalle en el formato v1, redondeado y dentro de sus límites.
+  Map<String, dynamic> aJson() => detalleAJson(this);
+
+  /// El mismo detalle sin la onda de la respiración (cuando la FR no salió,
+  /// no se guarda).
+  DetalleMedicion sinRespiracion() => DetalleMedicion(
+    duracion: duracion,
+    calidad: calidad,
+    onda: onda,
+    latidosEnOnda: latidosEnOnda,
+    fs: fs,
+    latidos: latidos,
+    fcPorSegundo: fcPorSegundo,
+    intervalos: intervalos,
+    metricas: metricas,
+    vfcValida: vfcValida,
+    espectro: espectro,
+    picoLpm: picoLpm,
+  );
+
   /// La calidad alcanza para los datos extra.
   bool get calidadSuficiente => calidad >= umbralCalidadRegular;
 
@@ -151,6 +181,24 @@ class DetalleMedicion {
   double? get fcMaxima => fcPorSegundo.isEmpty
       ? null
       : fcPorSegundo.map((p) => p.fc).reduce(math.max);
+
+  @override
+  List<Object?> get props => [
+    duracion,
+    calidad,
+    onda,
+    latidosEnOnda,
+    fs,
+    latidos,
+    fcPorSegundo,
+    intervalos,
+    metricas,
+    vfcValida,
+    espectro,
+    picoLpm,
+    respiracion,
+    fsRespiracion,
+  ];
 
   static List<double> _normalizada(List<double> x) {
     if (x.isEmpty) return const [];
