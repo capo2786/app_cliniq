@@ -176,6 +176,17 @@ void main() {
       expect(mala.valido, isFalse);
       expect(mala.consejo, 'Muy poca luz');
 
+      // Señal plana: el servidor responde sin FC
+      final plana = AnalisisEnServidor.leerResultado({
+        'fc': null,
+        'calidad': 0.0,
+        'motor': 'senales-ms 0.1.0',
+        'advertencias': ['No se detectó pulso'],
+      }, ModoEscaner.dedo);
+      expect(plana.valido, isFalse);
+      expect(plana.fc, isNull);
+      expect(plana.consejo, 'No se detectó pulso');
+
       expect(
         () => AnalisisEnServidor.leerResultado({'fc': 70}, ModoEscaner.dedo),
         throwsFormatException,
