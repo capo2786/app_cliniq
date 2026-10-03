@@ -14,6 +14,7 @@ import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/encuestas/data/encuestas_service.dart';
 import '../features/legal/data/legal_service.dart';
+import '../features/mediciones/data/analisis_en_servidor.dart';
 import '../features/mediciones/data/cola_mediciones.dart';
 import '../features/mediciones/data/mediciones_service.dart';
 import '../features/privacidad/data/arco_service.dart';
@@ -213,6 +214,12 @@ class Servicios {
   static final ColaMediciones colaMediciones = ColaMediciones(
     cache,
     mediciones,
+  );
+
+  /// El análisis experimental del escáner en el servidor: le llega solo la
+  /// serie de números de la medición, nunca imágenes.
+  static final AnalisisEnServidor analisisEnServidor = AnalisisEnServidor(
+    ApiClient().dio,
   );
 
   /// Los artículos del centro de ayuda.
