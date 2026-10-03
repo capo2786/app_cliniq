@@ -52,6 +52,43 @@ Color _colorDelNivel(NivelCalidad nivel) => switch (nivel) {
   NivelCalidad.baja => AppColors.peligroSuave,
 };
 
+/// Las insignias de una medición: el método (el origen), la calidad si es
+/// de la cámara, si se envió al médico y si el médico la usó. Las comparten
+/// la lista y el detalle.
+List<Widget> insigniasDeMedicion(Medicion m) {
+  final calidad = m.calidad;
+  return [
+    insigniaDelMetodo(m.metodo),
+    if (m.metodo.esCamara && calidad != null)
+      Pastilla(
+        texto: nombreDelNivel(nivelDeCalidad(calidad)),
+        color: _colorDelNivel(nivelDeCalidad(calidad)),
+      ),
+    if (m.enviadaAlMedico)
+      const Pastilla(
+        texto: 'Enviada a tu médico',
+        color: AppColors.celeste,
+        icono: Icons.send_rounded,
+      ),
+    if (m.usada)
+      const Pastilla(
+        texto: 'Usada en una atención',
+        color: AppColors.exito,
+        icono: Icons.check_rounded,
+      ),
+  ];
+}
+
+/// La flecha que dice que una tarjeta se abre.
+const Widget _flechaDeAbrir = Padding(
+  padding: EdgeInsets.only(top: 10, left: 2),
+  child: Icon(
+    Icons.chevron_right_rounded,
+    color: AppColors.textoTenue,
+    size: 22,
+  ),
+);
+
 /// «Hoy», «Ayer» o «Lunes 28 de septiembre»: el día de una medición en la
 /// hora de la clínica.
 String diaDeLaMedicion(DateTime medidoEn, DateTime ahora) {
@@ -69,16 +106,19 @@ String diaDeLaMedicion(DateTime medidoEn, DateTime ahora) {
       : FormatoFecha.diaLargoConAnio(dia);
 }
 
-/// Una medición en la lista.
+/// Una medición en la lista. Con [alAbrir], se toca para ver su detalle:
+/// lleva la flecha y es un botón para los lectores de pantalla.
 class TarjetaMedicion extends StatelessWidget {
   final Medicion medicion;
   final VoidCallback? alEliminar;
+  final VoidCallback? alAbrir;
   final bool eliminando;
 
   const TarjetaMedicion({
     super.key,
     required this.medicion,
     this.alEliminar,
+    this.alAbrir,
     this.eliminando = false,
   });
 
@@ -86,11 +126,11 @@ class TarjetaMedicion extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = medicion;
     final color = colorDelTipo(m.tipo);
-    final calidad = m.calidad;
     final hora = FormatoFecha.hora(enHoraDeLaClinica(m.medidoEn));
 
-    return TarjetaTranslucida(
+    final tarjeta = TarjetaTranslucida(
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      onTap: alAbrir,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -132,26 +172,7 @@ class TarjetaMedicion extends StatelessWidget {
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: [
-                    insigniaDelMetodo(m.metodo),
-                    if (m.metodo.esCamara && calidad != null)
-                      Pastilla(
-                        texto: nombreDelNivel(nivelDeCalidad(calidad)),
-                        color: _colorDelNivel(nivelDeCalidad(calidad)),
-                      ),
-                    if (m.citaId != null || m.consultaId != null)
-                      const Pastilla(
-                        texto: 'Enviada a tu médico',
-                        color: AppColors.celeste,
-                        icono: Icons.send_rounded,
-                      ),
-                    if (m.usada)
-                      const Pastilla(
-                        texto: 'Usada en una atención',
-                        color: AppColors.exito,
-                        icono: Icons.check_rounded,
-                      ),
-                  ],
+                  children: insigniasDeMedicion(m),
                 ),
                 if (m.notas != null && !m.notas!.startsWith('motor:')) ...[
                   const SizedBox(height: 6),
@@ -186,21 +207,33 @@ class TarjetaMedicion extends StatelessWidget {
                       color: AppColors.textoTenue,
                     ),
                   ),
+          if (alAbrir != null) _flechaDeAbrir,
         ],
       ),
+    );
+
+    if (alAbrir == null) return tarjeta;
+    return Semantics(
+      container: true,
+      button: true,
+      hint: 'Ver el detalle de la medición',
+      child: tarjeta,
     );
   }
 }
 
-/// Un envío que espera red (o que el servidor rechazó).
+/// Un envío que espera red (o que el servidor rechazó). Con [alAbrir], se
+/// toca para ver su detalle.
 class TarjetaPendiente extends StatelessWidget {
   final EnvioPendiente envio;
   final VoidCallback alDescartar;
+  final VoidCallback? alAbrir;
 
   const TarjetaPendiente({
     super.key,
     required this.envio,
     required this.alDescartar,
+    this.alAbrir,
   });
 
   @override
@@ -209,9 +242,10 @@ class TarjetaPendiente extends StatelessWidget {
     final momento = envio.mediciones.first.medidoEn;
     final cuando = FormatoFecha.cortaConHora(enHoraDeLaClinica(momento));
 
-    return TarjetaTranslucida(
+    final tarjeta = TarjetaTranslucida(
       tinte: color,
       padding: const EdgeInsets.fromLTRB(14, 12, 6, 12),
+      onTap: alAbrir,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -259,8 +293,17 @@ class TarjetaPendiente extends StatelessWidget {
             onPressed: alDescartar,
             icon: const Icon(Icons.close_rounded, color: AppColors.textoTenue),
           ),
+          if (alAbrir != null) _flechaDeAbrir,
         ],
       ),
+    );
+
+    if (alAbrir == null) return tarjeta;
+    return Semantics(
+      container: true,
+      button: true,
+      hint: 'Ver el detalle de la medición',
+      child: tarjeta,
     );
   }
 }

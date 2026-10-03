@@ -12,6 +12,7 @@ import '../../consultas/presentacion/detalle_consulta_page.dart';
 import '../../dependientes/presentacion/dependientes_page.dart';
 import '../../encuestas/presentacion/encuesta_page.dart';
 import '../../legal/presentacion/documento_legal_page.dart';
+import '../../mediciones/presentacion/detalle/detalle_medicion_page.dart';
 import '../../mediciones/presentacion/mis_signos_vitales_page.dart';
 import '../../mi_salud/presentacion/mi_salud_page.dart';
 import '../../perfil/presentacion/perfil_page.dart';
@@ -60,6 +61,9 @@ Widget pantallaNativa(
     ),
     PantallaNativa.miSalud => const MiSaludPage(),
     PantallaNativa.mediciones => const MisSignosVitalesPage(),
+    PantallaNativa.medicion => DetalleMedicionPage(
+      medicionId: destino.parametro('id'),
+    ),
     // Los enlaces internos de un artículo se abren con el mismo enrutador
     PantallaNativa.ayuda => const CentroAyudaPage(abrirRuta: _abrirRutaInterna),
     PantallaNativa.soporte => const SoportePage(),

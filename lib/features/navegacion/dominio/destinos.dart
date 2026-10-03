@@ -40,6 +40,9 @@ enum PantallaNativa {
   /// Mis signos vitales: `/portal/mediciones`.
   mediciones,
 
+  /// El detalle de una medición: `/portal/mediciones/:id`.
+  medicion,
+
   ayuda,
   soporte,
 
@@ -80,6 +83,7 @@ const List<RutaDelSistema> rutasDelSistema = [
   RutaDelSistema('/legal/:slug', PantallaNativa.legal),
   RutaDelSistema('/mi-salud', PantallaNativa.miSalud),
   RutaDelSistema('/portal/mediciones', PantallaNativa.mediciones),
+  RutaDelSistema('/portal/mediciones/:id', PantallaNativa.medicion),
   RutaDelSistema('/ayuda', PantallaNativa.ayuda),
   RutaDelSistema('/soporte', PantallaNativa.soporte),
   RutaDelSistema('/soporte/tickets/:id', PantallaNativa.ticket),
