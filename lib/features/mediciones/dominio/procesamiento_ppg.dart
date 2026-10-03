@@ -65,6 +65,7 @@ export 'ppg/picos.dart';
 export 'ppg/pos.dart';
 export 'ppg/respiracion.dart';
 export 'ppg/tendencia.dart';
+export 'ppg/variabilidad.dart';
 
 /// El resultado del análisis de una señal PPG.
 class AnalisisPpg {

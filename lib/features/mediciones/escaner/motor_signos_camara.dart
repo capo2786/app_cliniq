@@ -4,6 +4,7 @@ import 'dart:math' as math;
 
 import 'package:equatable/equatable.dart';
 
+import '../dominio/detalle_medicion.dart';
 import '../dominio/procesamiento_ppg.dart';
 import '../dominio/reglas_mediciones.dart';
 import 'consejos_escaner.dart';
@@ -59,6 +60,11 @@ class ResultadoEscaner extends Equatable {
   /// Si no se pudo medir: qué hacer para la próxima.
   final String? consejo;
 
+  /// El detalle y las gráficas, calculados siempre en el teléfono con la
+  /// misma serie (también cuando el resultado es del servidor). No se
+  /// guarda.
+  final DetalleMedicion? detalle;
+
   const ResultadoEscaner({
     required this.modo,
     required this.calidad,
@@ -69,7 +75,22 @@ class ResultadoEscaner extends Equatable {
     this.origen = OrigenAnalisis.telefono,
     this.advertencias = const [],
     this.consejo,
+    this.detalle,
   });
+
+  /// El mismo resultado con el [detalle] del teléfono.
+  ResultadoEscaner conDetalle(DetalleMedicion? detalle) => ResultadoEscaner(
+    modo: modo,
+    calidad: calidad,
+    motor: motor,
+    fc: fc,
+    fr: fr,
+    vfc: vfc,
+    origen: origen,
+    advertencias: advertencias,
+    consejo: consejo,
+    detalle: detalle,
+  );
 
   /// Hay un valor que enseñar: una FC con la calidad mínima.
   bool get valido => fc != null && calidad >= calidadMinimaParaMostrar;
@@ -90,6 +111,7 @@ class ResultadoEscaner extends Equatable {
     origen,
     advertencias,
     consejo,
+    detalle,
   ];
 }
 
@@ -303,6 +325,9 @@ class MotorInterno implements MotorSignosCamara {
       consejo: valido
           ? null
           : ConsejosEscaner.paraElMotivo(analisis.calidad.motivo, serie.modo),
+      detalle: valido
+          ? DetalleMedicion.desde(analisis, duracion: serie.duracion)
+          : null,
     );
   }
 }
