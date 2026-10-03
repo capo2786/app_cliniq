@@ -83,7 +83,6 @@ Map<String, dynamic> configJson({
     'medicionesPacienteActiva': true,
     'escanerCamaraActivo': false,
     'escanerSegundos': 30,
-    'escanerDedoActivo': false,
   }, telemedicina),
   'archivos': _mezclar({
     'tamanoMaximoMb': 20,
