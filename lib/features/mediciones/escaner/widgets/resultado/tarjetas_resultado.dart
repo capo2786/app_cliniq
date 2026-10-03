@@ -6,32 +6,37 @@ import '../../../../../core/tema/tokens.dart';
 import '../../../data/models/medicion.dart';
 import '../../../dominio/rangos_referencia.dart';
 import '../../../dominio/reglas_mediciones.dart';
-import '../../motor_signos_camara.dart';
+import '../../valores_del_resultado.dart';
 import '../pasos_comunes.dart';
 
 /// Los valores del resultado en tarjetas de dos columnas, que entran una
 /// tras otra y con los números subiendo: la FC con su rango, la FR y la
 /// variabilidad si vienen, y la calidad. Solo lo que la cámara mide.
+///
+/// Las usan el resultado del escáner y el detalle de una medición guardada
+/// (`ValoresDelResultado`).
 class TarjetasResultado extends StatelessWidget {
-  final ResultadoEscaner resultado;
+  final ValoresDelResultado valores;
 
-  const TarjetasResultado({super.key, required this.resultado});
+  const TarjetasResultado({super.key, required this.valores});
 
   @override
   Widget build(BuildContext context) {
-    final r = resultado;
+    final r = valores;
     final vfc = r.vfc;
+    final calidad = r.calidad;
     final tarjetas = <Widget>[
-      _TarjetaValor(
-        key: const Key('escaner-tarjeta-fc'),
-        icono: Icons.favorite_rounded,
-        color: AppColors.peligroSuave,
-        titulo: 'Frecuencia cardiaca',
-        valor: r.fc!,
-        valorKey: const Key('escaner-fc'),
-        unidad: 'lpm',
-        rango: etiquetaDeRango(TipoMedicion.fc, r.fc!),
-      ),
+      if (r.fc != null)
+        _TarjetaValor(
+          key: const Key('escaner-tarjeta-fc'),
+          icono: Icons.favorite_rounded,
+          color: AppColors.peligroSuave,
+          titulo: 'Frecuencia cardiaca',
+          valor: r.fc!,
+          valorKey: const Key('escaner-fc'),
+          unidad: 'lpm',
+          rango: etiquetaDeRango(TipoMedicion.fc, r.fc!),
+        ),
       if (r.fr != null)
         _TarjetaValor(
           key: const Key('escaner-fr'),
@@ -59,7 +64,7 @@ class TarjetasResultado extends StatelessWidget {
           unidad: 'ms',
         ),
       ],
-      _TarjetaCalidad(calidad: r.calidad),
+      if (calidad != null) _TarjetaCalidad(calidad: calidad),
     ];
 
     final filas = <Widget>[];

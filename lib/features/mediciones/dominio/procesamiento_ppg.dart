@@ -58,6 +58,7 @@ import 'ppg/tendencia.dart';
 
 export 'ppg/calidad.dart';
 export 'ppg/constantes.dart';
+export 'ppg/correccion_intervalos.dart';
 export 'ppg/espectro.dart';
 export 'ppg/fc_por_ventana.dart';
 export 'ppg/filtros.dart';

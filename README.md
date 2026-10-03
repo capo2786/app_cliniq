@@ -458,9 +458,12 @@ lib/
                               partes), órdenes, certificados de reposo, la firma electrónica
                               y el visor de PDF
     mediciones/               «Mis signos vitales» (lista, evolución, Registrar, la cola sin
-                              red) y el escáner experimental: escaner/ (cámara, extracción,
+                              red, el detalle de una medición en presentacion/detalle/) y
+                              el escáner experimental: escaner/ (cámara, extracción,
                               motor, cubit y pasos) y dominio/procesamiento_ppg.dart con
-                              dominio/ppg/ (el cálculo puro de la FC, la FR y la calidad)
+                              dominio/ppg/ (el cálculo puro de la FC, la FR, la calidad y
+                              la corrección de los intervalos); el formato del detalle y su
+                              validación en dominio/
     ayuda/                    centro de ayuda («Tu guía» primero, búsqueda, categorías y
                               artículos en Markdown nativo) y los botones de ayuda («?»)
     soporte/                  mis tickets, ticket nuevo y la conversación con soporte
@@ -547,6 +550,7 @@ de la campana y los enlaces de los textos (`abrirRuta`, en
 | `/legal/:slug` | El documento legal |
 | `/mi-salud` | Mi salud (también desde los avisos «Tu receta está lista» y «Tu certificado de reposo está listo») |
 | `/portal/mediciones` | Mis signos vitales |
+| `/portal/mediciones/:id` | El detalle de una medición (también la de un dependiente: el servidor decide si es de quien pregunta) |
 | `/ayuda`, `/soporte`, `/soporte/tickets/:id` | El centro de ayuda, soporte y el ticket (dentro de un artículo, `/ayuda?articulo=<id>` abre ese artículo) |
 
 La consulta y el fragmento de la ruta se ignoran. Una ruta del menú que la
@@ -1139,7 +1143,32 @@ hay accesos ni «Registrar».
   de la cámara (buena, regular o baja); «Enviada a tu médico» y «Usada en
   una atención». Lo propio que el médico no usó se puede borrar (pregunta
   antes; el servidor lo comprueba). «Ver mediciones anteriores» pide la
-  página siguiente.
+  página siguiente. Cada tarjeta (y cada envío pendiente) **se toca**: lleva
+  una flecha, es un botón para los lectores de pantalla y abre «Detalle de
+  la medición».
+- **«Detalle de la medición»** (`presentacion/detalle/`, ruta
+  `/portal/mediciones/:id`): arriba, la cabecera con el valor grande, el
+  tipo, la fecha y la hora, las insignias, el momento, quién la analizó
+  (si es de la cámara) y las notas. Debajo, según el caso
+  (`ficha_medicion.dart`, puro y probado):
+  - **el pulso de la cámara con detalle**: se pide entero con
+    `GET /portal/mediciones/:id` (las listas solo dicen `tieneDetalle`) y
+    se enseñan **las mismas tarjetas y las mismas seis gráficas del
+    resultado del escáner**, con sus widgets (`TarjetasResultado`,
+    `DetalleDeLaMedicion`); la respiración del mismo escaneo va en las
+    tarjetas;
+  - **de la cámara sin detalle** (las de antes): las tarjetas que haya (FC,
+    FR y calidad) y «Esta medición es anterior al detalle: las gráficas se
+    guardan en las mediciones nuevas.»;
+  - **de un aparato o a mano**: los datos (la sistólica y la diastólica en
+    la presión, la referencia, el momento y cómo se midió), sin gráficas;
+  - **pendiente de envío**: los datos de la cola, detalle incluido, con
+    «Pendiente de envío» y «Descartar».
+
+  Cargando, sin red (con la copia de las últimas diez abiertas, o sin ella)
+  y el 404 («Esta medición ya no existe») usan los widgets de estado.
+  «Eliminar» pregunta lo mismo que la lista y, al volver, la lista y las
+  tendencias se refrescan.
 - **Dos pestañas: «Tendencias» y «Registro».** «Registro» es la lista de
   arriba. «Tendencias» (la que abre) pide al servidor las mediciones del
   periodo elegido —**7 días, 30 días o 3 meses**— con `desde` y
@@ -1182,8 +1211,11 @@ hay accesos ni «Registrar».
   escribió o midió, y no se hacen pasar por guardados en la clínica.
 - **El servicio** (`MedicionesService`): `GET /portal/mediciones` (el
   titular sin `pacienteId`; un dependiente, con el suyo), con copia de la
-  primera página para verla sin red; `POST` con hasta 10 mediciones;
-  `DELETE /portal/mediciones/:id`. El contrato dice «paginadas» sin fijar
+  primera página para verla sin red; `GET /portal/mediciones/:id` (la
+  completa, con su `detalle`; se guardan las últimas diez abiertas en
+  `mediciones-completas:<uid>`, unos 10 KB cada una); `POST` con hasta 10
+  mediciones; `DELETE /portal/mediciones/:id` (también borra su copia). El
+  contrato dice «paginadas» sin fijar
   la forma: se leen `{items, total, page, limit}` (o `pagina`/`limite`),
   `{items, hayMas}` y una lista sola, y la página siguiente se pide con el
   nombre de parámetro que use el servidor.
@@ -1257,8 +1289,9 @@ decide si usa el valor (queda marcado su origen).
 - **El resultado**: tarjetas en dos columnas que entran escalonadas, con
   los números subiendo: la FC con su etiqueta de rango («En rango
   (60–100)», «Alta», «Baja»), la FR en rpm si la calidad es ≥ 0,6 y hay un
-  pico respiratorio claro, la variabilidad (SDNN y RMSSD en ms) si la
-  calculó el servidor, y la calidad (buena desde 0,7, regular desde 0,4,
+  pico respiratorio claro, la variabilidad (SDNN y RMSSD en ms) del
+  servidor o, si no vino, la del teléfono cuando es válida (ver abajo), y
+  la calidad (buena desde 0,7, regular desde 0,4,
   baja por debajo; por debajo de 0,3 no se da ningún valor: «No pudimos
   medir esta vez» con un consejo). Una tarjeta honesta, «Presión y
   saturación: regístralas con tu tensiómetro u oxímetro», lleva a
@@ -1267,10 +1300,12 @@ decide si usa el valor (queda marcado su origen).
   (experimental)».
 - **«Detalle de la medición»**, debajo: calculado **en el teléfono** con la
   misma serie aunque el resultado sea del servidor («Detalle calculado en
-  tu teléfono»), y sin guardarse. Datos en tarjetas pequeñas, solo con la
-  calidad que los sostiene: intervalo medio entre latidos, FC mínima y
-  máxima, latidos detectados, y con buena calidad, 30 s o más y 20
-  intervalos, pNN50, SD1 y SD2; siempre la duración y la calidad (%). Seis
+  tu teléfono»), y **guardado con el pulso** (ver «El detalle se guarda»).
+  Datos en tarjetas pequeñas, solo con la calidad que los sostiene:
+  intervalo medio entre latidos, FC mínima y máxima, latidos detectados, y
+  con la variabilidad válida (buena calidad, 30 s o más, 20 intervalos y
+  como mucho un 10 % de intervalos corregidos), pNN50, SD1 y SD2; siempre
+  la duración y la calidad (%). Seis
   gráficas con su explicación sencilla: la onda del pulso con sus latidos,
   la FC durante la medición con la franja de 60 a 100, los intervalos entre
   latidos (tacograma), Poincaré con SD1 y SD2, el espectro de 42 a 210 lpm
@@ -1278,21 +1313,45 @@ decide si usa el valor (queda marcado su origen).
   Sin datos suficientes, «No hay suficiente señal para esta gráfica».
   Nunca estrés, SpO2, presión, LF/HF ni nada que 30 s de cámara no
   sostengan.
+- **Los intervalos, corregidos** (`dominio/ppg/correccion_intervalos.dart`,
+  igual que en el servidor): los picos se afinan con una parábola por tres
+  puntos (`refinarPicos`; sin eso cada latido queda pegado a un cuadro,
+  ~33 ms, y el RMSSD sube); después, con la mediana de los 7 intervalos
+  vecinos (de los originales), de izquierda a derecha: un **pico mal
+  ubicado** (uno corto y otro largo que suman dos normales, como 620 + 860
+  ms donde había dos de ~740) mueve el latido al punto medio (cuenta 2);
+  **dos cortos** que suman uno se juntan (cuenta 1); **uno doble** se parte
+  (cuenta 1). Lo que sigue fuera de 42–210 lpm o a más del 20 % de la
+  mediana de sus 5 vecinos se descarta (también cuenta). Las diferencias
+  sucesivas y el Poincaré solo usan intervalos consecutivos.
+- **El detalle se guarda** con la FC de la cámara (formato v1 del contrato,
+  `dominio/formato_detalle.dart`): **solo números** —la onda de los
+  últimos 10 s normalizada, sus latidos, la FC por segundo, los intervalos
+  corregidos, las métricas, el espectro, el pico y la onda de la
+  respiración (solo si salió la FR)—, nunca imágenes ni la serie cruda.
+  Se redondea (3 decimales en la onda, la respiración y la potencia; 2 en
+  la calidad; 1 en lo demás) y ocupa ~10 KB (el máximo es 48 KB). Antes de
+  enviarlo o de guardarlo en la cola, una función pura lo valida con los
+  límites del servidor (`dominio/validacion_detalle.dart`); si no pasa, la
+  medición va sin él: **nunca se pierde una medición por su detalle**. Al
+  leerlo (`DetalleMedicion.desdeJson`), lo que no cuadra da `null` en vez
+  de un error.
 - Después, «Guardar en mis signos vitales», «Enviar a mi
   médico» (adjunta la medición a la **próxima cita de telemedicina** o a
   una **consulta en línea abierta** de ese paciente, la que la persona
   elija; abierto desde una cita o una consulta, a esa) o «Descartar». Se
   guardan `FC` (y `FR` si salió) con el método `CAMARA_DEDO` o
   `CAMARA_ROSTRO`, la calidad y el motor en las notas («motor: interno-ppg
-  v1»).
+  v1»); la `FC` lleva su `detalle`.
 - **Privacidad** (LOPDP), dicho en una línea en cada paso: **ninguna imagen
   se guarda ni se envía**. `FuenteCamara` reduce cada cuadro, en el
   momento, a unos pocos promedios (`CuadroPpg`) y lo suelta (ML Kit lo
   analiza en el mismo teléfono y puede mandar a Google métricas anónimas
   de uso de la librería, nunca imágenes); los números se
   juntan solo mientras dura la medición y se borran al terminar, cancelar o
-  descartar. Al servidor solo llegan números: el resultado y, para el
-  análisis experimental, la serie de promedios por cuadro.
+  descartar. Al servidor solo llegan números: el resultado, su detalle
+  (la onda ya filtrada de los últimos 10 s, los intervalos, el espectro…)
+  y, para el análisis experimental, la serie de promedios por cuadro.
 
 ### Cómo funciona
 
@@ -1682,7 +1741,12 @@ fvm flutter test
 | `procesador_de_rostro_test.dart` | El ritmo de la detección (~10 por segundo, sin bloquear), el promedio en cada cuadro con la última región, la detección vieja y el respaldo por color de piel |
 | `guia_encuadre_test.dart` | Cada instrucción de la guía de encuadre, su prioridad y el respaldo sin ML Kit |
 | `medicion_en_vivo_test.dart` | La cuenta (arranque solo, parpadeo, pausa sin el hueco, pérdida) y la FC en vivo con una señal sintética a 72 lpm |
-| `detalle_medicion_test.dart` | pNN50, SD1, SD2 y el intervalo medio, mínimo y máximo con series de RR conocidas, la limpieza, la FC por segundo, el detalle de una medición y los rangos de referencia para adultos |
+| `detalle_medicion_test.dart` | pNN50, SD1, SD2 y el intervalo medio, mínimo y máximo con series de RR conocidas, la corrección, la FC por segundo, el detalle de una medición y los rangos de referencia para adultos |
+| `correccion_intervalos_test.dart` | Cada regla de la corrección (pico mal ubicado, latido perdido y de más, lo descartado), una serie limpia que no se toca, un 620/860 aislado que se corrige, las diferencias solo entre consecutivos, el afinado parabólico, el RMSSD de una serie conocida con los picos a 30 Hz (±8 ms) y cuándo se enseña la variabilidad |
+| `formato_detalle_test.dart` | `aJson` y `desdeJson` de ida y vuelta, el redondeo, los límites, el tamaño y la tolerancia a un JSON roto |
+| `validacion_detalle_test.dart` | Los límites del servidor campo por campo y que una medición con un detalle que no pasa se guarda igual (en línea y en la cola), sin él |
+| `guardar_detalle_test.dart` | El detalle en el POST (solo en la FC de la cámara), en la cola sin red (tamaño) y al volver la red; `GET /portal/mediciones/:id`, su copia sin red, el 404 y las últimas diez copias |
+| `detalle_medicion_page_test.dart` | «Detalle de la medición»: la lógica (caso, compañera, tarjetas, datos, origen, ruta) y la pantalla con detalle, de la cámara sin detalle, de un aparato y pendiente, el 404, sin red con copia y sin ella, el toque en «Registro» (botón con flecha) y eliminar |
 | `tendencias_test.dart` | Las tendencias por tipo y periodo, y la pestaña con varios tipos, el cambio de periodo y sin red |
 | `mediciones_datos_test.dart` | El modelo, las reglas (rangos, hora, calidad), `/portal/mediciones` (paginación, copia sin red, POST y DELETE) y la cola sin red en la caché |
 | `mis_signos_vitales_page_test.dart` | «Mis signos vitales» (las pestañas, insignias, evolución, «?», el escáner según la configuración, borrar, error), «Registrar» (el pulso, la presión, sin red, desde una cita) y el acceso desde la cita |
@@ -1795,7 +1859,9 @@ las pruebas, `flutter build web` sirve de prueba de compilación.
   contrato y se probaron con dobles. Falta probarlos de punta a punta y
   confirmar con el API: la forma de la paginación (se aceptan `page`/`limit`
   y `pagina`/`limite`), la respuesta del `POST` y los umbrales de calidad
-  (buena ≥ 0,7, regular ≥ 0,4), que el panel debe pintar igual. Un `POST`
+  (buena ≥ 0,7, regular ≥ 0,4), que el panel debe pintar igual. El
+  `detalle` y `GET /portal/mediciones/:id` también se programaron contra
+  el contrato, con dobles (la medición sola o dentro de `medicion`). Un `POST`
   que llegó al servidor pero cuya respuesta se perdió se reenviará desde la
   cola (el contrato no trae una clave de idempotencia).
 - **ML Kit para el rostro**: no se usó (ver «Mis signos vitales y escáner

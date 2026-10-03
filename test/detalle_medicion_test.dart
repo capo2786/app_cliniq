@@ -1,7 +1,7 @@
 // test/detalle_medicion_test.dart
 //
 // El detalle de la medición, puro: las medidas de los intervalos con
-// series conocidas (pNN50, SD1, SD2, mínimo, máximo y medio), la limpieza
+// series conocidas (pNN50, SD1, SD2, mínimo, máximo y medio), la corrección
 // de los intervalos, la FC por segundo, el detalle de una señal sintética
 // y los rangos de referencia para adultos.
 
@@ -64,16 +64,14 @@ void main() {
       expect(MetricasRr.de([800, 900]), isNull);
     });
 
-    test('la limpieza quita un latido perdido y uno de más', () {
+    test('la corrección parte un latido perdido y junta uno de más', () {
       final rr = <double>[800, 810, 790, 1600, 805, 400, 395, 800, 810, 790];
-      final limpios = intervalosLimpios(_latidos(rr));
-      final ms = limpios.map((i) => i.ms.round()).toList();
-      expect(ms, isNot(contains(1600)));
-      expect(ms, isNot(contains(400)));
-      expect(ms, isNot(contains(395)));
-      expect(ms.length, 7);
-      // Fuera de 42–210 lpm tampoco cuenta.
-      expect(intervalosLimpios(_latidos([200, 2000])), isEmpty);
+      final c = corregirIntervalos(_latidos(rr));
+      final ms = c.intervalos.map((i) => i.ms.round()).toList();
+      expect(ms, [800, 810, 790, 800, 800, 805, 795, 800, 810, 790]);
+      expect(c.corregidos, 2);
+      // Fuera de 42–210 lpm no cuenta (y con dos no hay vecinos).
+      expect(corregirIntervalos(_latidos([200, 2000])).intervalos, isEmpty);
     });
   });
 

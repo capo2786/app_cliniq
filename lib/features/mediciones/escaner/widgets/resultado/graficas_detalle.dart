@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../../../../../core/tema/tokens.dart';
 import '../../../data/models/medicion.dart';
 import '../../../dominio/detalle_medicion.dart';
+import '../../../dominio/procesamiento_ppg.dart';
 import '../../../dominio/rangos_referencia.dart';
 import '../dibujos_escaner.dart';
 import '../../../presentacion/widgets/ejes_graficas.dart';
@@ -247,8 +248,14 @@ class GraficasDelDetalle extends StatelessWidget {
     );
   }
 
-  static Widget _poincare(DetalleMedicion d) {
-    final rr = d.intervalos.map((i) => i.ms).toList();
+  /// Solo con pares de intervalos consecutivos (sin uno descartado en
+  /// medio).
+  static Widget? _poincare(DetalleMedicion d) {
+    final pares = paresSucesivos(d.intervalos);
+    if (pares.length < 2) return null;
+    final rr = [
+      for (final (a, b) in pares) ...[a, b],
+    ];
     final minimo = rr.reduce(math.min) - 40;
     final maximo = rr.reduce(math.max) + 40;
     return SizedBox(
@@ -269,10 +276,10 @@ class GraficasDelDetalle extends StatelessWidget {
             unidadX: 'ms',
           ),
           scatterSpots: [
-            for (var i = 1; i < rr.length; i++)
+            for (final (a, b) in pares)
               ScatterSpot(
-                rr[i - 1],
-                rr[i],
+                a,
+                b,
                 dotPainter: FlDotCirclePainter(
                   radius: 3.5,
                   color: AppColors.violeta.withValues(alpha: 0.8),

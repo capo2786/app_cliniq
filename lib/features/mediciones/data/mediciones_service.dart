@@ -1,6 +1,9 @@
 // lib/features/mediciones/data/mediciones_service.dart
 
+import 'dart:math' as math;
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/network/errores.dart';
 import '../../../core/storage/cache_local.dart';
@@ -34,17 +37,36 @@ class PaginaMediciones {
   });
 }
 
+/// Una medición completa (`GET /portal/mediciones/:id`), del servidor o de
+/// la copia del teléfono.
+class MedicionObtenida {
+  final Medicion medicion;
+  final bool desdeCache;
+  final DateTime? guardadaEn;
+
+  const MedicionObtenida(
+    this.medicion, {
+    this.desdeCache = false,
+    this.guardadaEn,
+  });
+}
+
 /// Las mediciones del paciente en el servidor: `/portal/mediciones`.
 ///
 /// El servidor deja ver y registrar solo lo propio y lo de los dependientes
 /// del titular (`pacienteId`). La primera página se guarda en el teléfono
-/// tal como llegó (por persona y por paciente) para verla sin red; se
-/// borra al cerrar sesión, como todo lo personal.
+/// tal como llegó (por persona y por paciente) para verla sin red, y
+/// también las últimas [copiasDeMediciones] mediciones completas que se
+/// abrieron (con su detalle, unos 10 KB cada una); todo se borra al cerrar
+/// sesión, como todo lo personal.
 class MedicionesService {
   static const String ruta = '/portal/mediciones';
 
   /// Cuántas mediciones admite el servidor en un envío.
   static const int maximoPorEnvio = 10;
+
+  /// Cuántas mediciones completas abiertas se guardan para verlas sin red.
+  static const int copiasDeMediciones = 10;
 
   final Dio _dio;
   final CacheLocal _cache;
@@ -55,6 +77,8 @@ class MedicionesService {
       pacienteId == null || pacienteId.isEmpty ? uid : pacienteId;
 
   String _clave(String uid, String paciente) => 'mediciones:$uid:$paciente';
+
+  String _claveCompletas(String uid) => 'mediciones-completas:$uid';
 
   /// `GET /portal/mediciones`: la página [pagina] (la primera, si no se
   /// dice). Sin red, la primera página guardada; sin copia, el error.
@@ -160,8 +184,93 @@ class MedicionesService {
   }
 
   /// `DELETE /portal/mediciones/:id`: solo quien la registró y si no se usó
-  /// en una atención (si no, el servidor lo dice).
-  Future<void> eliminar(String id) => _dio.delete<dynamic>('$ruta/$id');
+  /// en una atención (si no, el servidor lo dice). Con [uid], también se
+  /// borra su copia del teléfono.
+  Future<void> eliminar(String id, {String? uid}) async {
+    await _dio.delete<dynamic>('$ruta/${Uri.encodeComponent(id)}');
+    if (uid != null) await _cambiarCompletas(uid, id, null);
+  }
+
+  /// `GET /portal/mediciones/:id`: la medición completa, con su detalle.
+  /// El servidor la da solo si es propia o de un dependiente del titular
+  /// (si no, 404). Sin red, la copia del teléfono; sin copia, el error.
+  Future<MedicionObtenida> obtener(String uid, String id) async {
+    try {
+      final respuesta = await _dio.get<dynamic>(
+        '$ruta/${Uri.encodeComponent(id)}',
+      );
+      final medicion = leerMedicion(respuesta.data);
+      if (medicion == null) {
+        throw const FormatException('La medición no se pudo leer');
+      }
+      await _cambiarCompletas(uid, id, respuesta.data);
+      return MedicionObtenida(medicion);
+    } catch (error) {
+      if (!esFaltaDeRed(error)) rethrow;
+
+      final copia = await completaGuardada(uid, id);
+      if (copia == null) rethrow;
+      return copia;
+    }
+  }
+
+  /// La copia de esa medición completa, si se abrió antes.
+  Future<MedicionObtenida?> completaGuardada(String uid, String id) async {
+    try {
+      final copias = await _cache.leer(_claveCompletas(uid));
+      final copia = copias is Map ? copias[id] : null;
+      if (copia is! Map) return null;
+      final medicion = leerMedicion(copia['datos']);
+      if (medicion == null) return null;
+      return MedicionObtenida(
+        medicion,
+        desdeCache: true,
+        guardadaEn: DateTime.tryParse(copia['guardadaEn']?.toString() ?? '')
+            ?.toLocal(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Guarda (o, con [datos] nulos, borra) la copia de una medición
+  /// completa; se quedan solo las [copiasDeMediciones] más recientes. Un
+  /// fallo al guardar no se propaga.
+  Future<void> _cambiarCompletas(String uid, String id, Object? datos) async {
+    try {
+      final clave = _claveCompletas(uid);
+      final previas = await _cache.leer(clave);
+      final habia = previas is Map && previas.containsKey(id);
+      if (datos == null && !habia) return;
+
+      // Las más viejas primero: la que se abre ahora va al final.
+      final copias = <String, Object?>{
+        if (previas is Map)
+          for (final MapEntry(:key, :value) in previas.entries)
+            if (key.toString() != id) key.toString(): value,
+        if (datos != null)
+          id: {
+            'guardadaEn': DateTime.now().toUtc().toIso8601String(),
+            'datos': datos,
+          },
+      };
+      final sobran = copias.keys
+          .take(math.max(0, copias.length - copiasDeMediciones))
+          .toList();
+      sobran.forEach(copias.remove);
+      await _cache.guardar(clave, copias);
+    } catch (error) {
+      debugPrint('Cliniq · no se pudo guardar la copia de la medición: $error');
+    }
+  }
+
+  /// Lee la respuesta de una medición: la medición sola, o dentro de
+  /// `medicion`, `data` o `item`.
+  static Medicion? leerMedicion(Object? datos) {
+    if (datos is! Map) return null;
+    final adentro = datos['medicion'] ?? datos['data'] ?? datos['item'];
+    return Medicion.desdeJson(adentro is Map ? adentro : datos);
+  }
 
   /// Lee la respuesta de la lista. El contrato dice «paginadas» sin fijar
   /// la forma, así que se aceptan las dos que usa el API: `{items, total,
