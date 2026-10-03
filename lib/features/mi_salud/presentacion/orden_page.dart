@@ -12,12 +12,15 @@ import '../data/mi_salud_service.dart';
 import '../data/models/mi_salud.dart';
 import '../dominio/reglas_mi_salud.dart';
 import '../providers/documento_cubit.dart';
+import 'visor_pdf_page.dart';
 import 'widgets/partes_documento.dart';
 import 'widgets/vista_documento.dart';
 
-/// Una orden de laboratorio, de imagen u otra, dentro de la aplicación: los
-/// exámenes con sus indicaciones, la prioridad, quién la emitió y su código
-/// de verificación.
+/// Una orden de laboratorio, de imagen u otra, dentro de la aplicación: la
+/// prioridad, cómo prepararse, los exámenes (agrupados por área, como en el
+/// PDF) con sus indicaciones, las indicaciones clínicas, quién la emitió y
+/// su código de verificación. Si el médico la firmó, lo dice; «Ver PDF» la
+/// abre en PDF (la firmada o la vista previa).
 class OrdenPage extends StatelessWidget {
   final String id;
 
@@ -41,14 +44,14 @@ class OrdenPage extends StatelessWidget {
       child: VistaDeDocumento<Orden>(
         titulo: 'Orden',
         cargando: 'Abriendo la orden…',
+        alVerPdf: (context, orden) =>
+            abrirPdfDelDocumento(context, TipoDocumentoFirmado.orden, orden),
         contenido: (context, orden) => [
           EncabezadoDeDocumento(
             icono: orden.tipo == TipoOrden.imagen
                 ? Icons.monitor_heart_outlined
                 : Icons.biotech_outlined,
-            titulo: orden.tipo == TipoOrden.otro
-                ? 'Orden'
-                : 'Orden de ${nombreDelTipoDeOrden(orden.tipo).toLowerCase()}',
+            titulo: nombreDeLaOrden(orden.tipo),
             documento: orden,
             pastillas: [
               if (orden.urgente)
@@ -59,6 +62,10 @@ class OrdenPage extends StatelessWidget {
                 ),
             ],
           ),
+          if (orden.firmado) ...[
+            const SizedBox(height: 12),
+            SelloDeFirma(firma: orden.firma),
+          ],
           if (orden.anulada) ...[
             const SizedBox(height: 12),
             RecuadroAviso.error(
@@ -75,19 +82,72 @@ class OrdenPage extends StatelessWidget {
               icono: Icons.priority_high_rounded,
             ),
           ],
+          if (orden.preparacion != null) ...[
+            const SizedBox(height: 22),
+            const EtiquetaSeccion('Cómo prepararte'),
+            TarjetaTranslucida(
+              key: const Key('preparacion-orden'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.checklist_rounded,
+                    color: AppColors.primarioClaro,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SelectableText(
+                      orden.preparacion!,
+                      style: const TextStyle(
+                        color: AppColors.texto,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.45,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 22),
           EtiquetaSeccion(examenes(orden.items.length)),
           TarjetaTranslucida(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                for (final (i, item) in orden.items.indexed) ...[
-                  if (i > 0) const Divider(color: AppColors.bordeCampo),
-                  _Examen(item: item),
+                for (final (i, (grupo, items)) in examenesPorArea(
+                  orden.items,
+                ).indexed) ...[
+                  if (grupo != null) ...[
+                    if (i > 0) const SizedBox(height: 10),
+                    RotuloPequeno(grupo),
+                    const SizedBox(height: 2),
+                  ],
+                  for (final (j, item) in items.indexed) ...[
+                    if (j > 0 || (i > 0 && grupo == null))
+                      const Divider(color: AppColors.bordeCampo),
+                    _Examen(item: item),
+                  ],
                 ],
               ],
             ),
           ),
+          if (orden.indicacionesClinicas != null) ...[
+            const SizedBox(height: 22),
+            const EtiquetaSeccion('Indicaciones clínicas'),
+            TarjetaTranslucida(
+              child: SelectableText(
+                orden.indicacionesClinicas!,
+                style: const TextStyle(
+                  color: AppColors.texto,
+                  fontSize: 13.5,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          ],
           if (orden.observaciones != null) ...[
             const SizedBox(height: 22),
             const EtiquetaSeccion('Observaciones'),

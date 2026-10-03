@@ -166,6 +166,59 @@ void main() {
     expect(find.text('En ayunas'), findsOneWidget);
   });
 
+  testWidgets('la orden: número, preparación, exámenes por área, '
+      'indicaciones clínicas, firma y «Ver PDF»', (tester) async {
+    api.rutas['GET /portal/ordenes/o1'] = (_) =>
+        ordenJson(firmada: true, pdfDisponible: true);
+
+    await montar(tester);
+    await tocar(tester, find.byKey(const Key('orden-o1')));
+
+    expect(find.text('Orden de laboratorio'), findsOneWidget);
+    expect(
+      find.text('N.º 000045 · Emitida el viernes 25 de septiembre de 2026'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('sello-firma')), findsOneWidget);
+    expect(find.text('Ayuno de 8 horas'), findsOneWidget);
+    expect(find.text('HEMATOLOGÍA'), findsOneWidget);
+    expect(find.text('SEROLOGÍA E INFECCIOSAS'), findsOneWidget);
+
+    await bajarHasta(tester, find.byKey(const Key('codigo-verificacion')));
+    expect(find.text('Control de infección respiratoria.'), findsOneWidget);
+    expect(find.text('Traer resultados al control.'), findsOneWidget);
+    expect(find.text('Presencial'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+    await tester.pumpAndSettle();
+    expect(find.byType(VisorPdfPage), findsOneWidget);
+    expect(pdf.pedidos.single, (
+      tipo: TipoDocumentoFirmado.orden,
+      id: 'o1',
+      sha256: huellaDePrueba,
+    ));
+    expect(find.text('Orden de laboratorio'), findsOneWidget);
+    expect(find.byKey(const Key('aviso-vista-previa')), findsNothing);
+  });
+
+  testWidgets('«Ver PDF» también desde la fila de la orden, sin firma: la '
+      'vista previa', (tester) async {
+    await montar(tester);
+    await bajarHasta(tester, find.byKey(const Key('pdf-orden-o1')));
+    expect(find.text('Firmada electrónicamente'), findsNothing);
+
+    await tocar(tester, find.byKey(const Key('pdf-orden-o1')));
+
+    expect(find.byType(VisorPdfPage), findsOneWidget);
+    expect(find.byType(OrdenPage), findsNothing);
+    expect(pdf.pedidos.single, (
+      tipo: TipoDocumentoFirmado.orden,
+      id: 'o1',
+      sha256: null,
+    ));
+    expect(find.byKey(const Key('aviso-vista-previa')), findsOneWidget);
+  });
+
   testWidgets('«para quién»: los dependientes, y al elegir uno se pide el '
       'suyo', (tester) async {
     await montar(
@@ -410,7 +463,7 @@ void main() {
       ));
     });
 
-    testWidgets('sin firma o sin PDF disponible no hay sello ni «Ver PDF»', (
+    testWidgets('sin firma no hay sello, y «Ver PDF» abre la vista previa', (
       tester,
     ) async {
       respuesta = miSaludJson(
@@ -427,13 +480,42 @@ void main() {
 
       await montar(tester);
       await bajarHasta(tester, find.byKey(const Key('certificado-c1')));
-      expect(find.byKey(const Key('pdf-receta-r1')), findsNothing);
-      expect(find.byKey(const Key('pdf-certificado-c1')), findsNothing);
+      expect(find.byKey(const Key('pdf-receta-r1')), findsOneWidget);
+      expect(find.byKey(const Key('pdf-certificado-c1')), findsOneWidget);
       expect(find.text('Firmada electrónicamente'), findsNothing);
 
       await tocar(tester, find.byKey(const Key('receta-r1')));
       expect(find.byKey(const Key('sello-firma')), findsNothing);
-      expect(find.byKey(const Key('boton-ver-pdf')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+      await tester.pumpAndSettle();
+      expect(pdf.pedidos.single, (
+        tipo: TipoDocumentoFirmado.receta,
+        id: 'r1',
+        sha256: null,
+      ));
+      expect(find.byKey(const Key('aviso-vista-previa')), findsOneWidget);
+    });
+
+    testWidgets('si el servidor no da el PDF, el visor enseña su mensaje', (
+      tester,
+    ) async {
+      pdf.responder = (_, _) async => throw errorHttp(
+        409,
+        'El PDF de este documento aún no está disponible.',
+      );
+      api.rutas['GET /portal/recetas/r1'] = (_) => recetaJson();
+
+      await montar(tester);
+      await tocar(tester, find.byKey(const Key('receta-r1')));
+      await tester.tap(find.byKey(const Key('boton-ver-pdf')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(VisorPdfPage), findsOneWidget);
+      expect(
+        find.text('El PDF de este documento aún no está disponible.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('una consulta todavía abierta enseña solo lo firmado', (

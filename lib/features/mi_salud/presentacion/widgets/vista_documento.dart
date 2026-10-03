@@ -18,8 +18,8 @@ import '../../providers/documento_cubit.dart';
 /// barra, lo que se dice mientras carga o si falla, la copia guardada y
 /// deslizar para ponerlo al día. El contenido lo pone cada pantalla.
 ///
-/// Con [alVerPdf], si el documento tiene su PDF firmado disponible, abajo va
-/// «Ver PDF» (en la `BarraDeAccion`).
+/// Con [alVerPdf], si el documento sigue vigente, abajo va «Ver PDF» (en la
+/// `BarraDeAccion`).
 class VistaDeDocumento<T extends DocumentoClinico> extends StatelessWidget {
   final String titulo;
   final String cargando;

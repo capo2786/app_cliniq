@@ -13,7 +13,8 @@ import '../../../core/archivos/salida_de_archivos.dart';
 import '../../../core/network/errores.dart';
 import 'models/mi_salud.dart';
 
-/// Un PDF firmado, ya guardado en el teléfono.
+/// El PDF de un documento, ya guardado en el teléfono: el firmado o, si el
+/// médico todavía no firmó, la vista previa que arma el servidor.
 class PdfGuardado extends Equatable {
   final TipoDocumentoFirmado tipo;
   final String id;
@@ -29,6 +30,11 @@ class PdfGuardado extends Equatable {
   /// Se abrió la copia del teléfono porque no hubo conexión.
   final bool sinConexion;
 
+  /// El servidor dijo que es la vista previa, sin firma electrónica
+  /// (`X-Firma-Estado: SIN_FIRMA`). De una copia guardada no se sabe: lo
+  /// dice el documento.
+  final bool sinFirma;
+
   const PdfGuardado({
     required this.tipo,
     required this.id,
@@ -36,6 +42,7 @@ class PdfGuardado extends Equatable {
     required this.bytes,
     required this.sha256,
     this.sinConexion = false,
+    this.sinFirma = false,
   });
 
   PdfGuardado _sinConexion() => PdfGuardado(
@@ -48,7 +55,7 @@ class PdfGuardado extends Equatable {
   );
 
   @override
-  List<Object?> get props => [tipo, id, ruta, sha256, sinConexion];
+  List<Object?> get props => [tipo, id, ruta, sha256, sinConexion, sinFirma];
 }
 
 /// Lo que llegó no es el PDF del documento: no se guarda ni se enseña.
@@ -61,8 +68,12 @@ class PdfNoValido implements Exception {
   String toString() => mensaje;
 }
 
-/// El PDF firmado de una receta o de un certificado de reposo:
-/// `GET /portal/{recetas|certificados}/:id/pdf`, con la sesión.
+/// El PDF de una receta, una orden o un certificado de reposo:
+/// `GET /portal/{recetas|ordenes|certificados}/:id/pdf`, con la sesión.
+/// Firmado, el servidor entrega el archivo guardado; sin firma, arma al
+/// vuelo la vista previa (y lo dice en `X-Firma-Estado: SIN_FIRMA`). Si la
+/// clínica lo entrega solo firmado, responde con su mensaje, que es el que
+/// se enseña.
 ///
 /// El servidor guarda el archivo firmado con su sha256 y nunca lo regenera,
 /// así que una copia sirve para siempre: cada PDF bajado se guarda en la
@@ -73,8 +84,9 @@ class PdfNoValido implements Exception {
 /// - Si se conoce la huella del documento firmado (`firma.sha256Firmado`),
 ///   primero se busca esa copia: se abre sin gastar datos. Lo que se baja
 ///   tiene que tener esa misma huella; si no, no se guarda.
-/// - Sin la huella, se pide al servidor y, sin conexión, se abre la última
-///   copia de ese documento.
+/// - Sin la huella (sin firma, o un servidor que no la manda), se pide al
+///   servidor y, sin conexión, se abre la última copia de ese documento.
+///   La vista previa también se guarda: es la última que dio el servidor.
 /// - Cada copia se comprueba al leerla contra la huella de su nombre: una
 ///   copia dañada se borra y no se enseña.
 /// - Al cerrar sesión se borra la carpeta entera ([borrarTodo]), y con ella
@@ -122,9 +134,9 @@ class DocumentosPdfService {
       if (copia != null) return copia;
     }
 
-    final Uint8List bytes;
+    final ({Uint8List bytes, bool sinFirma}) descarga;
     try {
-      bytes = await _descargar(tipo, id);
+      descarga = await _descargar(tipo, id);
     } catch (error) {
       if (!esFaltaDeRed(error)) rethrow;
 
@@ -134,6 +146,7 @@ class DocumentosPdfService {
       return copia._sinConexion();
     }
 
+    final bytes = descarga.bytes;
     if (!_esPdf(bytes)) {
       throw const PdfNoValido(
         'Lo que llegó del servidor no es un PDF. Intenta de nuevo más tarde.',
@@ -156,6 +169,7 @@ class DocumentosPdfService {
       ruta: ruta,
       bytes: bytes,
       sha256: calculada,
+      sinFirma: descarga.sinFirma,
     );
   }
 
@@ -239,7 +253,10 @@ class DocumentosPdfService {
     }
   }
 
-  Future<Uint8List> _descargar(TipoDocumentoFirmado tipo, String id) async {
+  Future<({Uint8List bytes, bool sinFirma})> _descargar(
+    TipoDocumentoFirmado tipo,
+    String id,
+  ) async {
     try {
       final respuesta = await _dio.get<List<int>>(
         '/portal/${tipo.ruta}/$id/pdf',
@@ -252,9 +269,14 @@ class DocumentosPdfService {
       );
 
       final datos = respuesta.data;
-      if (datos == null) return Uint8List(0);
+      final estado = respuesta.headers.value('x-firma-estado');
 
-      return datos is Uint8List ? datos : Uint8List.fromList(datos);
+      return (
+        bytes: datos == null
+            ? Uint8List(0)
+            : (datos is Uint8List ? datos : Uint8List.fromList(datos)),
+        sinFirma: estado?.trim().toUpperCase() == 'SIN_FIRMA',
+      );
     } on DioException catch (error) {
       throw _conMensajeLegible(error);
     }

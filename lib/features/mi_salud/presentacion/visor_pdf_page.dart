@@ -14,7 +14,21 @@ import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
 import '../data/documentos_pdf_service.dart';
 import '../data/models/mi_salud.dart';
+import '../dominio/reglas_mi_salud.dart';
 import '../providers/visor_pdf_cubit.dart';
+
+/// «Receta», «Orden de laboratorio», «Certificado de reposo»: qué es el
+/// documento, para el título del visor y el nombre del archivo.
+String nombreDelDocumento(
+  TipoDocumentoFirmado tipo, [
+  DocumentoClinico? documento,
+]) => switch (tipo) {
+  TipoDocumentoFirmado.receta => 'Receta',
+  TipoDocumentoFirmado.orden => nombreDeLaOrden(
+    documento is Orden ? documento.tipo : TipoOrden.otro,
+  ),
+  TipoDocumentoFirmado.certificado => 'Certificado de reposo',
+};
 
 /// «Receta UC7F6DB5UU.pdf», «Certificado de reposo 7Q2M.pdf»: el nombre con
 /// que se guarda o se comparte el PDF de un documento.
@@ -22,16 +36,12 @@ String nombreDelPdf(TipoDocumentoFirmado tipo, DocumentoClinico documento) {
   final codigo = documento.codigoVerificacion.isEmpty
       ? documento.id
       : documento.codigoVerificacion;
-  final que = switch (tipo) {
-    TipoDocumentoFirmado.receta => 'Receta',
-    TipoDocumentoFirmado.certificado => 'Certificado de reposo',
-  };
 
-  return nombreSeguro('$que $codigo.pdf');
+  return nombreSeguro('${nombreDelDocumento(tipo, documento)} $codigo.pdf');
 }
 
-/// Abre el PDF firmado de una receta o de un certificado en el visor de la
-/// aplicación.
+/// Abre el PDF de una receta, una orden o un certificado en el visor de la
+/// aplicación: el firmado o, sin firma, la vista previa.
 Future<void> abrirPdfDelDocumento(
   BuildContext context,
   TipoDocumentoFirmado tipo,
@@ -44,16 +54,21 @@ Future<void> abrirPdfDelDocumento(
         id: documento.id,
         sha256: documento.firma?.sha256,
         nombreArchivo: nombreDelPdf(tipo, documento),
+        titulo: nombreDelDocumento(tipo, documento),
+        firmado: documento.firmado,
       ),
     ),
   );
 }
 
-/// El PDF firmado de una receta o de un certificado de reposo, **dentro de
+/// El PDF de una receta, una orden o un certificado de reposo, **dentro de
 /// la aplicación**: se baja con la sesión
-/// (`GET /portal/{recetas|certificados}/:id/pdf`), queda guardado en el
-/// teléfono para verlo sin Internet y se pinta aquí mismo. Nunca se abre en
-/// otra aplicación ni en el navegador.
+/// (`GET /portal/{recetas|ordenes|certificados}/:id/pdf`), queda guardado
+/// en el teléfono para verlo sin Internet y se pinta aquí mismo. Nunca se
+/// abre en otra aplicación ni en el navegador.
+///
+/// Si el médico todavía no lo firmó, el servidor entrega la vista previa y
+/// arriba se dice; si no la entrega, se enseña su mensaje.
 ///
 /// Abajo, «Guardar en el teléfono» (el diálogo del sistema para elegir
 /// dónde) y «Compartir» (la hoja de compartir del sistema): solo si la
@@ -67,6 +82,13 @@ class VisorPdfPage extends StatelessWidget {
   final String? sha256;
 
   final String nombreArchivo;
+
+  /// El título de la cabecera; sin él, el del tipo («Receta»).
+  final String? titulo;
+
+  /// El documento está firmado electrónicamente. Si no, lo que se ve es la
+  /// vista previa y arriba se dice.
+  final bool firmado;
 
   /// Por defecto, `Servicios.documentosPdf`.
   final DocumentosPdfService? servicio;
@@ -83,15 +105,14 @@ class VisorPdfPage extends StatelessWidget {
     required this.id,
     required this.nombreArchivo,
     this.sha256,
+    this.titulo,
+    this.firmado = true,
     this.servicio,
     this.salida,
     this.pintor,
   });
 
-  String get _titulo => switch (tipo) {
-    TipoDocumentoFirmado.receta => 'Receta',
-    TipoDocumentoFirmado.certificado => 'Certificado de reposo',
-  };
+  String get _titulo => titulo ?? nombreDelDocumento(tipo);
 
   @override
   Widget build(BuildContext context) {
@@ -106,6 +127,7 @@ class VisorPdfPage extends StatelessWidget {
       )..cargar(),
       child: _VistaVisorPdf(
         titulo: _titulo,
+        firmado: firmado,
         pintor: pintor ?? Servicios.pintorDePdf,
       ),
     );
@@ -114,9 +136,14 @@ class VisorPdfPage extends StatelessWidget {
 
 class _VistaVisorPdf extends StatelessWidget {
   final String titulo;
+  final bool firmado;
   final PintorDePdf pintor;
 
-  const _VistaVisorPdf({required this.titulo, required this.pintor});
+  const _VistaVisorPdf({
+    required this.titulo,
+    required this.firmado,
+    required this.pintor,
+  });
 
   Future<void> _guardar(BuildContext context) async {
     final resultado = await context.read<VisorPdfCubit>().guardar();
@@ -202,6 +229,16 @@ class _VistaVisorPdf extends StatelessWidget {
                     child: RecuadroAviso.informacion(
                       'Sin conexión: es la copia guardada en este teléfono.',
                       icono: Icons.offline_pin_outlined,
+                    ),
+                  ),
+                if (!firmado || pdf.sinFirma)
+                  const Padding(
+                    key: Key('aviso-vista-previa'),
+                    padding: EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: RecuadroAviso.alerta(
+                      'Vista previa: el médico todavía no firmó '
+                      'electrónicamente este documento.',
+                      icono: Icons.edit_note_rounded,
                     ),
                   ),
                 Expanded(

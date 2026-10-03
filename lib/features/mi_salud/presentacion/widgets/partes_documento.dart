@@ -3,8 +3,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/catalogos/catalogo_service.dart';
+import '../../../../core/configuracion/en_contexto.dart';
 import '../../../../core/formato/fechas.dart';
 import '../../../../core/presentacion/avisos.dart';
+import '../../../../core/presentacion/estilo_de_catalogo.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../data/models/mi_salud.dart';
@@ -129,8 +132,8 @@ class ListaDeDiagnosticos extends StatelessWidget {
   }
 }
 
-/// La cabecera de una receta, una orden o un certificado: qué es, cuándo y
-/// si está anulado.
+/// La cabecera de una receta, una orden o un certificado: qué es, su número
+/// (si el servidor lo manda), cuándo y si está anulado.
 class EncabezadoDeDocumento extends StatelessWidget {
   final IconData icono;
   final String titulo;
@@ -155,14 +158,18 @@ class EncabezadoDeDocumento extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fecha = documento.fecha;
+    final numero = documento.numero;
     final emitido = masculino ? 'Emitido' : 'Emitida';
+    final cuando = fecha == null
+        ? '$emitido por ${documento.medicoNombre}'
+        : '$emitido el ${FormatoFecha.diaLargoConAnio(fecha).toLowerCase()}';
 
     return TarjetaEncabezado(
       icono: icono,
       titulo: titulo,
-      descripcion: fecha == null
-          ? '$emitido por ${documento.medicoNombre}'
-          : '$emitido el ${FormatoFecha.diaLargoConAnio(fecha).toLowerCase()}',
+      descripcion: numero == null
+          ? cuando
+          : '${numeroDelDocumento(numero)} · $cuando',
       accesorio: documento.anulada || pastillas.isNotEmpty
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -238,15 +245,26 @@ class SelloDeFirma extends StatelessWidget {
   }
 }
 
-/// Quién emitió el documento y para quién.
+/// Quién emitió el documento, para quién y en qué modalidad de atención (con
+/// el nombre de su catálogo).
 class EmisorYPaciente extends StatelessWidget {
   final DocumentoClinico documento;
 
-  const EmisorYPaciente({super.key, required this.documento});
+  /// El certificado de reposo enseña la modalidad con el reposo.
+  final bool conModalidad;
+
+  const EmisorYPaciente({
+    super.key,
+    required this.documento,
+    this.conModalidad = true,
+  });
 
   @override
   Widget build(BuildContext context) {
     final edad = documento.pacienteEdad;
+    final modalidad = conModalidad
+        ? nombreDeLaModalidad(context, documento.modalidad)
+        : null;
 
     return TarjetaTranslucida(
       child: Column(
@@ -279,10 +297,29 @@ class EmisorYPaciente extends StatelessWidget {
               rotulo: 'Documento de identidad',
               valor: documento.pacienteCedula,
             ),
+          if (modalidad != null)
+            FilaDato(
+              icono: Icons.medical_services_outlined,
+              rotulo: 'Modalidad de la atención',
+              valor: modalidad,
+            ),
         ],
       ),
     );
   }
+}
+
+/// El nombre de una modalidad en su catálogo (`MODALIDAD_CITA`), o `null`
+/// si el documento no la trae. Un código que el catálogo no tiene se enseña
+/// tal como llega.
+String? nombreDeLaModalidad(BuildContext context, String codigo) {
+  if (codigo.isEmpty) return null;
+
+  return EstiloDeCatalogo.de(
+    context.catalogos,
+    Catalogos.modalidadCita,
+    codigo,
+  ).nombre;
 }
 
 /// El código con que se comprueba el documento, para dictarlo o copiarlo.

@@ -34,8 +34,10 @@ import 'widgets/partes_documento.dart';
 /// clínica, como en el panel. Su ficha y sus alergias, las últimas
 /// mediciones y, por consulta, los diagnósticos, las indicaciones, las
 /// recetas, las órdenes, los certificados de reposo y los adjuntos clínicos.
-/// También los de sus dependientes, si la cuenta los gestiona. Una receta o
-/// un certificado firmado lo dice, y con su PDF disponible ofrece «Ver PDF».
+/// También los de sus dependientes, si la cuenta los gestiona. Una receta,
+/// una orden o un certificado firmado lo dice, y cada uno vigente ofrece
+/// «Ver PDF» (el firmado o la vista previa; si el servidor no lo da, su
+/// mensaje).
 ///
 /// Sin conexión enseña la última copia guardada; sin copia, lo dice con
 /// «Reintentar».
@@ -696,7 +698,16 @@ class _DetalleAtencion extends StatelessWidget {
               detalle: orden.items.map((i) => i.nombre).join(', '),
               anulado: orden.anulada,
               urgente: orden.urgente,
+              firmado: orden.firmado,
               alTocar: () => _abrirOrden(context, orden),
+              claveDelPdf: Key('pdf-orden-${orden.id}'),
+              alVerPdf: orden.puedeVerPdf
+                  ? () => abrirPdfDelDocumento(
+                      context,
+                      TipoDocumentoFirmado.orden,
+                      orden,
+                    )
+                  : null,
             ),
             const SizedBox(height: 8),
           ],
@@ -720,7 +731,7 @@ String _periodo(CertificadoReposo certificado) {
 }
 
 /// Una receta, una orden o un certificado dentro de una consulta: se toca
-/// para verlo entero. Si tiene su PDF firmado, «Ver PDF» lo abre directo.
+/// para verlo entero. «Ver PDF» abre directo su PDF.
 class _FilaDocumento extends StatelessWidget {
   final IconData icono;
   final String titulo;
