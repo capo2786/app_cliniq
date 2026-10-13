@@ -111,5 +111,15 @@ Uint8List recortarFotoDePerfilSincrono(
         : img.Interpolation.linear,
   );
 
-  return img.encodeJpg(reducida, quality: calidad);
+  // JPEG no tiene transparencia: lo transparente (una PNG) va sobre blanco,
+  // no sobre negro
+  final opaca = reducida.hasAlpha
+      ? img.compositeImage(
+          img.Image(width: lado, height: lado)
+            ..clear(img.ColorRgb8(255, 255, 255)),
+          reducida,
+        )
+      : reducida;
+
+  return img.encodeJpg(opaca, quality: calidad);
 }

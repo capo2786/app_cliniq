@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 // test/fotos_perfil_dominio_test.dart
 
 import 'package:app_cliniq/features/agendar/data/models/medico_portal.dart';
@@ -199,5 +200,17 @@ void main() {
       expect(detalle.fotoVersionDe(detalle.mensajes[2]), 2);
       expect(ConsultaDetalle.desdeJson(detalle.aJson()).medicoFotoVersion, 7);
     });
+  });
+
+  test('una PNG transparente queda sobre blanco, no sobre negro', () {
+    final png = img.Image(width: 300, height: 300, numChannels: 4)
+      ..clear(img.ColorRgba8(0, 0, 0, 0));
+    final jpg = recortarFotoDePerfilSincrono(
+      Uint8List.fromList(img.encodePng(png)),
+    );
+    final pixel = img.decodeJpg(jpg)!.getPixel(10, 10);
+    expect(pixel.r, greaterThan(240));
+    expect(pixel.g, greaterThan(240));
+    expect(pixel.b, greaterThan(240));
   });
 }
