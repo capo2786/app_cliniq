@@ -145,10 +145,7 @@ class FotoPerfilCubit extends Cubit<FotoPerfilState> {
         FotoPerfilState(
           fase: FaseFoto.vistaPrevia,
           nueva: nueva,
-          error: mensajeDeError(
-            error,
-            generico: 'No pudimos guardar la foto. Intenta de nuevo.',
-          ),
+          error: mensajeAlGuardarFoto(error),
         ),
       );
     }
@@ -179,4 +176,21 @@ class FotoPerfilCubit extends Cubit<FotoPerfilState> {
       );
     }
   }
+}
+
+/// Qué decir si la API no aceptó la foto.
+///
+/// El tamaño (413) y el tipo (415) se dicen con palabras propias: los
+/// rechaza el servidor antes de llegar a la regla que explica el motivo, y
+/// su texto puede no estar en español. Lo demás (la medida, 400; el
+/// permiso), con el mensaje de la API.
+String mensajeAlGuardarFoto(Object error) {
+  return switch (estadoDe(error)) {
+    413 => 'La foto pesa más de 1 MB. Prueba con otra.',
+    415 => 'Ese tipo de imagen no se acepta. Usa una foto JPEG, PNG o WebP.',
+    _ => mensajeDeError(
+      error,
+      generico: 'No pudimos guardar la foto. Intenta de nuevo.',
+    ),
+  };
 }

@@ -11,8 +11,8 @@ import 'adjuntos.dart';
 class BurbujaMensaje extends StatelessWidget {
   final MensajeConsulta mensaje;
 
-  /// La versión de la foto de quien escribió: con ella, los mensajes del
-  /// médico llevan su foto en vez del icono.
+  /// La versión de la foto de quien escribió, si se sabe. Los mensajes del
+  /// médico llevan su foto (sin versión, la vigente) o sus iniciales.
   final int? fotoVersionAutor;
 
   const BurbujaMensaje({
@@ -59,11 +59,12 @@ class BurbujaMensaje extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (medico && fotoVersionAutor != null) ...[
+                  if (medico && mensaje.autorId.isNotEmpty) ...[
                     AvatarUsuario(
                       uid: mensaje.autorId,
                       nombre: autor,
                       fotoVersion: fotoVersionAutor,
+                      buscarSinVersion: true,
                       tamano: 22,
                     ),
                     const SizedBox(width: 6),

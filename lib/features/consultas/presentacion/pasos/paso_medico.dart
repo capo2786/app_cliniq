@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/presentacion/widgets/estados.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../agendar/presentacion/widgets/opcion_seleccionable.dart';
+import '../../../fotos_perfil/presentacion/avatar_usuario.dart';
 import '../../providers/nueva_consulta_bloc.dart';
 import '../../providers/nueva_consulta_event.dart';
 import '../../providers/nueva_consulta_state.dart';
@@ -57,6 +58,13 @@ class PasoMedicoConsulta extends StatelessWidget {
                 ? state.especialidad
                 : medico.especialidad,
             icono: Icons.medical_information_outlined,
+            inicio: AvatarUsuario(
+              uid: medico.uid,
+              nombre: medico.nombre,
+              fotoVersion: medico.fotoVersion,
+              tamano: 46,
+              radio: 14,
+            ),
             color: AppColors.primarioClaro,
             elegida: state.medico?.uid == medico.uid,
             onTap: () => bloc.add(NuevaConsultaMedicoElegido(medico.uid)),

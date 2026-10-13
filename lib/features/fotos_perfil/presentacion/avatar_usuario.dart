@@ -34,6 +34,11 @@ class AvatarUsuario extends StatefulWidget {
   final Color colorTexto;
   final BorderSide borde;
 
+  /// Sin [fotoVersion], pedir igual la foto vigente (sin `v`): para el
+  /// médico de una cita o de una consulta, que no traen su versión. Un 404
+  /// deja las iniciales.
+  final bool buscarSinVersion;
+
   /// Sin él, el de la aplicación (`Servicios.fotosPerfil`).
   final FotosPerfilService? servicio;
 
@@ -48,6 +53,7 @@ class AvatarUsuario extends StatefulWidget {
     this.fondo,
     this.colorTexto = Colors.white,
     this.borde = BorderSide.none,
+    this.buscarSinVersion = false,
     this.servicio,
   });
 
@@ -62,8 +68,7 @@ class _AvatarUsuarioState extends State<AvatarUsuario> {
   /// llega la anterior, la vieja no pisa a la nueva.
   int _carga = 0;
 
-  FotosPerfilService get _servicio =>
-      widget.servicio ?? Servicios.fotosPerfil;
+  FotosPerfilService get _servicio => widget.servicio ?? Servicios.fotosPerfil;
 
   @override
   void initState() {
@@ -76,7 +81,8 @@ class _AvatarUsuarioState extends State<AvatarUsuario> {
     super.didUpdateWidget(anterior);
 
     if (anterior.uid != widget.uid ||
-        anterior.fotoVersion != widget.fotoVersion) {
+        anterior.fotoVersion != widget.fotoVersion ||
+        anterior.buscarSinVersion != widget.buscarSinVersion) {
       _cargar();
     }
   }
@@ -86,16 +92,24 @@ class _AvatarUsuarioState extends State<AvatarUsuario> {
     final uid = widget.uid;
     final version = widget.fotoVersion;
 
-    if (uid.isEmpty || version == null) {
+    final sinVersion = version == null && widget.buscarSinVersion;
+
+    if (uid.isEmpty || (version == null && !sinVersion)) {
       _bytes = null;
       return;
     }
 
     // Ya en memoria: se pinta en el primer cuadro, sin parpadeo.
-    _bytes = _servicio.enMemoria(uid, version);
+    _bytes = sinVersion
+        ? _servicio.vigenteEnMemoria(uid)
+        : _servicio.enMemoria(uid, version);
     if (_bytes != null) return;
 
-    _servicio.obtener(uid, version).then((bytes) {
+    final pedida = sinVersion
+        ? _servicio.obtenerVigente(uid)
+        : _servicio.obtener(uid, version);
+
+    pedida.then((bytes) {
       if (!mounted || carga != _carga) return;
       setState(() => _bytes = bytes);
     });
@@ -118,7 +132,9 @@ class _AvatarUsuarioState extends State<AvatarUsuario> {
     );
 
     return Semantics(
-      label: widget.nombre.isEmpty ? 'Foto de perfil' : 'Foto de ${widget.nombre}',
+      label: widget.nombre.isEmpty
+          ? 'Foto de perfil'
+          : 'Foto de ${widget.nombre}',
       image: true,
       child: Container(
         key: ValueKey('avatar-${widget.uid}'),
@@ -141,8 +157,8 @@ class _AvatarUsuarioState extends State<AvatarUsuario> {
                 height: tamano,
                 fit: BoxFit.cover,
                 gaplessPlayback: true,
-                cacheWidth:
-                    (tamano * MediaQuery.devicePixelRatioOf(context)).round(),
+                cacheWidth: (tamano * MediaQuery.devicePixelRatioOf(context))
+                    .round(),
                 errorBuilder: (_, _, _) => iniciales,
               ),
       ),

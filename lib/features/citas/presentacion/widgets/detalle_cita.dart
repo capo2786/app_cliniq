@@ -296,8 +296,9 @@ class DetalleCita extends StatelessWidget {
   }
 }
 
-/// El médico de la cita, con su foto si la API manda su versión
-/// (`doctorFotoVersion`); si no, sus iniciales.
+/// El médico de la cita, con su foto. La cita no trae su versión, así que se
+/// pide la vigente (`GET /auth/:doctorId/foto` sin `v`); si la manda
+/// (`doctorFotoVersion`), con ella. Sin foto (404), sus iniciales.
 class _FilaMedico extends StatelessWidget {
   final Cita cita;
 
@@ -313,6 +314,7 @@ class _FilaMedico extends StatelessWidget {
             uid: cita.doctorId,
             nombre: cita.medicoVisible ?? '',
             fotoVersion: cita.doctorFotoVersion,
+            buscarSinVersion: true,
             tamano: 40,
           ),
           const SizedBox(width: 12),

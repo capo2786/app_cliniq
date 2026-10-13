@@ -25,11 +25,22 @@ import '../dominio/foto_perfil.dart';
 /// la anterior.
 ///
 /// Sin versión no se pide nada: sin `fotoVersion` la persona no tiene foto
-/// y el avatar muestra sus iniciales.
+/// y el avatar muestra sus iniciales. La excepción es el médico de una cita
+/// o de una consulta, que no traen su versión: esa se pide sin `v`
+/// ([obtenerVigente]), solo se guarda en memoria y se vuelve a pedir pasados
+/// [vigenciaSinVersion], lo mismo que su `Cache-Control: max-age=300`.
 class FotosPerfilService {
   final Dio _dio;
   final Future<Directory> Function() _carpetaBase;
+  final DateTime Function() _ahora;
   final int maximoEnMemoria;
+
+  /// Cuánto vale una foto pedida sin versión.
+  static const Duration vigenciaSinVersion = Duration(minutes: 5);
+
+  /// Las fotos pedidas sin versión: los bytes (o `null`, «no tiene») y
+  /// cuándo se pidieron.
+  final Map<String, ({Uint8List? bytes, DateTime cuando})> _vigentes = {};
 
   /// En memoria, del uso más viejo al más reciente. `null` es «la API dijo
   /// que no hay foto» (404), para no volver a preguntar en cada pantalla.
@@ -41,8 +52,10 @@ class FotosPerfilService {
   FotosPerfilService(
     this._dio, {
     Future<Directory> Function()? carpetaBase,
+    DateTime Function()? ahora,
     this.maximoEnMemoria = 80,
-  }) : _carpetaBase = carpetaBase ?? getApplicationCacheDirectory;
+  }) : _carpetaBase = carpetaBase ?? getApplicationCacheDirectory,
+       _ahora = ahora ?? DateTime.now;
 
   static String _clave(String uid, int version) => '$uid@$version';
 
@@ -87,9 +100,11 @@ class FotosPerfilService {
       return Future.value(bytes);
     }
 
-    return _enCurso[clave] ??= _buscar(uid, version).whenComplete(
-      () => _enCurso.remove(clave),
-    );
+    // Con llaves a propósito: si la acción devolviera el futuro quitado del
+    // mapa, `whenComplete` se esperaría a sí mismo.
+    return _enCurso[clave] ??= _buscar(uid, version).whenComplete(() {
+      _enCurso.remove(clave);
+    });
   }
 
   Future<Uint8List?> _buscar(String uid, int version) async {
@@ -123,6 +138,67 @@ class FotosPerfilService {
       // Sin foto o sin permiso para verla: se recuerda. Un fallo de red, no:
       // la próxima pantalla lo vuelve a intentar.
       if (error.response?.statusCode == 404) _recordarEnMemoria(clave, null);
+      return null;
+    } catch (error) {
+      debugPrint('Cliniq · no se pudo traer una foto de perfil: $error');
+      return null;
+    }
+  }
+
+  // ── Sin versión (el médico de una cita o de una consulta) ────────────
+
+  ({Uint8List? bytes, DateTime cuando})? _vigente(String uid) {
+    final guardada = _vigentes[uid];
+    if (guardada == null) return null;
+
+    if (_ahora().difference(guardada.cuando) >= vigenciaSinVersion) {
+      _vigentes.remove(uid);
+      return null;
+    }
+
+    return guardada;
+  }
+
+  /// La foto vigente ya cargada, sin esperar.
+  Uint8List? vigenteEnMemoria(String uid) => _vigente(uid)?.bytes;
+
+  /// La foto de [uid] sin saber su versión: `GET /auth/:id/foto` sin `v`.
+  ///
+  /// Solo en memoria. Un 404 es «sin foto» y se recuerda igual que una
+  /// foto; un fallo de red no. Nunca lanza.
+  Future<Uint8List?> obtenerVigente(String uid) {
+    if (uid.isEmpty) return Future.value(null);
+
+    final guardada = _vigente(uid);
+    if (guardada != null) return Future.value(guardada.bytes);
+
+    final clave = '$uid@vigente';
+    return _enCurso[clave] ??= _buscarVigente(uid).whenComplete(() {
+      _enCurso.remove(clave);
+    });
+  }
+
+  Future<Uint8List?> _buscarVigente(String uid) async {
+    try {
+      final respuesta = await _dio.get<List<int>>(
+        '/auth/$uid/foto',
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: const {'Accept': 'image/*'},
+        ),
+      );
+
+      final datos = respuesta.data;
+      final bytes = datos == null || datos.isEmpty
+          ? null
+          : (datos is Uint8List ? datos : Uint8List.fromList(datos));
+      _vigentes[uid] = (bytes: bytes, cuando: _ahora());
+
+      return bytes;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) {
+        _vigentes[uid] = (bytes: null, cuando: _ahora());
+      }
       return null;
     } catch (error) {
       debugPrint('Cliniq · no se pudo traer una foto de perfil: $error');
@@ -184,8 +260,10 @@ class FotosPerfilService {
     await _guardarEnDisco(uid, version, bytes);
   }
 
-  void _olvidarDeMemoria(String uid) =>
-      _memoria.removeWhere((clave, _) => clave.startsWith('$uid@'));
+  void _olvidarDeMemoria(String uid) {
+    _memoria.removeWhere((clave, _) => clave.startsWith('$uid@'));
+    _vigentes.remove(uid);
+  }
 
   /// Borra todas las copias de [uid]: tras quitar su foto.
   Future<void> olvidar(String uid) async {
@@ -196,6 +274,7 @@ class FotosPerfilService {
   /// Borra todas las fotos guardadas: al cerrar sesión.
   Future<void> borrarTodo() async {
     _memoria.clear();
+    _vigentes.clear();
     try {
       final carpeta = await _carpeta();
       if (await carpeta.exists()) await carpeta.delete(recursive: true);
@@ -243,7 +322,9 @@ class FotosPerfilService {
 
   /// `DELETE /auth/me/foto` (sin [uid]) o `DELETE /auth/:id/foto`.
   Future<void> quitar({String? uid, String? uidPropio}) async {
-    await _dio.delete<dynamic>(uid == null ? '/auth/me/foto' : '/auth/$uid/foto');
+    await _dio.delete<dynamic>(
+      uid == null ? '/auth/me/foto' : '/auth/$uid/foto',
+    );
 
     final duenio = uid ?? uidPropio;
     if (duenio != null && duenio.isNotEmpty) await olvidar(duenio);

@@ -213,9 +213,7 @@ class HojaFotoPerfil extends StatelessWidget {
                           color: AppColors.veloOvalo,
                         ),
                         child: Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white),
                         ),
                       ),
                   ],
@@ -255,9 +253,7 @@ class HojaFotoPerfil extends StatelessWidget {
                     BotonSecundario(
                       texto: 'Cambiar',
                       icono: Icons.flip_camera_ios_outlined,
-                      onPressed: state.ocupado
-                          ? null
-                          : () => _cambiar(context),
+                      onPressed: state.ocupado ? null : () => _cambiar(context),
                     ),
                   ] else
                     for (final (origen, icono, texto) in _origenes) ...[

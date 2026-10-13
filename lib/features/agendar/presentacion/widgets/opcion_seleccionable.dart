@@ -18,6 +18,9 @@ class OpcionSeleccionable extends StatelessWidget {
   final VoidCallback? onTap;
   final Widget? extra;
 
+  /// En lugar del icono: la foto de un médico, por ejemplo.
+  final Widget? inicio;
+
   const OpcionSeleccionable({
     super.key,
     required this.titulo,
@@ -27,6 +30,7 @@ class OpcionSeleccionable extends StatelessWidget {
     this.descripcion,
     this.color,
     this.extra,
+    this.inicio,
   });
 
   @override
@@ -56,15 +60,16 @@ class OpcionSeleccionable extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Container(
-                  width: 46,
-                  height: 46,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Icon(icono, color: color, size: 23),
-                ),
+                inicio ??
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: color.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(icono, color: color, size: 23),
+                    ),
                 const SizedBox(width: 13),
                 Expanded(
                   child: Column(
