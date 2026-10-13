@@ -1,4 +1,5 @@
 import '../../../citas/data/models/cita.dart';
+import '../../../fotos_perfil/dominio/foto_perfil.dart';
 import '../../dominio/horarios.dart';
 import 'turnos.dart';
 
@@ -8,6 +9,9 @@ class MedicoPortal implements MedicoConAgenda {
   final String nombre;
   final String? especialidad;
   final String? ciudad;
+
+  /// La versión de su foto de perfil, o `null` si no tiene.
+  final int? fotoVersion;
 
   /// Las modalidades que ofrece. La API ya devuelve las tres cuando el
   /// médico no configuró ninguna.
@@ -30,6 +34,7 @@ class MedicoPortal implements MedicoConAgenda {
     required this.nombre,
     this.especialidad,
     this.ciudad,
+    this.fotoVersion,
     this.modalidades = TipoCita.values,
     this.horariosAtencion = const [],
     this.configAgenda,
@@ -60,6 +65,7 @@ class MedicoPortal implements MedicoConAgenda {
       nombre: texto(json['nombre']) ?? '',
       especialidad: texto(json['especialidad']),
       ciudad: texto(json['ciudad']),
+      fotoVersion: versionDeFoto(json['fotoVersion']),
       modalidades: modalidades,
       horariosAtencion: [
         for (final dia in (json['horariosAtencion'] as List?) ?? const [])

@@ -2,6 +2,7 @@ import 'package:equatable/equatable.dart';
 
 import '../../../../core/archivos/archivo_meta.dart';
 import '../../../../core/fechas/instante.dart';
+import '../../../fotos_perfil/dominio/foto_perfil.dart';
 import 'campo_formulario.dart';
 
 /// En qué va una consulta en línea.
@@ -62,6 +63,9 @@ class MensajeConsulta extends Equatable {
   final String texto;
   final ArchivoMeta? adjunto;
 
+  /// La versión de la foto de quien escribió, si la API la manda.
+  final int? autorFotoVersion;
+
   /// Instante real en que se escribió.
   final DateTime? fecha;
 
@@ -73,6 +77,7 @@ class MensajeConsulta extends Equatable {
     required this.texto,
     this.adjunto,
     this.fecha,
+    this.autorFotoVersion,
   });
 
   factory MensajeConsulta.desdeJson(Map<dynamic, dynamic> json) {
@@ -84,6 +89,7 @@ class MensajeConsulta extends Equatable {
       texto: json['texto']?.toString() ?? '',
       adjunto: ArchivoMeta.desdeJson(json['adjunto']),
       fecha: leerInstante(json['fecha']),
+      autorFotoVersion: versionDeFoto(json['autorFotoVersion']),
     );
   }
 
@@ -95,6 +101,7 @@ class MensajeConsulta extends Equatable {
     'texto': texto,
     if (adjunto != null) 'adjunto': adjunto!.aJson(),
     'fecha': aTextoInstante(fecha),
+    if (autorFotoVersion != null) 'autorFotoVersion': autorFotoVersion,
   };
 
   @override
@@ -106,6 +113,7 @@ class MensajeConsulta extends Equatable {
     texto,
     adjunto,
     fecha,
+    autorFotoVersion,
   ];
 }
 
@@ -168,6 +176,11 @@ class ConsultaResumen extends Equatable {
   final bool paraDependiente;
   final String medicoId;
   final String medicoNombre;
+
+  /// La versión de la foto del médico, si la API la manda
+  /// (`doctorFotoVersion`) y el médico tiene foto.
+  final int? medicoFotoVersion;
+
   final String especialidad;
   final String motivoId;
   final String motivoNombre;
@@ -200,6 +213,7 @@ class ConsultaResumen extends Equatable {
     this.paraDependiente = false,
     this.medicoId = '',
     this.medicoNombre = '',
+    this.medicoFotoVersion,
     this.especialidad = '',
     this.motivoId = '',
     this.motivoNombre = '',
@@ -238,6 +252,9 @@ class ConsultaResumen extends Equatable {
       paraDependiente: json['paraDependiente'] == true,
       medicoId: _texto(json['medicoId']) ?? '',
       medicoNombre: _texto(json['medicoNombre']) ?? '',
+      medicoFotoVersion: versionDeFoto(
+        json['doctorFotoVersion'] ?? json['medicoFotoVersion'],
+      ),
       especialidad: _texto(json['especialidad']) ?? '',
       motivoId: _texto(json['motivoId']) ?? '',
       motivoNombre: _texto(json['motivoNombre']) ?? '',
@@ -266,6 +283,7 @@ class ConsultaResumen extends Equatable {
     'paraDependiente': paraDependiente,
     'medicoId': medicoId,
     'medicoNombre': medicoNombre,
+    if (medicoFotoVersion != null) 'doctorFotoVersion': medicoFotoVersion,
     'especialidad': especialidad,
     'motivoId': motivoId,
     'motivoNombre': motivoNombre,
@@ -291,6 +309,7 @@ class ConsultaResumen extends Equatable {
     paraDependiente,
     medicoId,
     medicoNombre,
+    medicoFotoVersion,
     especialidad,
     motivoId,
     motivoNombre,
@@ -347,6 +366,7 @@ class ConsultaDetalle extends ConsultaResumen {
     super.paraDependiente,
     super.medicoId,
     super.medicoNombre,
+    super.medicoFotoVersion,
     super.especialidad,
     super.motivoId,
     super.motivoNombre,
@@ -386,6 +406,7 @@ class ConsultaDetalle extends ConsultaResumen {
       paraDependiente: resumen.paraDependiente,
       medicoId: resumen.medicoId,
       medicoNombre: resumen.medicoNombre,
+      medicoFotoVersion: resumen.medicoFotoVersion,
       especialidad: resumen.especialidad,
       motivoId: resumen.motivoId,
       motivoNombre: resumen.motivoNombre,
@@ -430,6 +451,7 @@ class ConsultaDetalle extends ConsultaResumen {
     paraDependiente: paraDependiente,
     medicoId: medicoId,
     medicoNombre: medicoNombre,
+    medicoFotoVersion: medicoFotoVersion,
     especialidad: especialidad,
     motivoId: motivoId,
     motivoNombre: motivoNombre,

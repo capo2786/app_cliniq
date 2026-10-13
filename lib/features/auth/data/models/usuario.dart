@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../fotos_perfil/dominio/foto_perfil.dart';
+
 /// Los permisos del portal del paciente, con los nombres de la API.
 class Permisos {
   const Permisos._();
@@ -98,6 +100,10 @@ class Usuario extends Equatable {
 
   bool get dosFactores => datos['dosFactores'] == true;
 
+  /// La versión de su foto de perfil, o `null` si no tiene. Sube con cada
+  /// cambio: es la que va en `GET /auth/:id/foto?v=`.
+  int? get fotoVersion => versionDeFoto(datos['fotoVersion']);
+
   String? get cedula => _texto('cedula');
 
   String? get telefono => _texto('telefono');
@@ -147,17 +153,7 @@ class Usuario extends Equatable {
   }
 
   /// Dos letras para el avatar mientras no haya foto.
-  String get iniciales {
-    final partes = nombre
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-
-    if (partes.isEmpty) return '?';
-    if (partes.length == 1) return partes.first[0].toUpperCase();
-
-    return (partes.first[0] + partes[1][0]).toUpperCase();
-  }
+  String get iniciales => inicialesDe(nombre);
 
   @override
   List<Object?> get props => [datos];

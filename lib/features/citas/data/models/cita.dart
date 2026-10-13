@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 
 import '../../../../core/fechas/fecha_local.dart';
+import '../../../fotos_perfil/dominio/foto_perfil.dart';
 
 /// Las tres maneras de atender una cita.
 ///
@@ -72,6 +73,10 @@ class Cita extends Equatable {
   final String? medico;
   final String? especialidad;
 
+  /// La versión de la foto del médico, si la API la manda
+  /// (`doctorFotoVersion`) y el médico tiene foto.
+  final int? doctorFotoVersion;
+
   /// El motivo de consulta que escribió quien agendó.
   final String? motivo;
 
@@ -93,6 +98,7 @@ class Cita extends Equatable {
     required this.doctorId,
     this.medico,
     this.especialidad,
+    this.doctorFotoVersion,
     this.motivo,
     this.motivoCancelacion,
     this.pacienteNombre,
@@ -131,6 +137,7 @@ class Cita extends Equatable {
       doctorId: _texto(json['doctorId']) ?? '',
       medico: _texto(json['doctorName']),
       especialidad: _texto(json['doctorSpecialty']),
+      doctorFotoVersion: versionDeFoto(json['doctorFotoVersion']),
       motivo: _texto(json['reason']),
       motivoCancelacion: _texto(json['cancelReason']),
       pacienteNombre: pacienteNombre,
@@ -150,6 +157,7 @@ class Cita extends Equatable {
     'doctorId': doctorId,
     'doctorName': medico,
     'doctorSpecialty': especialidad,
+    if (doctorFotoVersion != null) 'doctorFotoVersion': doctorFotoVersion,
     'reason': motivo,
     'cancelReason': motivoCancelacion,
     'pacienteNombre': pacienteNombre,
@@ -175,6 +183,7 @@ class Cita extends Equatable {
       doctorId: doctorId,
       medico: medico ?? this.medico,
       especialidad: especialidad ?? this.especialidad,
+      doctorFotoVersion: doctorFotoVersion,
       motivo: motivo,
       motivoCancelacion: motivoCancelacion,
       pacienteNombre: pacienteNombre ?? this.pacienteNombre,
@@ -193,6 +202,7 @@ class Cita extends Equatable {
     doctorId,
     medico,
     especialidad,
+    doctorFotoVersion,
     motivo,
     motivoCancelacion,
     pacienteNombre,

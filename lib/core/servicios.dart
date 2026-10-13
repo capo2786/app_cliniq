@@ -13,6 +13,8 @@ import '../features/citas/data/videollamada_service.dart';
 import '../features/consultas/data/consultas_service.dart';
 import '../features/dependientes/data/dependientes_service.dart';
 import '../features/encuestas/data/encuestas_service.dart';
+import '../features/fotos_perfil/data/fotos_perfil_service.dart';
+import '../features/fotos_perfil/data/selector_de_foto.dart';
 import '../features/legal/data/legal_service.dart';
 import '../features/mediciones/data/analisis_en_servidor.dart';
 import '../features/mediciones/data/cola_mediciones.dart';
@@ -168,6 +170,27 @@ class Servicios {
 
   static final ArchivosService archivos = ArchivosService(ApiClient().dio);
 
+  // ── Fotos de perfil ────────────────────────────────────────────────
+  static FotosPerfilService _fotosPerfil = FotosPerfilService(ApiClient().dio);
+
+  /// Las fotos de perfil (`/auth/:id/foto`), con su copia por versión en
+  /// memoria y en el teléfono.
+  static FotosPerfilService get fotosPerfil => _fotosPerfil;
+
+  @visibleForTesting
+  static set fotosPerfilParaPruebas(FotosPerfilService otro) =>
+      _fotosPerfil = otro;
+
+  static SelectorDeFoto _selectorDeFoto = SelectorDeFotoDelSistema();
+
+  /// La cámara y la galería, para la foto de perfil.
+  static SelectorDeFoto get selectorDeFoto => _selectorDeFoto;
+
+  /// En el anfitrión de pruebas no hay cámara ni galería.
+  @visibleForTesting
+  static set selectorDeFotoParaPruebas(SelectorDeFoto otro) =>
+      _selectorDeFoto = otro;
+
   // ── Mi salud, centro de ayuda y soporte ────────────────────────────
   /// La historia clínica que ve el paciente: recetas, órdenes y
   /// certificados de reposo.
@@ -247,15 +270,16 @@ class Servicios {
   /// Lo que se borra del teléfono al cerrar sesión o al vencer la sesión.
   ///
   /// Las citas, las consultas, los dependientes, los archivos descargados,
-  /// los PDF firmados guardados y los recordatorios son de quien estaba
-  /// dentro: en un teléfono compartido, la siguiente persona no tiene por qué
-  /// verlos ni oírlos. La configuración, los catálogos, los documentos
+  /// los PDF firmados guardados, las fotos de perfil y los recordatorios son
+  /// de quien estaba dentro: en un teléfono compartido, la siguiente persona
+  /// no tiene por qué verlos ni oírlos. La configuración, los catálogos, los documentos
   /// legales y el logotipo se quedan: son de la clínica.
   static Future<void> limpiarDatosLocales() async {
     await recordatorios.cancelarTodo();
     await cache.vaciarDatosPersonales();
     await archivos.borrarDescargas();
     await documentosPdf.borrarTodo();
+    await fotosPerfil.borrarTodo();
     await push.olvidarEsteTelefono();
   }
 }
