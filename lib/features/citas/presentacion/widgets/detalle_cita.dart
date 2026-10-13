@@ -10,6 +10,7 @@ import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/servicios.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../agendar/presentacion/agendar_page.dart';
+import '../../../fotos_perfil/presentacion/avatar_usuario.dart';
 import '../../../mediciones/dominio/destinos_medico.dart';
 import '../../../mediciones/presentacion/widgets/accesos_signos_vitales.dart';
 import '../../data/models/cita.dart';
@@ -171,11 +172,14 @@ class DetalleCita extends StatelessWidget {
                       ? '${cita.pacienteNombre ?? 'Dependiente'} (dependiente)'
                       : cita.pacienteNombre,
                 ),
-                FilaDato(
-                  icono: Icons.medical_information_outlined,
-                  rotulo: 'Médico',
-                  valor: [?cita.medicoVisible, ?cita.especialidad].join(' · '),
-                ),
+                if (cita.medicoVisible == null)
+                  FilaDato(
+                    icono: Icons.medical_information_outlined,
+                    rotulo: 'Médico',
+                    valor: cita.especialidad,
+                  )
+                else
+                  _FilaMedico(cita: cita),
                 FilaDato(
                   icono: modalidad.icono,
                   rotulo: 'Modalidad',
@@ -286,6 +290,57 @@ class DetalleCita extends StatelessWidget {
             const SizedBox(height: 8),
             const ContactoClinica(),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// El médico de la cita, con su foto si la API manda su versión
+/// (`doctorFotoVersion`); si no, sus iniciales.
+class _FilaMedico extends StatelessWidget {
+  final Cita cita;
+
+  const _FilaMedico({required this.cita});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          AvatarUsuario(
+            uid: cita.doctorId,
+            nombre: cita.medicoVisible ?? '',
+            fotoVersion: cita.doctorFotoVersion,
+            tamano: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Médico',
+                  style: TextStyle(
+                    color: AppColors.textoSecundario,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  [?cita.medicoVisible, ?cita.especialidad].join(' · '),
+                  style: const TextStyle(
+                    color: AppColors.texto,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

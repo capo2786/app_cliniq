@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../../core/tema/tokens.dart';
 import '../../../citas/presentacion/estilos_cita.dart';
+import '../../../fotos_perfil/presentacion/avatar_usuario.dart';
 import '../../data/models/medico_portal.dart';
 import '../../dominio/horarios.dart';
 import '../../dominio/huecos.dart';
@@ -68,7 +69,13 @@ class _Encabezado extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _Iniciales(nombre: medico.nombre),
+        AvatarUsuario(
+          uid: medico.uid,
+          nombre: medico.nombre,
+          fotoVersion: medico.fotoVersion,
+          tamano: 50,
+          radio: 16,
+        ),
         const SizedBox(width: 13),
         Expanded(
           child: Column(
@@ -99,43 +106,6 @@ class _Encabezado extends StatelessWidget {
           color: AppColors.textoSecundario,
         ),
       ],
-    );
-  }
-}
-
-class _Iniciales extends StatelessWidget {
-  final String nombre;
-
-  const _Iniciales({required this.nombre});
-
-  String get _iniciales {
-    final partes = nombre
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (partes.isEmpty) return '?';
-    if (partes.length == 1) return partes.first[0].toUpperCase();
-    return (partes[0][0] + partes[1][0]).toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 50,
-      height: 50,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        gradient: AppGradientes.encabezado,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Text(
-        _iniciales,
-        style: const TextStyle(
-          color: Colors.white,
-          fontWeight: FontWeight.w900,
-          fontSize: 17,
-        ),
-      ),
     );
   }
 }

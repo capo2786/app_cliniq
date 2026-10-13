@@ -441,6 +441,14 @@ class ConsultaDetalle extends ConsultaResumen {
     );
   }
 
+  /// La versión de la foto de quien escribió [mensaje]: la que trae el
+  /// mensaje o, si es del médico de la consulta, la del médico.
+  int? fotoVersionDe(MensajeConsulta mensaje) =>
+      mensaje.autorFotoVersion ??
+      (mensaje.esMedico && mensaje.autorId == medicoId
+          ? medicoFotoVersion
+          : null);
+
   /// El resumen de esta consulta, para ponerlo al día en la lista.
   ConsultaResumen get resumen => ConsultaResumen(
     id: id,

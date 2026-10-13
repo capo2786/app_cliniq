@@ -104,6 +104,21 @@ class Usuario extends Equatable {
   /// cambio: es la que va en `GET /auth/:id/foto?v=`.
   int? get fotoVersion => versionDeFoto(datos['fotoVersion']);
 
+  /// El mismo perfil con otra foto: la versión nueva tras subirla, o
+  /// ninguna tras quitarla. Para verla al instante, antes de releer
+  /// `/auth/me`.
+  Usuario conFotoVersion(int? version) {
+    final copia = Map<String, dynamic>.from(datos);
+
+    if (version == null) {
+      copia.remove('fotoVersion');
+    } else {
+      copia['fotoVersion'] = version;
+    }
+
+    return Usuario(copia);
+  }
+
   String? get cedula => _texto('cedula');
 
   String? get telefono => _texto('telefono');

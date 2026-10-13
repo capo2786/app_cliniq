@@ -81,6 +81,10 @@ class Dependiente extends Equatable {
     if (fotoVersion != null) 'fotoVersion': fotoVersion,
   };
 
+  /// El mismo dependiente con otra foto (o sin ella).
+  Dependiente conFotoVersion(int? version) =>
+      Dependiente.desdeJson({...aJson(), 'fotoVersion': version});
+
   @override
   List<Object?> get props => [
     uid,
