@@ -44,6 +44,10 @@ dependencies:
   flutter_local_notifications: ^22.3.0
   timezone: ^0.11.0
   image_picker: ^1.2.3
+  # La foto de perfil se recorta en cuadrado y se pasa a JPEG de 512 px en
+  # Dart puro (sin código nativo), en un isolate aparte. Ya venía en el
+  # lockfile como dependencia de flutter_launcher_icons.
+  image: ^4.10.1
   file_selector: ^1.1.0
   open_filex: ^4.7.0
   path_provider: ^2.1.6

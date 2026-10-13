@@ -16,6 +16,9 @@ import '../../../core/tema/tokens.dart';
 import '../../agendar/presentacion/agendar_page.dart';
 import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
+import '../../fotos_perfil/presentacion/avatar_editable.dart';
+import '../../fotos_perfil/presentacion/hoja_foto_perfil.dart';
+import '../../fotos_perfil/providers/foto_perfil_cubit.dart';
 import '../data/models/dependiente.dart';
 import '../dominio/validaciones.dart';
 import '../providers/dependientes_bloc.dart';
@@ -49,6 +52,35 @@ class DependientesPage extends StatelessWidget {
         builder: (_) => FormularioDependientePage(dependiente: dependiente),
       ),
     );
+  }
+
+  /// El titular les pone foto a sus dependientes.
+  void _alCambiarFoto(
+    BuildContext context,
+    Dependiente d,
+    FotoPerfilState resultado,
+  ) {
+    context.read<DependientesBloc>().add(
+      DependienteFotoCambiada(
+        d.uid,
+        resultado.quitada ? null : (resultado.version ?? d.fotoVersion),
+      ),
+    );
+
+    mostrarAviso(
+      context,
+      resultado.quitada
+          ? 'Quitamos la foto de ${d.nombre}.'
+          : 'La foto de ${d.nombre} quedó guardada.',
+    );
+  }
+
+  Future<void> _abrirFoto(BuildContext context, Dependiente d) async {
+    final resultado = await mostrarHojaFotoPerfil(context, duenioDeFoto(d));
+
+    if (resultado != null && context.mounted) {
+      _alCambiarFoto(context, d, resultado);
+    }
   }
 
   Future<void> _quitar(BuildContext context, Dependiente d) async {
@@ -178,6 +210,9 @@ class DependientesPage extends StatelessWidget {
                               ocupado: state.guardando,
                               alEditar: () => _abrirFormulario(context, d),
                               alQuitar: () => _quitar(context, d),
+                              alAbrirFoto: () => _abrirFoto(context, d),
+                              alCambiarFoto: (resultado) =>
+                                  _alCambiarFoto(context, d, resultado),
                               alAgendar: puedeAgendar
                                   ? () => Navigator.of(context).push(
                                       MaterialPageRoute<void>(
@@ -204,6 +239,8 @@ class _TarjetaDependiente extends StatelessWidget {
   final bool ocupado;
   final VoidCallback alEditar;
   final VoidCallback alQuitar;
+  final VoidCallback alAbrirFoto;
+  final ValueChanged<FotoPerfilState> alCambiarFoto;
   final VoidCallback? alAgendar;
 
   const _TarjetaDependiente({
@@ -211,18 +248,10 @@ class _TarjetaDependiente extends StatelessWidget {
     required this.ocupado,
     required this.alEditar,
     required this.alQuitar,
+    required this.alAbrirFoto,
+    required this.alCambiarFoto,
     this.alAgendar,
   });
-
-  String get _iniciales {
-    final partes = dependiente.nombre
-        .split(RegExp(r'\s+'))
-        .where((p) => p.isNotEmpty)
-        .toList();
-    if (partes.isEmpty) return '?';
-    if (partes.length == 1) return partes.first[0].toUpperCase();
-    return (partes[0][0] + partes[1][0]).toUpperCase();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -235,23 +264,14 @@ class _TarjetaDependiente extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(15, 13, 6, 13),
       child: Row(
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.menta.withValues(alpha: 0.15),
-              border: Border.all(color: AppColors.menta.withValues(alpha: 0.4)),
-            ),
-            child: Text(
-              _iniciales,
-              style: const TextStyle(
-                color: AppColors.menta,
-                fontWeight: FontWeight.w900,
-                fontSize: 16,
-              ),
-            ),
+          AvatarEditable(
+            duenio: duenioDeFoto(d),
+            tamano: 48,
+            fondo: AppColors.menta.withValues(alpha: 0.15),
+            colorTexto: AppColors.menta,
+            borde: BorderSide(color: AppColors.menta.withValues(alpha: 0.4)),
+            habilitado: !ocupado,
+            alCambiar: alCambiarFoto,
           ),
           const SizedBox(width: 13),
           Expanded(
@@ -295,6 +315,8 @@ class _TarjetaDependiente extends StatelessWidget {
               switch (opcion) {
                 case 'agendar':
                   alAgendar?.call();
+                case 'foto':
+                  alAbrirFoto();
                 case 'editar':
                   alEditar();
                 case 'quitar':
@@ -308,6 +330,7 @@ class _TarjetaDependiente extends StatelessWidget {
                   child: Text('Agendar una cita'),
                 ),
               const PopupMenuItem(value: 'editar', child: Text('Editar datos')),
+              const PopupMenuItem(value: 'foto', child: Text('Foto de perfil')),
               const PopupMenuItem(
                 value: 'quitar',
                 child: Text(
@@ -322,3 +345,11 @@ class _TarjetaDependiente extends StatelessWidget {
     );
   }
 }
+
+/// El dependiente como dueño de una foto: la pone el titular.
+DuenioDeFoto duenioDeFoto(Dependiente d) => DuenioDeFoto(
+  uid: d.uid,
+  nombre: d.nombre,
+  fotoVersion: d.fotoVersion,
+  propia: false,
+);

@@ -346,7 +346,10 @@ class _VistaDetalleState extends State<_VistaDetalle>
             )
           else
             for (final mensaje in detalle.mensajes)
-              BurbujaMensaje(mensaje: mensaje),
+              BurbujaMensaje(
+                mensaje: mensaje,
+                fotoVersionAutor: detalle.fotoVersionDe(mensaje),
+              ),
           if (state.puedeCancelar) ...[
             const SizedBox(height: 22),
             ConRed(

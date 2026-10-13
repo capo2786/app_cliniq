@@ -1126,6 +1126,38 @@ Todo es opcional: los documentos viejos se leen y se enseñan igual.
   sigue abierta; si la clínica no lo quiere, la alternativa es la carpeta
   de soporte de la aplicación marcada fuera de la copia.
 
+## Foto de perfil
+
+La foto del paciente, la de sus dependientes y la de los médicos
+(`lib/features/fotos_perfil/`).
+
+- **Se ve** con `AvatarUsuario`: en el saludo del inicio, en el perfil, en
+  cada dependiente, en las tarjetas de médicos al agendar, en los médicos
+  que se eligen para una consulta en línea, en el detalle de la cita (el
+  médico) y en los mensajes del médico de la consulta en línea. Mientras
+  carga, si no hay foto o si falla, las iniciales sobre el color de la marca.
+- **Se pide con su versión** cuando la API la manda (`fotoVersion` en
+  `/auth/me`, el acceso, los dependientes, los médicos para agendar y los de
+  una consulta en línea): `GET /auth/:id/foto?v=<versión>` con el Dio de la
+  aplicación, que pone el token. Cada versión se guarda en memoria y en la
+  carpeta de caché del teléfono y no se vuelve a pedir; al guardar otra se
+  borran las viejas, y al cerrar sesión, todas. Sin `fotoVersion` no tiene
+  foto: no se pide nada.
+- **El médico de una cita o de una consulta** no trae su versión: se pide la
+  vigente, sin `v` (si algún día llega `doctorFotoVersion`, se usa esa), solo
+  en memoria y por cinco minutos, como su `max-age=300`. Un 404 (sin foto o
+  sin permiso) deja las iniciales.
+- **Los errores al guardar**: 413 («pesa más de 1 MB») y 415 («tipo de
+  imagen») con palabras propias; la medida (400) y lo demás, con el mensaje
+  de la API.
+- **Se cambia** tocando el avatar del perfil, o el de un dependiente (o
+  «Foto de perfil» en su menú): cámara o galería con `image_picker` (a 1024
+  px), recorte cuadrado al centro y JPEG de 512 px en Dart puro (paquete
+  `image`, en un isolate), vista previa y «Guardar», «Cambiar» y «Quitar».
+  Va a `PUT`/`DELETE /auth/me/foto` (la propia) o `/auth/:id/foto` (la de un
+  dependiente), multipart con el campo `foto`. Al terminar, la foto nueva se
+  ve al instante y se relee el perfil o la lista de dependientes.
+
 ## Mis signos vitales
 
 Lo que el paciente mide en casa, para que su médico lo vea en la consulta
@@ -1692,6 +1724,10 @@ fvm flutter test
 | `mi_salud_page_test.dart` | La pantalla y el detalle de la receta **en dos bloques** («Para la farmacia» y «Cómo tomarlo»), la receta vieja, el aviso de la receta a distancia sin firma, la orden (número, preparación, áreas, firma y su PDF) y el certificado: la firma, «Ver PDF» (desde el documento y desde su fila; sin firma, la vista previa; si el servidor no lo da, su mensaje), el diagnóstico reservado o autorizado, anulado |
 | `documentos_legales_test.dart` | El texto de `GET /legal/documentos/:slug`, su copia (también sin sesión) y el 404; el Markdown que se entiende; la pantalla nativa, sus enlaces internos y «Leer» en la aceptación |
 | `paleta_marca_test.dart` | Los colores de la marca de la configuración y los de siempre |
+| `fotos_perfil_dominio_test.dart` | Iniciales, la versión de la foto, el recorte cuadrado centrado a JPEG de 512 px (también en el isolate) y lo que leen los modelos (usuario, dependiente, médico, cita y consulta) |
+| `fotos_perfil_servicio_test.dart` | `GET /auth/:id/foto?v=` en bytes, sin versión no se pide, la caché en memoria y en disco, una sola petición para muchos avatares, el 404 recordado y el fallo de red que no, la foto vigente sin versión del médico (y sus cinco minutos), la subida multipart (propia y de un dependiente), quitar y el borrado al cerrar sesión |
+| `foto_perfil_cubit_test.dart` | Elegir, arrepentirse, sin permiso de cámara, la imagen ilegible, guardar (y su rechazo; 413 y 415 con palabras propias), quitar, y la foto nueva del dependiente en la lista |
+| `fotos_perfil_widgets_test.dart` | El avatar con foto o con iniciales y la hoja: cámara o galería, vista previa, «Guardar», «Cambiar», «Quitar» con confirmación y el error dentro de la hoja |
 | `detalle_cita_test.dart` | Las horas para cambiar, los consejos, la modalidad y el estado de sus catálogos, el contacto |
 | `contacto_clinica_test.dart` | Teléfono y correo para tocar, y el número de emergencias |
 | `seguridad_test.dart` | La contraseña mínima de la clínica |

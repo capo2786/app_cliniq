@@ -22,6 +22,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'dobles/clinica.dart';
 import 'dobles/dio_grabador.dart';
 import 'dobles/dobles.dart';
+import 'dobles/fotos_perfil.dart';
 import 'dobles/mediciones.dart';
 import 'dobles/pantalla.dart';
 
@@ -52,6 +53,8 @@ void main() {
     sondeoConRed();
     cache = CacheEnMemoria();
     Servicios.cacheParaPruebas = cache;
+    // El detalle de la cita pide la foto del médico: sin red de verdad.
+    Servicios.fotosPerfilParaPruebas = FotosPerfilFalso();
     hayRed = true;
     lista = [
       medicionJson(id: 'pa1', medidoEn: '2026-10-01T13:00:00.000Z'),

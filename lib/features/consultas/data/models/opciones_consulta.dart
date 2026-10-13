@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../fotos_perfil/dominio/foto_perfil.dart';
 import 'campo_formulario.dart';
 
 /// Un motivo de consulta tal como lo ve el paciente (`MotivoPublico`): sin
@@ -76,10 +77,14 @@ class MedicoConsulta extends Equatable {
   final String nombre;
   final String especialidad;
 
+  /// La versión de su foto de perfil, o `null` si no tiene.
+  final int? fotoVersion;
+
   const MedicoConsulta({
     required this.uid,
     required this.nombre,
     this.especialidad = '',
+    this.fotoVersion,
   });
 
   static MedicoConsulta? desdeJson(Object? json) {
@@ -92,11 +97,12 @@ class MedicoConsulta extends Equatable {
       uid: uid,
       nombre: json['nombre']?.toString().trim() ?? '',
       especialidad: json['especialidad']?.toString().trim() ?? '',
+      fotoVersion: versionDeFoto(json['fotoVersion']),
     );
   }
 
   @override
-  List<Object?> get props => [uid, nombre, especialidad];
+  List<Object?> get props => [uid, nombre, especialidad, fotoVersion];
 }
 
 /// Una especialidad con sus motivos y sus médicos.

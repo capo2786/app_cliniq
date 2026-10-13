@@ -149,6 +149,7 @@ class AgendarBloc extends Bloc<AgendarEvent, AgendarState> {
       uid: original.doctorId,
       nombre: original.medicoVisible ?? '',
       especialidad: original.especialidad,
+      fotoVersion: original.doctorFotoVersion,
       modalidades: [original.tipo],
     );
 

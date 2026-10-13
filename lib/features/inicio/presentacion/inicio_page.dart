@@ -16,6 +16,7 @@ import '../../../core/presentacion/widgets/logo_clinica.dart';
 import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
+import '../../fotos_perfil/presentacion/avatar_usuario.dart';
 import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
@@ -346,25 +347,15 @@ class _Bienvenida extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.16),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            width: 2,
-                          ),
-                        ),
-                        child: Text(
-                          usuario?.iniciales ?? '?',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            fontWeight: FontWeight.w900,
-                          ),
+                      AvatarUsuario(
+                        uid: usuario?.uid ?? '',
+                        nombre: usuario?.nombre ?? '',
+                        fotoVersion: usuario?.fotoVersion,
+                        tamano: 60,
+                        fondo: Colors.white.withValues(alpha: 0.16),
+                        borde: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          width: 2,
                         ),
                       ),
                       const SizedBox(width: 15),

@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../fotos_perfil/dominio/foto_perfil.dart';
+
 /// Un dependiente: paciente sin cuenta propia que gestiona el titular.
 ///
 /// Hijos menores, padres mayores, personas a su cargo. El titular les agenda
@@ -20,6 +22,9 @@ class Dependiente extends Equatable {
   final String? antecedentesPersonales;
   final String? medicacionHabitual;
 
+  /// La versión de su foto de perfil, o `null` si no tiene.
+  final int? fotoVersion;
+
   const Dependiente({
     required this.uid,
     required this.nombre,
@@ -32,6 +37,7 @@ class Dependiente extends Equatable {
     this.alergias,
     this.antecedentesPersonales,
     this.medicacionHabitual,
+    this.fotoVersion,
   });
 
   static String? _texto(Object? valor) {
@@ -56,6 +62,7 @@ class Dependiente extends Equatable {
       alergias: _texto(json['alergias']),
       antecedentesPersonales: _texto(json['antecedentesPersonales']),
       medicacionHabitual: _texto(json['medicacionHabitual']),
+      fotoVersion: versionDeFoto(json['fotoVersion']),
     );
   }
 
@@ -71,7 +78,12 @@ class Dependiente extends Equatable {
     'alergias': alergias,
     'antecedentesPersonales': antecedentesPersonales,
     'medicacionHabitual': medicacionHabitual,
+    if (fotoVersion != null) 'fotoVersion': fotoVersion,
   };
+
+  /// El mismo dependiente con otra foto (o sin ella).
+  Dependiente conFotoVersion(int? version) =>
+      Dependiente.desdeJson({...aJson(), 'fotoVersion': version});
 
   @override
   List<Object?> get props => [
@@ -86,6 +98,7 @@ class Dependiente extends Equatable {
     alergias,
     antecedentesPersonales,
     medicacionHabitual,
+    fotoVersion,
   ];
 }
 

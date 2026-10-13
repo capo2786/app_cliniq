@@ -43,6 +43,20 @@ class DependienteEliminado extends DependientesEvent {
   List<Object?> get props => [dependiente];
 }
 
+/// Se guardó o se quitó la foto de un dependiente: se ve al instante y se
+/// relee la lista.
+class DependienteFotoCambiada extends DependientesEvent {
+  final String uid;
+
+  /// La versión nueva, o `null` si se quitó.
+  final int? fotoVersion;
+
+  const DependienteFotoCambiada(this.uid, this.fotoVersion);
+
+  @override
+  List<Object?> get props => [uid, fotoVersion];
+}
+
 class DependientesVaciados extends DependientesEvent {
   const DependientesVaciados();
 }
@@ -133,6 +147,7 @@ class DependientesBloc extends Bloc<DependientesEvent, DependientesState> {
     on<DependientesSolicitados>(_alSolicitar);
     on<DependienteGuardado>(_alGuardar);
     on<DependienteEliminado>(_alEliminar);
+    on<DependienteFotoCambiada>(_alCambiarFoto);
     on<DependientesVaciados>((event, emit) {
       _uid = null;
       emit(const DependientesState());
@@ -223,6 +238,23 @@ class DependientesBloc extends Bloc<DependientesEvent, DependientesState> {
         ),
       );
     }
+  }
+
+  void _alCambiarFoto(
+    DependienteFotoCambiada event,
+    Emitter<DependientesState> emit,
+  ) {
+    emit(
+      state.copiarCon(
+        lista: [
+          for (final d in state.lista)
+            d.uid == event.uid ? d.conFotoVersion(event.fotoVersion) : d,
+        ],
+      ),
+    );
+
+    final uid = _uid;
+    if (uid != null) add(DependientesSolicitados(uid));
   }
 
   Future<void> _alEliminar(

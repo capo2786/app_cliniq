@@ -3,6 +3,7 @@
 import 'package:app_cliniq/core/catalogos/catalogo_service.dart';
 import 'package:app_cliniq/core/fechas/fecha_local.dart';
 import 'package:app_cliniq/core/fechas/zona_clinica.dart';
+import 'package:app_cliniq/core/servicios.dart';
 import 'package:app_cliniq/core/tema/tema_app.dart';
 import 'package:app_cliniq/features/citas/data/models/cita.dart';
 import 'package:app_cliniq/features/citas/presentacion/widgets/detalle_cita.dart';
@@ -10,13 +11,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'dobles/clinica.dart';
+import 'dobles/fotos_perfil.dart';
 
 /// El detalle de una cita con la configuración y los catálogos de la
 /// clínica: las horas para cambiarla, los consejos, la modalidad y el
 /// contacto.
 void main() {
   setUpAll(() => ZonaClinica.aplicar('America/Guayaquil'));
-  setUp(sondeoConRed);
+  late FotosPerfilFalso fotos;
+
+  setUp(() {
+    sondeoConRed();
+    // La foto del médico se pide sin versión: la cita no la trae.
+    fotos = FotosPerfilFalso(fotos: {'doc@vigente': pngDePrueba(8, 8)});
+    Servicios.fotosPerfilParaPruebas = fotos;
+  });
 
   // Faltan 20 horas: con 12 de anticipación se puede cambiar; con 24, no.
   Cita cita() {
@@ -127,5 +136,13 @@ void main() {
     await bajarHasta(tester, find.text('Reprogramar'));
 
     expect(find.text('Cómo prepararte'), findsNothing);
+  });
+
+  testWidgets('el médico, con su foto vigente (sin versión)', (tester) async {
+    await montar(tester);
+
+    expect(fotos.llamadas, contains('vigente:doc'));
+    expect(find.byKey(const Key('avatar-foto')), findsOneWidget);
+    expect(find.text('Luis Mora · Pediatría'), findsOneWidget);
   });
 }

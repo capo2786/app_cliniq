@@ -20,6 +20,9 @@ import '../../auth/data/models/usuario.dart';
 import '../../auth/providers/auth_bloc.dart';
 import '../../auth/providers/auth_event.dart';
 import '../../dependientes/dominio/validaciones.dart';
+import '../../fotos_perfil/presentacion/avatar_editable.dart';
+import '../../fotos_perfil/presentacion/hoja_foto_perfil.dart';
+import '../../fotos_perfil/providers/foto_perfil_cubit.dart';
 import '../../legal/providers/legal_bloc.dart';
 import '../../navegacion/dominio/destinos.dart';
 import '../../navegacion/presentacion/enrutador.dart';
@@ -185,6 +188,28 @@ class _Identidad extends StatelessWidget {
 
   const _Identidad({required this.usuario});
 
+  /// La foto cambió: se ve al instante y después se relee el perfil.
+  void _alCambiarFoto(BuildContext context, FotoPerfilState resultado) {
+    context.read<AuthBloc>()
+      ..add(
+        AuthPerfilActualizado(
+          usuario.conFotoVersion(
+            resultado.quitada
+                ? null
+                : (resultado.version ?? usuario.fotoVersion),
+          ),
+        ),
+      )
+      ..add(const AuthPerfilRefrescado());
+
+    mostrarAviso(
+      context,
+      resultado.quitada
+          ? 'Quitamos tu foto de perfil.'
+          : 'Tu foto de perfil quedó guardada.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -206,26 +231,19 @@ class _Identidad extends StatelessWidget {
       ),
       child: Column(
         children: [
-          Container(
-            width: 86,
-            height: 86,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppGradientes.accion,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.4),
-                width: 3,
-              ),
+          AvatarEditable(
+            duenio: DuenioDeFoto(
+              uid: usuario.uid,
+              nombre: usuario.nombre,
+              fotoVersion: usuario.fotoVersion,
+              propia: true,
             ),
-            child: Text(
-              usuario.iniciales,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
-              ),
+            degradado: AppGradientes.accion,
+            borde: BorderSide(
+              color: Colors.white.withValues(alpha: 0.4),
+              width: 3,
             ),
+            alCambiar: (resultado) => _alCambiarFoto(context, resultado),
           ),
           const SizedBox(height: 16),
           Text(

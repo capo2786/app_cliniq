@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/tema/tokens.dart';
+import '../../../fotos_perfil/presentacion/avatar_usuario.dart';
 import '../../data/models/consulta.dart';
 import '../../dominio/reglas_consultas.dart';
 import 'adjuntos.dart';
@@ -10,7 +11,15 @@ import 'adjuntos.dart';
 class BurbujaMensaje extends StatelessWidget {
   final MensajeConsulta mensaje;
 
-  const BurbujaMensaje({super.key, required this.mensaje});
+  /// La versión de la foto de quien escribió, si se sabe. Los mensajes del
+  /// médico llevan su foto (sin versión, la vigente) o sus iniciales.
+  final int? fotoVersionAutor;
+
+  const BurbujaMensaje({
+    super.key,
+    required this.mensaje,
+    this.fotoVersionAutor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -50,16 +59,27 @@ class BurbujaMensaje extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    medico
-                        ? Icons.medical_information_outlined
-                        : Icons.person_outline_rounded,
-                    size: 14,
-                    color: medico
-                        ? AppColors.primarioClaro
-                        : AppColors.acentoSuave,
-                  ),
-                  const SizedBox(width: 5),
+                  if (medico && mensaje.autorId.isNotEmpty) ...[
+                    AvatarUsuario(
+                      uid: mensaje.autorId,
+                      nombre: autor,
+                      fotoVersion: fotoVersionAutor,
+                      buscarSinVersion: true,
+                      tamano: 22,
+                    ),
+                    const SizedBox(width: 6),
+                  ] else ...[
+                    Icon(
+                      medico
+                          ? Icons.medical_information_outlined
+                          : Icons.person_outline_rounded,
+                      size: 14,
+                      color: medico
+                          ? AppColors.primarioClaro
+                          : AppColors.acentoSuave,
+                    ),
+                    const SizedBox(width: 5),
+                  ],
                   Flexible(
                     child: Text(
                       autor,
