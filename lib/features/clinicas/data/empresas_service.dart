@@ -3,6 +3,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_interceptor.dart';
+import '../../../core/network/interceptor_de_empresa.dart';
 import '../../auth/data/auth_service.dart';
 import '../dominio/clinica.dart';
 
@@ -37,7 +38,8 @@ class EmpresasService {
     try {
       final respuesta = await _dio.get<dynamic>(
         '$ruta/${Uri.encodeComponent(limpio)}',
-        options: Options(extra: const {rutaPublica: true}),
+        // Sin `X-Empresa`: la clínica es la del código, no la guardada.
+        options: Options(extra: const {rutaPublica: true, sinEmpresa: true}),
       );
 
       final clinica = Clinica.desdeJson(respuesta.data);

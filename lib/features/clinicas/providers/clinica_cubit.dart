@@ -21,10 +21,15 @@ class ClinicaState extends Equatable {
   /// misma clínica no lo sube.
   final int cambios;
 
-  const ClinicaState({this.clinica, this.cambios = 0});
+  /// El código de la clínica guardada que se acaba de olvidar porque ya no
+  /// está disponible (suspendida), para avisarlo una vez. El estado
+  /// siguiente ya no lo trae.
+  final String? noDisponible;
+
+  const ClinicaState({this.clinica, this.cambios = 0, this.noDisponible});
 
   @override
-  List<Object?> get props => [clinica, cambios];
+  List<Object?> get props => [clinica, cambios, noDisponible];
 }
 
 /// Qué pasó al buscar un código.
@@ -86,6 +91,9 @@ String? mensajeDeBusqueda(
 /// registro), al abrir un enlace de registro con `?clinica=`, al elegir una
 /// en el acceso cuando el correo está en varias, y al entrar (la del
 /// usuario, que manda). Cerrar sesión no la toca.
+///
+/// Y se olvida sola si la API dice que la guardada ya no está disponible
+/// (ver [alNoEstarDisponible]).
 class ClinicaCubit extends Cubit<ClinicaState> {
   final AlmacenDeClinica _almacen;
   final EmpresasService _empresas;
@@ -104,7 +112,10 @@ class ClinicaCubit extends Cubit<ClinicaState> {
   }) : _olvidarDatosDeLaClinica = olvidarDatosDeLaClinica ?? (() async {}),
        super(ClinicaState(clinica: inicial)) {
     EmpresaDeLasPeticiones.codigo = inicial?.codigo;
+    EmpresaDeLasPeticiones.alNoEstarDisponible = alNoEstarDisponible;
   }
+
+  Future<void>? _olvidandoLaNoDisponible;
 
   Clinica? get clinica => state.clinica;
 
@@ -165,15 +176,25 @@ class ClinicaCubit extends Cubit<ClinicaState> {
 
   /// «No sé el código de mi clínica»: sin clínica guardada, la API la busca
   /// por el correo al entrar (y si no, usa la predeterminada).
-  Future<void> olvidar() async {
-    if (state.clinica == null) return;
+  Future<void> olvidar() => _quitar();
 
-    EmpresaDeLasPeticiones.codigo = null;
-    await _olvidar();
-    await _almacen.borrar();
-    if (isClosed) return;
+  /// La guardada respondió 403 «Esta clínica no está disponible» (está
+  /// suspendida): se olvida como al cambiar de clínica —lo guardado de
+  /// ella, la cabecera— y se sigue con la predeterminada, como hace el
+  /// panel. [ClinicaState.noDisponible] queda con su código para avisarlo.
+  ///
+  /// Lo llama el interceptor de la clínica (ver
+  /// `EmpresaDeLasPeticiones.alNoEstarDisponible`), a veces varias peticiones
+  /// a la vez: se olvida una sola vez. Si [codigo] no es el de la guardada
+  /// (ya se olvidó, o la petición llevaba otra), no hace nada.
+  Future<void> alNoEstarDisponible(String codigo) {
+    final enCurso = _olvidandoLaNoDisponible;
+    if (enCurso != null) return enCurso;
+    if (!mismoCodigo(state.clinica?.codigo, codigo)) return Future.value();
 
-    emit(ClinicaState(cambios: state.cambios + 1));
+    return _olvidandoLaNoDisponible = _quitar(
+      noDisponible: state.clinica!.codigo,
+    ).whenComplete(() => _olvidandoLaNoDisponible = null);
   }
 
   /// Al entrar: la clínica de la cuenta es la que manda. Sin ella (un
@@ -207,6 +228,25 @@ class ClinicaCubit extends Cubit<ClinicaState> {
     if (isClosed || !nueva.esLaMismaQue(state.clinica)) return;
 
     emit(ClinicaState(clinica: nueva, cambios: state.cambios));
+  }
+
+  Future<void> _quitar({String? noDisponible}) async {
+    if (state.clinica == null) return;
+
+    EmpresaDeLasPeticiones.codigo = null;
+    await _olvidar();
+    await _almacen.borrar();
+    if (isClosed) return;
+
+    emit(ClinicaState(cambios: state.cambios + 1, noDisponible: noDisponible));
+  }
+
+  @override
+  Future<void> close() {
+    if (EmpresaDeLasPeticiones.alNoEstarDisponible == alNoEstarDisponible) {
+      EmpresaDeLasPeticiones.alNoEstarDisponible = null;
+    }
+    return super.close();
   }
 
   Future<void> _olvidar() async {

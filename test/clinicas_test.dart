@@ -22,7 +22,10 @@ import 'dobles/dobles.dart';
 /// La clínica de la aplicación: cómo se lee, cómo se guarda, qué va en
 /// `X-Empresa` y cuándo cambia.
 void main() {
-  tearDown(() => EmpresaDeLasPeticiones.codigo = null);
+  tearDown(() {
+    EmpresaDeLasPeticiones.codigo = null;
+    EmpresaDeLasPeticiones.alNoEstarDisponible = null;
+  });
 
   group('La clínica', () {
     test('se lee de la API con su marca, y sin código no es una clínica', () {
@@ -196,6 +199,119 @@ void main() {
         cabeceras['/portal/mis-citas']!.containsKey(cabeceraEmpresa),
         isFalse,
       );
+    });
+
+    test('la búsqueda de un código no lleva la guardada', () async {
+      final api = DioGrabador({
+        'GET /empresas/publica/sur': (_) => clinicaDelSur.aJson(),
+      });
+      api.dio.interceptors.insert(
+        0,
+        InterceptorDeEmpresa(leerCodigo: () => 'andina'),
+      );
+
+      await EmpresasService(api.dio).buscar('sur');
+
+      expect(api.pedidos.single.headers.containsKey(cabeceraEmpresa), isFalse);
+    });
+  });
+
+  group('Una clínica suspendida', () {
+    DioException error403(
+      Map<String, dynamic> cuerpo, {
+      Map<String, dynamic> cabeceras = const {cabeceraEmpresa: 'andina'},
+    }) {
+      final opciones = RequestOptions(path: '/x', headers: {...cabeceras});
+      return DioException(
+        requestOptions: opciones,
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(
+          requestOptions: opciones,
+          statusCode: 403,
+          data: cuerpo,
+        ),
+      );
+    }
+
+    test('el 403 de la clínica se distingue del 403 de permisos', () {
+      expect(
+        clinicaNoDisponibleDe(error403(cuerpoClinicaNoDisponible)),
+        'andina',
+      );
+      // Un servidor que solo manda el mensaje.
+      expect(
+        clinicaNoDisponibleDe(
+          error403({'message': 'Esta clínica no está disponible'}),
+        ),
+        'andina',
+      );
+      // Con la sesión, un 403 es de permisos aunque diga lo mismo.
+      expect(
+        clinicaNoDisponibleDe(
+          error403(
+            cuerpoClinicaNoDisponible,
+            cabeceras: {cabeceraEmpresa: 'andina', 'Authorization': 'Bearer t'},
+          ),
+        ),
+        isNull,
+      );
+      // Otros 403: permisos, o los del acceso.
+      expect(
+        clinicaNoDisponibleDe(
+          error403({'status': 403, 'message': 'No tienes permiso.'}),
+        ),
+        isNull,
+      );
+      // Sin X-Empresa no es la guardada (la predeterminada, o una búsqueda).
+      expect(
+        clinicaNoDisponibleDe(
+          error403(cuerpoClinicaNoDisponible, cabeceras: const {}),
+        ),
+        isNull,
+      );
+      expect(clinicaNoDisponibleDe(errorHttp(404, 'No existe')), isNull);
+    });
+
+    test('el interceptor la avisa antes de dejar pasar el error, y no con un '
+        '403 de permisos', () async {
+      final avisos = <String>[];
+      var avisadaAntesDelError = false;
+      final adaptador = AdaptadorHttpFalso({
+        'GET /configuracion/publica': (_) =>
+            (estado: 403, cuerpo: cuerpoClinicaNoDisponible),
+        'GET /portal/mis-citas': (_) =>
+            (estado: 403, cuerpo: {'message': 'No tienes permiso.'}),
+      });
+      final dio = Dio(BaseOptions(baseUrl: 'https://api.ec/api'))
+        ..httpClientAdapter = adaptador
+        ..interceptors.add(
+          InterceptorDeEmpresa(
+            leerCodigo: () => 'andina',
+            alNoEstarDisponible: (codigo) async {
+              await Future<void>.delayed(Duration.zero);
+              avisos.add(codigo);
+            },
+          ),
+        );
+
+      await expectLater(
+        dio.get<dynamic>('/configuracion/publica').catchError((Object e) {
+          avisadaAntesDelError = avisos.isNotEmpty;
+          throw e;
+        }),
+        throwsA(isA<DioException>()),
+      );
+      expect(avisos, ['andina']);
+      expect(avisadaAntesDelError, isTrue);
+
+      await expectLater(
+        dio.get<dynamic>(
+          '/portal/mis-citas',
+          options: Options(headers: {'Authorization': 'Bearer t'}),
+        ),
+        throwsA(isA<DioException>()),
+      );
+      expect(avisos, ['andina'], reason: 'el 403 de permisos no la olvida');
     });
   });
 
@@ -374,6 +490,46 @@ void main() {
       expect(guardada?.colorPrimario, '#2E7D32');
       expect(guardada?.colorAcento, isNull);
       expect(prueba.cubit.state.cambios, 0);
+    });
+
+    test('si la guardada no está disponible se olvida una vez, como al '
+        'cambiar de clínica, y queda el aviso', () async {
+      final cache = CacheEnMemoria();
+      await cache.guardar('configuracion:publica', {'de': 'andina'});
+      final prueba = clinicaCubitDePrueba(
+        inicial: clinicaAndina,
+        olvidarDatos: cache.vaciarDatosDeLaClinica,
+      );
+      final cubit = prueba.cubit;
+      await AlmacenDeClinica(prueba.llavero).guardar(clinicaAndina);
+
+      // Es el cubit quien atiende al interceptor.
+      expect(EmpresaDeLasPeticiones.alNoEstarDisponible, isNotNull);
+
+      // Otra clínica (la que llevaba una petición) no toca la guardada.
+      await cubit.alNoEstarDisponible('sur');
+      expect(cubit.clinica, clinicaAndina);
+
+      // Varias peticiones a la vez: un solo olvido.
+      await Future.wait([
+        EmpresaDeLasPeticiones.alNoEstarDisponible!('ANDINA'),
+        cubit.alNoEstarDisponible('andina'),
+      ]);
+      await cubit.alNoEstarDisponible('andina');
+
+      expect(cubit.clinica, isNull);
+      expect(cubit.state.cambios, 1);
+      expect(cubit.state.noDisponible, 'andina');
+      expect(EmpresaDeLasPeticiones.codigo, isNull);
+      expect(prueba.llavero.valores, isEmpty);
+      expect(await cache.leer('configuracion:publica'), isNull);
+
+      // El aviso es una vez: el estado siguiente ya no lo trae.
+      await cubit.elegir(clinicaDelSur);
+      expect(cubit.state.noDisponible, isNull);
+
+      await cubit.close();
+      expect(EmpresaDeLasPeticiones.alNoEstarDisponible, isNull);
     });
 
     test('cargar lee la guardada si no arrancó con una', () async {
