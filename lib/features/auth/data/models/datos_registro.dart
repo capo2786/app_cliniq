@@ -25,6 +25,12 @@ class DatosRegistro extends Equatable {
 
   final String password;
 
+  /// El código de la clínica donde se crea la cuenta, o `null` para la
+  /// predeterminada, como antes de haber varias. Va en la cabecera
+  /// `X-Empresa` y no en el cuerpo: ahí `empresa` es el empleador del
+  /// paciente (un dato de su filiación).
+  final String? empresa;
+
   const DatosRegistro({
     required this.nombre,
     required this.email,
@@ -34,6 +40,7 @@ class DatosRegistro extends Equatable {
     required this.password,
     this.telefono = '',
     this.sexo = '',
+    this.empresa,
   });
 
   /// El correo como se envía y como se muestra después («te enviamos un
@@ -68,5 +75,6 @@ class DatosRegistro extends Equatable {
     fechaNacimiento,
     sexo,
     password,
+    empresa,
   ];
 }

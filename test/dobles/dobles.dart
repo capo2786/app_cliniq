@@ -67,12 +67,17 @@ class AuthServiceFalso implements AuthService {
 
   final List<String> llamadas = [];
 
+  /// La clínica de cada intento de acceso y de código (`null` sin elegir).
+  final List<String?> empresas = [];
+
   @override
   Future<ResultadoDeAcceso> iniciarSesion({
     required String email,
     required String password,
+    String? empresa,
   }) {
     llamadas.add('login:$email');
+    empresas.add(empresa);
     return alEntrar!(email, password);
   }
 
@@ -80,8 +85,10 @@ class AuthServiceFalso implements AuthService {
   Future<ResultadoDeAcceso> verificarCodigo({
     required String desafio,
     required String codigo,
+    String? empresa,
   }) {
     llamadas.add('2fa:$desafio:$codigo');
+    empresas.add(empresa);
     return alVerificar!(desafio, codigo);
   }
 

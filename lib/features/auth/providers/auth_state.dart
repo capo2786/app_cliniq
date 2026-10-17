@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../clinicas/dominio/clinica.dart';
 import '../data/models/usuario.dart';
 
 sealed class AuthState extends Equatable {
@@ -56,6 +57,17 @@ class AuthRequiere2fa extends AuthState {
 
   @override
   List<Object?> get props => [desafio, destino, enviando, error];
+}
+
+/// El correo tiene cuenta en varias clínicas (HTTP 409 `EMPRESA_AMBIGUA`):
+/// falta elegir en cuál entrar. La contraseña espera en el bloc.
+class AuthEligeClinica extends AuthState {
+  final List<Clinica> clinicas;
+
+  const AuthEligeClinica(this.clinicas);
+
+  @override
+  List<Object?> get props => [clinicas];
 }
 
 /// Dentro.

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_interceptor.dart';
+import '../../../core/network/interceptor_de_empresa.dart';
 import 'models/datos_registro.dart';
 import 'models/usuario.dart';
 
@@ -55,27 +56,42 @@ class AuthService {
   AuthService(this._dio);
 
   /// `POST /auth/login`: 200 con token, o 200 pidiendo el segundo factor.
-  /// 401 son credenciales equivocadas y 423 una cuenta bloqueada.
+  /// 401 son credenciales equivocadas, 423 una cuenta bloqueada y 409
+  /// `EMPRESA_AMBIGUA` un correo con cuenta en varias clínicas: se vuelve a
+  /// intentar con la elegida en [empresa] (en el cuerpo y en `X-Empresa`).
   Future<ResultadoDeAcceso> iniciarSesion({
     required String email,
     required String password,
+    String? empresa,
   }) async {
     final respuesta = await _dio.post<dynamic>(
       '/auth/login',
-      data: {'email': email.trim().toLowerCase(), 'password': password},
+      data: {
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        ...?_cuerpoDeEmpresa(empresa),
+      },
+      options: _opcionesDeEmpresa(empresa),
     );
 
     return interpretarAcceso(respuesta.data);
   }
 
-  /// `POST /auth/login/2fa`: el segundo paso, con el código del correo.
+  /// `POST /auth/login/2fa`: el segundo paso, con el código del correo. Con
+  /// la misma [empresa] del primero, si se eligió una.
   Future<ResultadoDeAcceso> verificarCodigo({
     required String desafio,
     required String codigo,
+    String? empresa,
   }) async {
     final respuesta = await _dio.post<dynamic>(
       '/auth/login/2fa',
-      data: {'desafio': desafio, 'codigo': codigo.trim()},
+      data: {
+        'desafio': desafio,
+        'codigo': codigo.trim(),
+        ...?_cuerpoDeEmpresa(empresa),
+      },
+      options: _opcionesDeEmpresa(empresa),
     );
 
     return interpretarAcceso(respuesta.data);
@@ -122,12 +138,17 @@ class AuthService {
   /// El API valida lo mismo que la pantalla y responde 400 con el motivo, 409
   /// si el correo o el documento ya tienen cuenta y 429 si desde la misma
   /// conexión se crearon demasiadas en una hora: esos mensajes se enseñan
-  /// tal cual.
+  /// tal cual. La clínica va en `X-Empresa` ([DatosRegistro.empresa]).
   Future<void> registrar(DatosRegistro datos) async {
+    final empresa = datos.empresa?.trim() ?? '';
+
     await _dio.post<dynamic>(
       '/auth/registro',
       data: datos.aJson(),
-      options: Options(extra: const {rutaPublica: true}),
+      options: Options(
+        extra: const {rutaPublica: true},
+        headers: empresa.isEmpty ? null : {cabeceraEmpresa: empresa},
+      ),
     );
   }
 
@@ -211,6 +232,18 @@ class AuthService {
 
     return yo();
   }
+}
+
+Map<String, dynamic>? _cuerpoDeEmpresa(String? empresa) {
+  final codigo = empresa?.trim() ?? '';
+  return codigo.isEmpty ? null : {'empresa': codigo};
+}
+
+/// La clínica elegida va también en la cabecera: así manda sobre la que
+/// estaba guardada (ver `InterceptorDeEmpresa`).
+Options? _opcionesDeEmpresa(String? empresa) {
+  final codigo = empresa?.trim() ?? '';
+  return codigo.isEmpty ? null : Options(headers: {cabeceraEmpresa: codigo});
 }
 
 /// El `message` de una respuesta, si trae uno legible.

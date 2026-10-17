@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../clinicas/dominio/clinica.dart';
 import '../data/models/usuario.dart';
 
 sealed class AuthEvent extends Equatable {
@@ -63,4 +64,20 @@ class AuthPerfilActualizado extends AuthEvent {
 
   @override
   List<Object?> get props => [usuario];
+}
+
+/// Eligió su clínica en la hoja que sale cuando el correo tiene cuenta en
+/// varias: se vuelve a intentar con ella.
+class AuthClinicaElegida extends AuthEvent {
+  final Clinica clinica;
+
+  const AuthClinicaElegida(this.clinica);
+
+  @override
+  List<Object?> get props => [clinica];
+}
+
+/// Cerró la hoja de las clínicas sin elegir ninguna.
+class AuthEleccionDeClinicaCancelada extends AuthEvent {
+  const AuthEleccionDeClinicaCancelada();
 }

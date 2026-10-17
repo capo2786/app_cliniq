@@ -47,7 +47,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ///
   /// Se guardan en el llavero solo cuando el código se acepta: hasta ese
   /// momento el acceso no está concedido.
-  ({String email, String password})? _pendiente;
+  /// Con la clínica elegida, si el correo estaba en varias: el código va
+  /// con el mismo [empresa].
+  ({String email, String password, String? empresa})? _pendiente;
 
   AuthBloc({
     required this._servicio,
@@ -65,6 +67,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     on<AuthLoginSolicitado>(_alEntrar);
     on<AuthCodigoEnviado>(_alRecibirCodigo);
     on<AuthCodigoCancelado>(_alCancelarCodigo);
+    on<AuthClinicaElegida>(_alElegirClinica);
+    on<AuthEleccionDeClinicaCancelada>(_alCancelarCodigo);
     on<AuthCierreSolicitado>(_alSalir);
     on<AuthSesionVencida>(_alVencer);
     on<AuthPerfilRefrescado>(_alRefrescarPerfil);
@@ -150,21 +154,49 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     AuthLoginSolicitado event,
     Emitter<AuthState> emit,
   ) async {
-    emit(const AuthCargando());
+    await _intentarEntrar(
+      email: event.email.trim().toLowerCase(),
+      password: event.password,
+      emit: emit,
+    );
+  }
 
-    final email = event.email.trim().toLowerCase();
+  Future<void> _alElegirClinica(
+    AuthClinicaElegida event,
+    Emitter<AuthState> emit,
+  ) async {
+    final pendiente = _pendiente;
+    if (state is! AuthEligeClinica || pendiente == null) return;
+
+    await _intentarEntrar(
+      email: pendiente.email,
+      password: pendiente.password,
+      empresa: event.clinica.codigo,
+      emit: emit,
+    );
+  }
+
+  Future<void> _intentarEntrar({
+    required String email,
+    required String password,
+    required Emitter<AuthState> emit,
+    String? empresa,
+  }) async {
+    emit(const AuthCargando());
+    _pendiente = null;
 
     try {
       final resultado = await _servicio.iniciarSesion(
         email: email,
-        password: event.password,
+        password: password,
+        empresa: empresa,
       );
 
       switch (resultado) {
         case AccesoConcedido():
-          await _completarAcceso(resultado, email, event.password, emit);
+          await _completarAcceso(resultado, email, password, emit);
         case SegundoFactorRequerido():
-          _pendiente = (email: email, password: event.password);
+          _pendiente = (email: email, password: password, empresa: empresa);
           emit(
             AuthRequiere2fa(
               desafio: resultado.desafio,
@@ -173,6 +205,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
           );
       }
     } catch (error) {
+      // El correo está en varias clínicas: que elija. Con una ya elegida no
+      // se vuelve a preguntar (sería un bucle); cae en el error de siempre.
+      final clinicas = empresa == null ? clinicasParaElegir(error) : null;
+      if (clinicas != null) {
+        _pendiente = (email: email, password: password, empresa: null);
+        emit(AuthEligeClinica(clinicas));
+        return;
+      }
+
       final traducido = errorDeAcceso(error);
       emit(
         AuthError(
@@ -202,6 +243,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final resultado = await _servicio.verificarCodigo(
         desafio: actual.desafio,
         codigo: event.codigo,
+        empresa: pendiente.empresa,
       );
 
       if (resultado is! AccesoConcedido) {
@@ -228,7 +270,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  void _alCancelarCodigo(AuthCodigoCancelado event, Emitter<AuthState> emit) {
+  /// Volver al formulario: desde el código o desde la hoja de las clínicas.
+  void _alCancelarCodigo(AuthEvent event, Emitter<AuthState> emit) {
     _pendiente = null;
     emit(const AuthNoAutenticado());
   }
