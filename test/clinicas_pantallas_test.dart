@@ -170,6 +170,22 @@ void main() {
     expect(find.byKey(const Key('error-codigo')), findsOneWidget);
     expect(clinicas.clinica, clinicaAndina);
 
+    // Una suspendida tampoco se usa, y se dice que no está disponible.
+    await tester.enterText(
+      find.byKey(const Key('campo-codigo-clinica')),
+      'cerrada',
+    );
+    await tocar(tester, find.byKey(const Key('boton-buscar-clinica')));
+    expect(
+      find.text(
+        'La clínica «cerrada» no está disponible por ahora. Consulta con tu '
+        'clínica.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('boton-usar-clinica')), findsNothing);
+    expect(clinicas.clinica, clinicaAndina);
+
     await tester.enterText(
       find.byKey(const Key('campo-codigo-clinica')),
       'sur',
@@ -335,6 +351,27 @@ void main() {
       expect(find.byType(RegistroPage), findsNothing);
       expect(find.textContaining('«nadie»'), findsOneWidget);
       expect(clinicas.clinica, isNull);
+    });
+
+    testWidgets('con una clínica suspendida dice que no está disponible y no '
+        'abre nada', (tester) async {
+      final enlaces = StreamController<Uri>();
+      addTearDown(enlaces.close);
+      final clinicas = await montarReceptor(tester, enlaces);
+
+      enlaces.add(Uri.parse('$panel/registro?clinica=cerrada'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(RegistroPage), findsNothing);
+      expect(
+        find.text(
+          'La clínica «cerrada» no está disponible por ahora. Consulta con '
+          'tu clínica.',
+        ),
+        findsOneWidget,
+      );
+      expect(clinicas.clinica, isNull);
+      expect(EmpresaDeLasPeticiones.codigo, isNull);
     });
 
     test('lleva el código de la clínica; sin él, el registro de siempre', () {

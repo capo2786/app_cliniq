@@ -46,10 +46,40 @@ DioException errorEmpresaAmbigua(List<Clinica> clinicas) {
   );
 }
 
-/// `GET /empresas/publica/:codigo` que conoce estas clínicas.
-DioGrabador empresasConocidas(List<Clinica> clinicas) => DioGrabador({
+/// El cuerpo del 403 de una clínica suspendida, como lo manda el gateway
+/// (en `/empresas/publica/:codigo` y en lo que lleva su `X-Empresa`).
+const Map<String, Object> cuerpoClinicaNoDisponible = {
+  'status': 403,
+  'message': 'Esta clínica no está disponible',
+  'codigo': 'EMPRESA_NO_DISPONIBLE',
+};
+
+/// El 403 de una clínica suspendida, para lanzarlo desde un [DioGrabador].
+DioException errorClinicaNoDisponible([String ruta = '/prueba']) {
+  final opciones = RequestOptions(path: ruta);
+
+  return DioException(
+    requestOptions: opciones,
+    type: DioExceptionType.badResponse,
+    response: Response<dynamic>(
+      requestOptions: opciones,
+      statusCode: 403,
+      data: cuerpoClinicaNoDisponible,
+    ),
+  );
+}
+
+/// `GET /empresas/publica/:codigo` que conoce estas clínicas; las de
+/// [suspendidas] responden 403.
+DioGrabador empresasConocidas(
+  List<Clinica> clinicas, {
+  List<String> suspendidas = const [],
+}) => DioGrabador({
   for (final c in clinicas)
     'GET ${EmpresasService.ruta}/${c.codigo}': (_) => c.aJson(),
+  for (final codigo in suspendidas)
+    'GET ${EmpresasService.ruta}/$codigo': (_) =>
+        throw errorClinicaNoDisponible(),
 });
 
 /// Un [ClinicaCubit] con el llavero en memoria y las clínicas dadas.
@@ -57,10 +87,11 @@ DioGrabador empresasConocidas(List<Clinica> clinicas) => DioGrabador({
 clinicaCubitDePrueba({
   Clinica? inicial,
   List<Clinica> conocidas = const [clinicaAndina, clinicaDelSur],
+  List<String> suspendidas = const ['cerrada'],
   Future<void> Function()? olvidarDatos,
 }) {
   final llavero = AlmacenClavesEnMemoria();
-  final api = empresasConocidas(conocidas);
+  final api = empresasConocidas(conocidas, suspendidas: suspendidas);
 
   return (
     cubit: ClinicaCubit(

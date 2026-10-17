@@ -6,6 +6,15 @@ import '../../../core/network/api_interceptor.dart';
 import '../../auth/data/auth_service.dart';
 import '../dominio/clinica.dart';
 
+/// La clínica del código existe pero no está disponible (suspendida): la API
+/// responde 403 «Esta clínica no está disponible».
+class ClinicaNoDisponible implements Exception {
+  const ClinicaNoDisponible();
+
+  @override
+  String toString() => 'ClinicaNoDisponible';
+}
+
 /// `GET /empresas/publica/:codigo`: la clínica de un código, pública.
 ///
 /// Sirve para comprobar el código que alguien escribe (o que llega en el
@@ -17,9 +26,10 @@ class EmpresasService {
 
   EmpresasService(this._dio);
 
-  /// La clínica de [codigo], o `null` si no existe (404). Un fallo de red o
-  /// del servidor se propaga, para decir «revisa tu conexión» y no «ese
-  /// código no existe».
+  /// La clínica de [codigo], o `null` si no existe (404). Si existe pero
+  /// está suspendida (403), [ClinicaNoDisponible]. Un fallo de red o del
+  /// servidor se propaga, para decir «revisa tu conexión» y no «ese código
+  /// no existe».
   Future<Clinica?> buscar(String codigo) async {
     final limpio = limpiarCodigo(codigo);
     if (limpio.isEmpty) return null;
@@ -36,6 +46,8 @@ class EmpresasService {
       return clinica;
     } on DioException catch (error) {
       if (error.response?.statusCode == 404) return null;
+      // Esta ruta es pública: su 403 no es de permisos, es la clínica.
+      if (error.response?.statusCode == 403) throw const ClinicaNoDisponible();
       rethrow;
     }
   }

@@ -225,6 +225,8 @@ void main() {
           'colorAcento': '#445566',
         },
         'GET /empresas/publica/caida': (_) => throw errorDeRed(),
+        'GET /empresas/publica/cerrada': (_) =>
+            throw errorClinicaNoDisponible(),
       });
       final servicio = EmpresasService(api.dio);
 
@@ -233,6 +235,11 @@ void main() {
       expect(await servicio.buscar('nadie'), isNull);
       expect(await servicio.buscar(''), isNull);
       await expectLater(servicio.buscar('caida'), throwsA(isA<DioException>()));
+      // Suspendida: existe, pero no está disponible (403, antes 404).
+      await expectLater(
+        servicio.buscar('cerrada'),
+        throwsA(isA<ClinicaNoDisponible>()),
+      );
     });
   });
 
@@ -310,6 +317,22 @@ void main() {
       final sinRed = await prueba.cubit.buscar('caida');
       expect(sinRed, isA<CodigoSinRespuesta>());
       expect(mensajeDeBusqueda(sinRed, 'caida'), contains('Sin conexión'));
+      expect(prueba.cubit.clinica, isNull);
+    });
+
+    test('una clínica suspendida (403) tiene su propio mensaje, y no es «sin '
+        'conexión» ni «no tienes permiso»', () async {
+      final prueba = clinicaCubitDePrueba();
+      addTearDown(prueba.cubit.close);
+
+      final resultado = await prueba.cubit.buscar(' cerrada ');
+
+      expect(resultado, isA<CodigoNoDisponible>());
+      expect(
+        mensajeDeBusqueda(resultado, ' cerrada '),
+        'La clínica «cerrada» no está disponible por ahora. Consulta con tu '
+        'clínica.',
+      );
       expect(prueba.cubit.clinica, isNull);
     });
 

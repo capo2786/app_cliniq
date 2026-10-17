@@ -44,12 +44,24 @@ class CodigoDesconocido extends ResultadoDeCodigo {
   const CodigoDesconocido();
 }
 
+/// La clínica existe pero no está disponible por ahora (suspendida).
+class CodigoNoDisponible extends ResultadoDeCodigo {
+  const CodigoNoDisponible();
+}
+
 /// No se pudo preguntar (sin red, o el servidor falló).
 class CodigoSinRespuesta extends ResultadoDeCodigo {
   final Object error;
 
   const CodigoSinRespuesta(this.error);
 }
+
+/// Lo que se le dice a la persona cuando la clínica de [codigo] está
+/// suspendida: al buscar su código, al abrir su enlace de registro o cuando
+/// la guardada deja de estar disponible.
+String mensajeDeClinicaNoDisponible(String codigo) =>
+    'La clínica «${limpiarCodigo(codigo)}» no está disponible por ahora. '
+    'Consulta con tu clínica.';
 
 /// Lo que se le dice a la persona de una búsqueda que no encontró su
 /// clínica, o `null` si la encontró.
@@ -61,6 +73,7 @@ String? mensajeDeBusqueda(
   CodigoDesconocido() =>
     'No encontramos ninguna clínica con el código «${limpiarCodigo(codigo)}». '
         'Revísalo con tu clínica.',
+  CodigoNoDisponible() => mensajeDeClinicaNoDisponible(codigo),
   CodigoSinRespuesta(:final error) => mensajeDeError(
     error,
     generico: 'No pudimos comprobar el código. Intenta de nuevo.',
@@ -112,6 +125,8 @@ class ClinicaCubit extends Cubit<ClinicaState> {
       return clinica == null
           ? const CodigoDesconocido()
           : CodigoEncontrado(clinica);
+    } on ClinicaNoDisponible {
+      return const CodigoNoDisponible();
     } catch (error) {
       return CodigoSinRespuesta(error);
     }
