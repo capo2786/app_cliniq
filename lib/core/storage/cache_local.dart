@@ -25,6 +25,10 @@ abstract class CacheLocal {
 
   /// Borra lo que es de una persona y conserva lo de la clínica (catálogos).
   Future<void> vaciarDatosPersonales();
+
+  /// Borra lo que es de la clínica (ver [prefijosDeLaClinica]): al cambiar
+  /// de clínica, lo de la anterior no tiene que verse en la nueva.
+  Future<void> vaciarDatosDeLaClinica();
 }
 
 /// Los prefijos que guardan datos de la clínica y no de alguien: se quedan
@@ -134,6 +138,20 @@ class CacheHive implements CacheLocal {
 
     await caja.deleteAll(personales);
   }
+
+  @override
+  Future<void> vaciarDatosDeLaClinica() async {
+    await inicializar();
+
+    _respaldo.removeWhere((clave, _) => esDatoDeLaClinica(clave));
+
+    final caja = _caja;
+    if (caja == null) return;
+
+    await caja.deleteAll(
+      caja.keys.map((clave) => clave.toString()).where(esDatoDeLaClinica),
+    );
+  }
 }
 
 /// Una caché que vive solo en memoria. Para las pruebas.
@@ -156,4 +174,8 @@ class CacheEnMemoria implements CacheLocal {
   @override
   Future<void> vaciarDatosPersonales() async =>
       valores.removeWhere((clave, _) => !esDatoDeLaClinica(clave));
+
+  @override
+  Future<void> vaciarDatosDeLaClinica() async =>
+      valores.removeWhere((clave, _) => esDatoDeLaClinica(clave));
 }

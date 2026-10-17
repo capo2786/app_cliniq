@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 
+import '../../../clinicas/dominio/clinica.dart';
 import '../../../fotos_perfil/dominio/foto_perfil.dart';
 
 /// Los permisos del portal del paciente, con los nombres de la API.
@@ -99,6 +100,15 @@ class Usuario extends Equatable {
   bool get tieneLegalesPendientes => legalPendientes.isNotEmpty;
 
   bool get dosFactores => datos['dosFactores'] == true;
+
+  /// La clínica de la sesión (`empresaSesion: {id, codigo, nombre}`), o
+  /// `null` si el servidor no la manda (uno anterior a las clínicas).
+  ///
+  /// Ojo: `empresa`, en el perfil, es el empleador del paciente (un texto
+  /// de la filiación). Solo se toma como clínica si llega como objeto.
+  Clinica? get clinicaDeLaSesion =>
+      Clinica.desdeJson(datos['empresaSesion']) ??
+      Clinica.desdeJson(datos['empresa']);
 
   /// La versión de su foto de perfil, o `null` si no tiene. Sube con cada
   /// cambio: es la que va en `GET /auth/:id/foto?v=`.

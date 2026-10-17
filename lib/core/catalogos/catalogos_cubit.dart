@@ -119,6 +119,13 @@ class CatalogosCubit extends Cubit<CatalogosState> {
   CatalogosCubit(this._servicio, {CatalogosState? inicial})
     : super(inicial ?? const CatalogosState());
 
+  /// Vuelve a pedir los catálogos después de la petición en curso, si hay una:
+  /// al cambiar de clínica, la que ya salió es de la anterior.
+  Future<void> recargar() async {
+    await _enCurso;
+    await cargar();
+  }
+
   Future<void> cargar() => _enCurso ??= _cargar().whenComplete(() {
     _enCurso = null;
   });

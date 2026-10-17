@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../../../core/network/errores.dart';
+import '../../clinicas/dominio/clinica.dart';
 
 /// Por qué no se pudo entrar, en palabras de la persona.
 class ErrorDeAcceso {
@@ -87,4 +88,29 @@ ErrorDeAcceso errorDeAcceso(Object error, {bool esCodigo = false}) {
       generico: 'No fue posible iniciar sesión. Intenta nuevamente.',
     ),
   );
+}
+
+/// El `codigo` con que la API dice que el correo tiene cuenta en varias
+/// clínicas (HTTP 409).
+const String codigoEmpresaAmbigua = 'EMPRESA_AMBIGUA';
+
+/// Las clínicas entre las que hay que elegir, si el acceso respondió 409
+/// `EMPRESA_AMBIGUA` (`empresas: [{codigo, nombre, logoUrl?,
+/// colorPrimario}]`); si no, `null`. Una lista vacía o sin códigos también
+/// es `null`: no hay nada que ofrecer y el error se trata como cualquier
+/// otro.
+List<Clinica>? clinicasParaElegir(Object error) {
+  if (error is! DioException || error.response?.statusCode != 409) {
+    return null;
+  }
+
+  final datos = error.response?.data;
+  if (datos is! Map || datos['codigo'] != codigoEmpresaAmbigua) return null;
+
+  final empresas = datos['empresas'];
+  if (empresas is! List) return null;
+
+  final clinicas = [for (final e in empresas) ?Clinica.desdeJson(e)];
+
+  return clinicas.isEmpty ? null : clinicas;
 }

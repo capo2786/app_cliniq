@@ -7,6 +7,8 @@ import '../features/ayuda/data/ayuda_service.dart';
 import '../features/auth/data/almacen_de_sesion.dart';
 import '../features/auth/data/auth_service.dart';
 import '../features/citas/data/citas_service.dart';
+import '../features/clinicas/data/almacen_de_clinica.dart';
+import '../features/clinicas/data/empresas_service.dart';
 import '../features/citas/data/permisos_de_video.dart';
 import '../features/citas/data/sala_jitsi.dart';
 import '../features/citas/data/videollamada_service.dart';
@@ -113,6 +115,13 @@ class Servicios {
   /// pruebas no hay WebView.
   @visibleForTesting
   static set vistaWebParaPruebas(FabricaDeVistaWeb otra) => _vistaWeb = otra;
+
+  // ── Clínicas ───────────────────────────────────────────────────────
+  /// La última clínica, guardada en el teléfono (no se borra al salir).
+  static const AlmacenDeClinica almacenDeClinica = AlmacenDeClinica(llavero);
+
+  /// `GET /empresas/publica/:codigo`: comprobar el código de una clínica.
+  static final EmpresasService empresas = EmpresasService(ApiClient().dio);
 
   // ── Módulos ────────────────────────────────────────────────────────
   static final AuthService auth = AuthService(ApiClient().dio);

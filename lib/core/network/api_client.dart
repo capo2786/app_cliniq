@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import '../config/entorno.dart';
 import 'api_interceptor.dart';
 import 'corte_rapido_sin_red.dart';
+import 'interceptor_de_empresa.dart';
 
 /// Cliente HTTP de toda la aplicación.
 ///
@@ -37,6 +38,8 @@ class ApiClient {
         alVencerLaSesion: () => _sesionVencida.add(null),
       ),
     );
+    // Después del token: la clínica solo va en las peticiones sin sesión.
+    dio.interceptors.add(InterceptorDeEmpresa());
   }
 
   static final ApiClient _instancia = ApiClient._();

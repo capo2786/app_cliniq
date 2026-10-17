@@ -12,6 +12,7 @@ import 'core/configuracion/config_publica.dart';
 import 'core/configuracion/config_publica_cubit.dart';
 import 'core/fechas/zona_clinica.dart';
 import 'core/network/api_client.dart';
+import 'core/network/interceptor_de_empresa.dart';
 import 'core/presentacion/rutas.dart';
 import 'core/presentacion/widgets/barra_de_accion.dart';
 import 'core/servicios.dart';
@@ -26,6 +27,9 @@ import 'features/auth/providers/auth_bloc.dart';
 import 'features/auth/providers/auth_state.dart';
 import 'features/citas/providers/citas_bloc.dart';
 import 'features/citas/providers/citas_event.dart';
+import 'features/clinicas/dominio/clinica.dart';
+import 'features/clinicas/presentacion/sincronizar_clinica.dart';
+import 'features/clinicas/providers/clinica_cubit.dart';
 import 'features/consultas/providers/consultas_bloc.dart';
 import 'features/consultas/providers/consultas_event.dart';
 import 'features/dependientes/providers/dependientes_bloc.dart';
@@ -59,6 +63,14 @@ void main() {
     // enseñar las citas guardadas desde el primer cuadro.
     await intentar('la caché local', () => Servicios.cache.inicializar());
 
+    // La última clínica (la de `X-Empresa` en lo que se pide sin sesión),
+    // antes de la primera petición. Sin ella, la predeterminada de la API.
+    Clinica? clinica;
+    await intentar('la clínica guardada', () async {
+      clinica = await Servicios.almacenDeClinica.leer();
+      EmpresaDeLasPeticiones.codigo = clinica?.codigo;
+    });
+
     // La última configuración de la clínica, si hay: su zona horaria y los
     // colores de su marca desde el primer cuadro. La del servidor llega
     // después (ver `ConfigPublicaCubit`).
@@ -81,7 +93,9 @@ void main() {
     // Los enlaces de los correos (confirmar el correo, crear la contraseña
     // nueva) abren la aplicación: App Links y Universal Links. El primero
     // —el que abrió la aplicación— llega al empezar a escuchar.
-    runApp(CliniqApp(enlacesEntrantes: AppLinks().uriLinkStream));
+    runApp(
+      CliniqApp(enlacesEntrantes: AppLinks().uriLinkStream, clinica: clinica),
+    );
   }, (error, pila) => registrarFallo('el arranque', error, pila));
 }
 
@@ -145,12 +159,25 @@ class CliniqApp extends StatelessWidget {
   /// ellos —en las pruebas—, no se escucha ninguno.
   final Stream<Uri>? enlacesEntrantes;
 
-  const CliniqApp({super.key, this.enlacesEntrantes});
+  /// La clínica guardada, ya leída antes de abrir (ver `main`).
+  final Clinica? clinica;
+
+  const CliniqApp({super.key, this.enlacesEntrantes, this.clinica});
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        // La clínica va primero: la configuración ya sale con su cabecera.
+        BlocProvider<ClinicaCubit>(
+          lazy: false,
+          create: (_) => ClinicaCubit(
+            almacen: Servicios.almacenDeClinica,
+            empresas: Servicios.empresas,
+            olvidarDatosDeLaClinica: Servicios.cache.vaciarDatosDeLaClinica,
+            inicial: clinica,
+          ),
+        ),
         // La configuración y los catálogos son públicos: se piden al abrir,
         // antes de saber si hay sesión, porque el acceso ya los necesita.
         BlocProvider<ConfigPublicaCubit>(
@@ -301,7 +328,10 @@ class _DatosDeLaClinicaAlDiaState extends State<_DatosDeLaClinicaAlDia>
           listener: (context, _) => _revisarRecordatorios(context),
         ),
       ],
-      child: widget.child,
+      child: SincronizarClinica(
+        leerToken: () => ApiClient().token,
+        child: widget.child,
+      ),
     );
   }
 }

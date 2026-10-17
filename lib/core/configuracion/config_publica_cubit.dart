@@ -74,6 +74,13 @@ class ConfigPublicaCubit extends Cubit<ConfigPublicaState> {
 
   /// Carga (o refresca) la configuración. Dos llamadas seguidas comparten la
   /// misma petición.
+  /// Vuelve a pedir la configuración después de la petición en curso, si hay una:
+  /// al cambiar de clínica, la que ya salió es de la anterior.
+  Future<void> recargar() async {
+    await _enCurso;
+    await cargar();
+  }
+
   Future<void> cargar() => _enCurso ??= _cargar().whenComplete(() {
     _enCurso = null;
   });
