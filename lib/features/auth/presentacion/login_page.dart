@@ -32,6 +32,8 @@ import 'widgets/recuperar_contrasena.dart';
 import '../../../core/configuracion/config_publica_cubit.dart';
 import '../../../core/configuracion/en_contexto.dart';
 import '../../../core/presentacion/widgets/logo_clinica.dart';
+import '../../clinicas/presentacion/cambiar_de_clinica.dart';
+import '../../clinicas/presentacion/hoja_elegir_clinica.dart';
 
 /// La pantalla de acceso.
 ///
@@ -260,6 +262,18 @@ class _LoginPageState extends State<LoginPage> {
     _password.clear();
   }
 
+  /// El correo tiene cuenta en varias clínicas: que elija en cuál entrar.
+  Future<void> _elegirClinica(AuthEligeClinica estado) async {
+    final bloc = context.read<AuthBloc>();
+    final elegida = await elegirClinica(context, estado.clinicas);
+
+    bloc.add(
+      elegida == null
+          ? const AuthEleccionDeClinicaCancelada()
+          : AuthClinicaElegida(elegida),
+    );
+  }
+
   Future<void> _recuperar() async {
     await mostrarRecuperarContrasena(
       context,
@@ -295,6 +309,9 @@ class _LoginPageState extends State<LoginPage> {
                   if (state is AuthAutenticado) {
                     TextInput.finishAutofillContext();
                     _password.clear();
+                  }
+                  if (state is AuthEligeClinica) {
+                    unawaited(_elegirClinica(state));
                   }
                 },
                 builder: (context, state) {
@@ -333,7 +350,9 @@ class _LoginPageState extends State<LoginPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const _Marca(),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 6),
+                        BotonCambiarDeClinica(habilitado: !cargando),
+                        const SizedBox(height: 12),
                         if (state is AuthCuentaDelPersonal) ...[
                           const _SoloPacientes(),
                           const SizedBox(height: 16),

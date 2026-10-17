@@ -1,7 +1,8 @@
 // lib/features/navegacion/dominio/enlaces_entrantes.dart
 
 /// Los enlaces de los correos de la clínica que abren la aplicación (App
-/// Links en Android, Universal Links en iOS).
+/// Links en Android, Universal Links en iOS), y el enlace de registro de
+/// una clínica.
 ///
 /// El API los arma con la dirección del panel (`general.frontendUrl`, o
 /// `FRONTEND_URL`): `https://<panel>/confirmar-correo?token=…` al crear la
@@ -18,6 +19,10 @@ const String rutaConfirmarCorreo = '/confirmar-correo';
 
 /// La ruta del panel donde se crea la contraseña nueva.
 const String rutaRestablecer = '/restablecer';
+
+/// La ruta del panel del registro del paciente: con `?clinica=CODIGO`, el
+/// enlace (o el QR de recepción) de una clínica.
+const String rutaRegistro = '/registro';
 
 /// A qué pantalla lleva un enlace de un correo.
 sealed class EnlaceEntrante {
@@ -57,10 +62,29 @@ class EnlaceRestablecer extends EnlaceEntrante {
   String toString() => 'EnlaceRestablecer($token)';
 }
 
+/// «Crear mi cuenta» en una clínica: `/registro?clinica=CODIGO`. Sin
+/// código, la clínica que ya tenga la aplicación (o la predeterminada).
+class EnlaceRegistro extends EnlaceEntrante {
+  /// El código de la clínica, ya limpio; vacío si no vino.
+  final String codigo;
+
+  const EnlaceRegistro(this.codigo) : super('');
+
+  @override
+  bool operator ==(Object other) =>
+      other is EnlaceRegistro && other.codigo == codigo;
+
+  @override
+  int get hashCode => Object.hash(EnlaceRegistro, codigo);
+
+  @override
+  String toString() => 'EnlaceRegistro($codigo)';
+}
+
 /// Lee un enlace que abrió la aplicación, o `null` si no es de los suyos.
 ///
 /// Tiene que ser `https`, del servidor del panel ([panel], `WEB_URL`) y de
-/// una de las dos rutas (con la ruta base del panel, si tiene una, y sin
+/// una de sus rutas (con la ruta base del panel, si tiene una, y sin
 /// importar la barra final ni las mayúsculas). El `token` se toma de la
 /// consulta; el resto se ignora.
 EnlaceEntrante? leerEnlaceEntrante(
@@ -92,6 +116,9 @@ EnlaceEntrante? leerEnlaceEntrante(
   return switch (ruta) {
     rutaConfirmarCorreo => EnlaceConfirmarCorreo(token),
     rutaRestablecer => EnlaceRestablecer(token),
+    rutaRegistro => EnlaceRegistro(
+      (enlace.queryParameters['clinica'] ?? '').replaceAll(RegExp(r'\s+'), ''),
+    ),
     _ => null,
   };
 }

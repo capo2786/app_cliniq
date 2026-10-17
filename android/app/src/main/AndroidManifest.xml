@@ -105,7 +105,9 @@
                 App Links: los enlaces de los correos de la clínica abren la
                 aplicación en vez del navegador. Son las dos rutas del panel
                 que arma el API (auth-mailer.service.ts):
-                /confirmar-correo?token=… y /restablecer?token=…. El resto
+                /confirmar-correo?token=… y /restablecer?token=…, y el
+                enlace de registro de cada clínica, /registro?clinica=…
+                (el que se copia o se imprime en QR desde el panel). El resto
                 del panel sigue abriéndose en el navegador.
 
                 autoVerify: Android comprueba al instalar que el dominio
@@ -128,6 +130,7 @@
                 <data android:host="cliniq.gcaicedo-proyectos.com" />
                 <data android:path="/confirmar-correo" />
                 <data android:path="/restablecer" />
+                <data android:path="/registro" />
             </intent-filter>
 
         </activity>

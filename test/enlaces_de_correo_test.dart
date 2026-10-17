@@ -67,7 +67,8 @@ void main() {
         leer('https://cliniq.gcaicedo-proyectos.com:8443/restablecer?token=a'),
         isNull,
       );
-      expect(leer('$panel/registro'), isNull);
+      // `/registro` sí es suyo desde las clínicas (ver clinicas_pantallas).
+      expect(leer('$panel/registro/otra-cosa'), isNull);
       expect(leer('$panel/legal/terminos'), isNull);
       expect(leer('$panel/restablecer/otra-cosa?token=a'), isNull);
     });
@@ -204,7 +205,7 @@ void main() {
       await montar(tester);
 
       enlaces
-        ..add(Uri.parse('$panel/registro'))
+        ..add(Uri.parse('$panel/legal/terminos'))
         ..add(Uri.parse('https://otro.com/restablecer?token=a'));
       await tester.pumpAndSettle();
 

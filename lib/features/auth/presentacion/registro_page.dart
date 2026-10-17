@@ -21,6 +21,8 @@ import '../../../core/presentacion/widgets/fondo_app.dart';
 import '../../../core/presentacion/widgets/tarjetas.dart';
 import '../../../core/servicios.dart';
 import '../../../core/tema/tokens.dart';
+import '../../clinicas/presentacion/cambiar_de_clinica.dart';
+import '../../clinicas/presentacion/logo_de_clinica_publica.dart';
 import '../../dependientes/dominio/validaciones.dart';
 import '../../legal/data/legal_service.dart';
 import '../data/auth_service.dart';
@@ -246,6 +248,7 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
           fechaNacimiento: _fechaNacimiento!,
           sexo: _sexo,
           password: _contrasena.text,
+          empresa: clinicaCubitSiHay(context)?.clinica?.codigo,
         ),
       ),
     );
@@ -307,6 +310,14 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
                         'Te pedimos lo justo para identificarte en '
                         '${clinica.nombre}. Después te enviaremos un enlace '
                         'para confirmar tu correo.',
+                  ),
+                  // Los documentos legales son de la clínica: con otra, se
+                  // vuelven a pedir.
+                  BotonCambiarDeClinica(
+                    habilitado: !enviando,
+                    alCambiar: () => context.read<RegistroBloc>().add(
+                      const RegistroDocumentosPedidos(),
+                    ),
                   ),
                   _YaTengoCuenta(alIngresar: () => Navigator.of(context).pop()),
                   const SizedBox(height: 8),
