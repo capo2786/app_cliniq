@@ -18,7 +18,9 @@ import '../providers/clinica_cubit.dart';
 ///   `empresaSesion`, o la que dice el token).
 /// - **Al cambiar de clínica**, se vuelven a pedir la configuración pública
 ///   y los catálogos: ahora salen con la otra `X-Empresa`, y con ellos la
-///   marca, el logotipo y los colores de la nueva.
+///   marca, el logotipo y los colores de la nueva. También cuando la
+///   guardada se olvida porque ya no está disponible: entonces salen de la
+///   predeterminada.
 /// - **Con cada configuración**, el nombre, el logotipo y los colores se
 ///   copian en la clínica guardada.
 class SincronizarClinica extends StatelessWidget {

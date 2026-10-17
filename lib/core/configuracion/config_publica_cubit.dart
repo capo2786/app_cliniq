@@ -87,6 +87,11 @@ class ConfigPublicaCubit extends Cubit<ConfigPublicaState> {
 
   Future<void> _cargar() async {
     if (state.config == null) {
+      // Sin el error de la vez anterior, la rueda desde ya: al reintentar, o
+      // al olvidar una clínica suspendida (el error era de ella), no se ve
+      // otra vez «no pudimos cargar» mientras se lee la copia.
+      if (state.error != null) emit(const ConfigPublicaState(cargando: true));
+
       final guardada = await _servicio.guardada();
       if (guardada != null) _emitirConfig(guardada);
     }

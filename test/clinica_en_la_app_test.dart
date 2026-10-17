@@ -1,6 +1,7 @@
 // test/clinica_en_la_app_test.dart
 
 import 'package:app_cliniq/core/app/version_instalada.dart';
+import 'package:app_cliniq/core/configuracion/config_publica_cubit.dart';
 import 'package:app_cliniq/core/fechas/zona_clinica.dart';
 import 'package:app_cliniq/core/network/api_client.dart';
 import 'package:app_cliniq/core/network/interceptor_de_empresa.dart';
@@ -75,6 +76,7 @@ void main() {
 
   tearDown(() {
     EmpresaDeLasPeticiones.codigo = null;
+    EmpresaDeLasPeticiones.alNoEstarDisponible = null;
     PaletaMarca.actual = PaletaMarca.deSiempre;
   });
 
@@ -177,5 +179,56 @@ void main() {
     expect((await Servicios.almacenDeClinica.leer())?.codigo, 'sur');
 
     expect(EmpresaDeLasPeticiones.codigo, 'sur');
+  });
+
+  testWidgets('la clínica guardada se suspendió: se olvida, se avisa una vez '
+      'y se sigue con la predeterminada, sin quedarse en «no pudimos '
+      'cargar»', (tester) async {
+    // El gateway: todo lo que lleva X-Empresa de andina responde 403.
+    api.rutas['GET /configuracion/publica'] = (_) => (
+      estado: 200,
+      cuerpo: configJson(clinica: {'nombre': 'Clínica Principal'}),
+    );
+    api.rutas.updateAll(
+      (_, responder) =>
+          (o) => clinicaDe(o) == 'andina'
+          ? (estado: 403, cuerpo: cuerpoClinicaNoDisponible)
+          : responder(o),
+    );
+    await Servicios.almacenDeClinica.guardar(clinicaAndina);
+
+    await abrir(tester);
+
+    expect(find.byKey(const Key('sin-datos-de-la-clinica')), findsNothing);
+    expect(find.byType(LoginPage), findsOneWidget);
+    expect(find.text('Entrar a Clínica Principal'), findsOneWidget);
+    expect(
+      find.text(
+        'La clínica «andina» no está disponible por ahora. Consulta con tu '
+        'clínica.',
+      ),
+      findsOneWidget,
+    );
+
+    final cubit = tester.element(find.byType(LoginPage)).read<ClinicaCubit>();
+    expect(cubit.clinica, isNull);
+    expect(cubit.state.cambios, 1);
+    expect(EmpresaDeLasPeticiones.codigo, isNull);
+    expect(await Servicios.almacenDeClinica.leer(), isNull);
+
+    // Lo que se pide después ya va a la predeterminada, sin X-Empresa.
+    final cabeceras = <String?>[];
+    final configuracion = api.rutas['GET /configuracion/publica']!;
+    api.rutas['GET /configuracion/publica'] = (o) {
+      cabeceras.add(o.headers[cabeceraEmpresa]?.toString());
+      return configuracion(o);
+    };
+    await tester.runAsync(
+      () => tester
+          .element(find.byType(LoginPage))
+          .read<ConfigPublicaCubit>()
+          .cargar(),
+    );
+    expect(cabeceras, [null]);
   });
 }

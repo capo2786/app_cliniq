@@ -28,6 +28,7 @@ import 'features/auth/providers/auth_state.dart';
 import 'features/citas/providers/citas_bloc.dart';
 import 'features/citas/providers/citas_event.dart';
 import 'features/clinicas/dominio/clinica.dart';
+import 'features/clinicas/presentacion/aviso_de_clinica_no_disponible.dart';
 import 'features/clinicas/presentacion/sincronizar_clinica.dart';
 import 'features/clinicas/providers/clinica_cubit.dart';
 import 'features/consultas/providers/consultas_bloc.dart';
@@ -255,14 +256,18 @@ class CliniqApp extends StatelessWidget {
                 navigatorObservers: [observadorDeRutas],
                 builder: (context, hijo) =>
                     CerrarTecladoAlTocarFuera(child: hijo ?? const SizedBox()),
-                home: EsperaDatosDeLaClinica(
-                  child: ReceptorDeEnlaces(
-                    enlaces: enlacesEntrantes,
-                    // Las mediciones registradas sin red salen al volver.
-                    child: EnvioDeMedicionesPendientes(
-                      cola: Servicios.colaMediciones,
-                      red: Servicios.red,
-                      child: const PuertaDeEntrada(),
+                // Si la clínica guardada se suspendió, se olvida y se dice
+                // aquí, con la predeterminada ya cargando.
+                home: AvisoDeClinicaNoDisponible(
+                  child: EsperaDatosDeLaClinica(
+                    child: ReceptorDeEnlaces(
+                      enlaces: enlacesEntrantes,
+                      // Las mediciones registradas sin red salen al volver.
+                      child: EnvioDeMedicionesPendientes(
+                        cola: Servicios.colaMediciones,
+                        red: Servicios.red,
+                        child: const PuertaDeEntrada(),
+                      ),
                     ),
                   ),
                 ),
