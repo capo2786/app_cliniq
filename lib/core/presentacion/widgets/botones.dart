@@ -53,8 +53,10 @@ class BotonPrincipal extends StatelessWidget {
           style: FilledButton.styleFrom(
             backgroundColor: Colors.transparent,
             disabledBackgroundColor: Colors.transparent,
-            foregroundColor: Colors.white,
-            disabledForegroundColor: Colors.white.withValues(alpha: 0.8),
+            foregroundColor: AppColors.textoSobreAccion,
+            disabledForegroundColor: AppColors.textoSobreAccion.withValues(
+              alpha: 0.8,
+            ),
             shadowColor: Colors.transparent,
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -68,11 +70,11 @@ class BotonPrincipal extends StatelessWidget {
                     key: const ValueKey('cargando'),
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                          color: Colors.white,
+                          color: AppColors.textoSobreAccion,
                           strokeWidth: 2.4,
                         ),
                       ),

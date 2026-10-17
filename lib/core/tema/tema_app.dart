@@ -12,7 +12,7 @@ ThemeData temaCliniq() {
         brightness: Brightness.dark,
       ).copyWith(
         primary: AppColors.acento,
-        onPrimary: Colors.white,
+        onPrimary: AppColors.textoSobreAccion,
         secondary: AppColors.primarioClaro,
         surface: AppColors.superficie,
         onSurface: AppColors.texto,
@@ -28,24 +28,24 @@ ThemeData temaCliniq() {
   return base.copyWith(
     scaffoldBackgroundColor: AppColors.fondo,
     canvasColor: AppColors.fondo,
-    appBarTheme: const AppBarTheme(
+    appBarTheme: AppBarTheme(
       backgroundColor: AppColors.superficie,
       foregroundColor: AppColors.texto,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(
+      titleTextStyle: const TextStyle(
         color: AppColors.texto,
         fontSize: 18,
         fontWeight: FontWeight.w800,
       ),
     ),
-    dialogTheme: const DialogThemeData(backgroundColor: AppColors.superficie),
-    bottomSheetTheme: const BottomSheetThemeData(
+    dialogTheme: DialogThemeData(backgroundColor: AppColors.superficie),
+    bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: AppColors.superficie,
       surfaceTintColor: Colors.transparent,
     ),
-    datePickerTheme: const DatePickerThemeData(
+    datePickerTheme: DatePickerThemeData(
       backgroundColor: AppColors.superficie,
       surfaceTintColor: Colors.transparent,
       headerBackgroundColor: AppColors.tarjeta,

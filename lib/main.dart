@@ -95,8 +95,23 @@ void aplicarConfiguracion(ConfigPublica config) {
   final cambioLaMarca = PaletaMarca.aplicar(
     primario: config.clinica.colorPrimario,
     acento: config.clinica.colorAcento,
+    fondo: config.clinica.colorFondo,
+    barra: config.clinica.colorBarraLateral,
+    textoSobrePrimario: config.clinica.colorTextoSobrePrimario,
   );
   if (cambioLaMarca) repintarTodo();
+}
+
+/// Los colores de la marca en un texto, para saber si cambiaron.
+String _coloresDeLaMarca(ConfigPublica? config) {
+  final c = config?.clinica;
+  return [
+    c?.colorPrimario,
+    c?.colorAcento,
+    c?.colorFondo,
+    c?.colorBarraLateral,
+    c?.colorTextoSobrePrimario,
+  ].join('|');
 }
 
 /// Marca para reconstruir cada elemento del árbol. Los colores de la marca
@@ -191,14 +206,13 @@ class CliniqApp extends StatelessWidget {
             BlocSelector<
               ConfigPublicaCubit,
               ConfigPublicaState,
-              (String, String?, String?)
+              (String, String)
             >(
               // El nombre para el sistema y los colores de la marca para el
               // tema: si cambian, el tema se vuelve a armar.
               selector: (state) => (
                 state.config?.clinica.nombre ?? '',
-                state.config?.clinica.colorPrimario,
-                state.config?.clinica.colorAcento,
+                _coloresDeLaMarca(state.config),
               ),
               builder: (context, datos) => MaterialApp(
                 title: datos.$1,

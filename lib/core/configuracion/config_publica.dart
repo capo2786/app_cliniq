@@ -96,6 +96,13 @@ class DatosClinica extends Equatable {
   final String? colorPrimario;
   final String? colorAcento;
 
+  /// Los tokens nuevos de la marca (`#RRGGBB` o `null`): el fondo, la barra
+  /// lateral del panel y el texto sobre el primario. Sin ellos, los de
+  /// siempre (ver `PaletaMarca`, que los adapta al tema oscuro).
+  final String? colorFondo;
+  final String? colorBarraLateral;
+  final String? colorTextoSobrePrimario;
+
   const DatosClinica({
     required this.nombre,
     required this.telefono,
@@ -106,6 +113,9 @@ class DatosClinica extends Equatable {
     required this.zonaHoraria,
     this.colorPrimario,
     this.colorAcento,
+    this.colorFondo,
+    this.colorBarraLateral,
+    this.colorTextoSobrePrimario,
   });
 
   /// De dónde sale el logotipo, o `null` si no hay uno propio.
@@ -123,6 +133,12 @@ class DatosClinica extends Equatable {
     zonaHoraria: l.texto('zonaHoraria'),
     colorPrimario: l.colorOpcional('colorPrimario'),
     colorAcento: l.colorOpcional('colorAcento'),
+    colorFondo: l.colorOpcional('colorFondo'),
+    colorBarraLateral:
+        l.colorOpcional('colorBarraLateral') ?? l.colorOpcional('colorBarra'),
+    colorTextoSobrePrimario:
+        l.colorOpcional('colorTextoSobrePrimario') ??
+        l.colorOpcional('colorTextoPrimario'),
   );
 
   @override
@@ -136,6 +152,9 @@ class DatosClinica extends Equatable {
     zonaHoraria,
     colorPrimario,
     colorAcento,
+    colorFondo,
+    colorBarraLateral,
+    colorTextoSobrePrimario,
   ];
 }
 

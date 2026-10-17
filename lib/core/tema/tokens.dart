@@ -38,22 +38,31 @@ class AppColors {
   /// El acento muy suave, para textos que acompañan a una acción.
   static Color get acentoSuave => PaletaMarca.actual.acentoSuave;
 
+  /// El texto y los iconos sobre la acción principal: blanco, o el texto
+  /// sobre el primario de la clínica si se lee sobre su acento.
+  static Color get textoSobreAccion => PaletaMarca.actual.textoSobreAccion;
+
   // ── Fondos ─────────────────────────────────────────────────────────
+  // El fondo, su degradado y la superficie salen de la marca (el fondo y
+  // la barra lateral de la clínica, oscurecidos: ver `PaletaMarca`).
+
   /// Fondo general de las pantallas oscuras: el gris azulado casi negro.
-  static const Color fondo = Color(0xFF0F171A);
+  static Color get fondo => PaletaMarca.actual.fondo;
 
   /// Aún más profundo que `fondo`, para el inicio y el arranque.
   static const Color fondoProfundo = Color(0xFF0B1113);
 
   /// Barras y superficies elevadas sobre el fondo.
-  static const Color superficie = Color(0xFF162022);
+  static Color get superficie => PaletaMarca.actual.superficie;
 
   /// Tarjetas opacas sobre la superficie (diálogos, hojas inferiores).
   static const Color tarjeta = Color(0xFF212E31);
 
   /// Los tres tonos del degradado de fondo (ver `FondoDegradado`).
-  static const Color fondoDegradadoInicio = Color(0xFF283A3E);
-  static const Color fondoDegradadoMedio = Color(0xFF192629);
+  static Color get fondoDegradadoInicio =>
+      PaletaMarca.actual.fondoDegradadoInicio;
+  static Color get fondoDegradadoMedio =>
+      PaletaMarca.actual.fondoDegradadoMedio;
 
   // ── Tarjetas y campos ──────────────────────────────────────────────
   // Sobre el degradado de fondo las superficies no son opacas: dejan pasar

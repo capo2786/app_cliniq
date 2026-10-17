@@ -2,6 +2,8 @@
 
 import 'package:flutter/painting.dart';
 
+import 'contraste.dart';
+
 /// Los colores de la marca de la clínica y los tonos que salen de ellos.
 ///
 /// La marca son dos colores: el primario (la calma) y el acento (la acción).
@@ -12,7 +14,16 @@ import 'package:flutter/painting.dart';
 /// siempre: la misma diferencia de tono, saturación y luz respecto de su
 /// color base.
 ///
-/// Los fondos oscuros, los estados (éxito, alerta, peligro) y los textos no
+/// Además, la clínica puede elegir el fondo, la barra lateral y el texto
+/// sobre el primario (`clinica.colorFondo`, `colorBarraLateral`,
+/// `colorTextoSobrePrimario`). La aplicación es oscura siempre, así que del
+/// fondo y de la barra toma el tono y les da la oscuridad de los de siempre
+/// (ver `oscurecerComo`): los textos blancos se siguen leyendo. La barra
+/// lateral del panel es, en la aplicación, la de arriba y la de abajo
+/// (`superficie`). El texto sobre el primario va en la acción principal,
+/// si se lee sobre el acento.
+///
+/// Los estados (éxito, alerta, peligro), las tarjetas y los demás textos no
 /// son de la marca y no cambian.
 class PaletaMarca {
   final Color primario;
@@ -30,6 +41,17 @@ class PaletaMarca {
   /// El saludo del inicio: del primario oscurecido al acento.
   final List<Color> bienvenida;
 
+  /// El fondo de las pantallas y los dos tonos de arriba de su degradado.
+  final Color fondo;
+  final Color fondoDegradadoInicio;
+  final Color fondoDegradadoMedio;
+
+  /// Las barras de arriba y de abajo y las hojas que suben.
+  final Color superficie;
+
+  /// El texto y los iconos de la acción principal.
+  final Color textoSobreAccion;
+
   const PaletaMarca({
     required this.primario,
     required this.primarioClaro,
@@ -39,7 +61,18 @@ class PaletaMarca {
     required this.encabezado,
     required this.identidad,
     required this.bienvenida,
+    this.fondo = _fondo,
+    this.fondoDegradadoInicio = _fondoDegradadoInicio,
+    this.fondoDegradadoMedio = _fondoDegradadoMedio,
+    this.superficie = _superficie,
+    this.textoSobreAccion = _blanco,
   });
+
+  static const Color _fondo = Color(0xFF0F171A);
+  static const Color _fondoDegradadoInicio = Color(0xFF283A3E);
+  static const Color _fondoDegradadoMedio = Color(0xFF192629);
+  static const Color _superficie = Color(0xFF162022);
+  static const Color _blanco = Color(0xFFFFFFFF);
 
   /// La de siempre: la que se usa si la clínica no configuró colores.
   static const PaletaMarca deSiempre = PaletaMarca(
@@ -63,10 +96,19 @@ class PaletaMarca {
 
   /// Aplica los colores de la configuración (`#RRGGBB` o `null`). Devuelve si
   /// la paleta cambió, para que la aplicación se vuelva a pintar.
-  static bool aplicar({String? primario, String? acento}) {
+  static bool aplicar({
+    String? primario,
+    String? acento,
+    String? fondo,
+    String? barra,
+    String? textoSobrePrimario,
+  }) {
     final nueva = PaletaMarca.desde(
       primario: _color(primario),
       acento: _color(acento),
+      fondo: _color(fondo),
+      barra: _color(barra),
+      textoSobrePrimario: _color(textoSobrePrimario),
     );
     if (nueva == actual) return false;
 
@@ -74,15 +116,23 @@ class PaletaMarca {
     return true;
   }
 
-  /// La paleta de estos dos colores; el que falte, el de siempre.
-  factory PaletaMarca.desde({Color? primario, Color? acento}) {
+  /// La paleta de estos colores; el que falte, el de siempre.
+  factory PaletaMarca.desde({
+    Color? primario,
+    Color? acento,
+    Color? fondo,
+    Color? barra,
+    Color? textoSobrePrimario,
+  }) {
     const base = deSiempre;
     final p = primario ?? base.primario;
     final a = acento ?? base.acento;
 
     final mismoPrimario = _igual(p, base.primario);
     final mismoAcento = _igual(a, base.acento);
-    if (mismoPrimario && mismoAcento) return base;
+    final sinFondos =
+        fondo == null && barra == null && textoSobrePrimario == null;
+    if (mismoPrimario && mismoAcento && sinFondos) return base;
 
     List<Color> desdePrimario(List<Color> tonos) => mismoPrimario
         ? tonos
@@ -92,6 +142,12 @@ class PaletaMarca {
         mismoAcento ? tono : _derivar(tono, base.acento, a);
 
     final bienvenida = desdePrimario([base.bienvenida[0]]).first;
+
+    // El fondo: el de la clínica, oscuro; sus tonos, con el mismo criterio
+    // que los del primario. La barra, la suya; sin ella, la del fondo.
+    final f = fondo == null ? base.fondo : oscurecerComo(fondo, base.fondo);
+    Color desdeFondo(Color tono) =>
+        _igual(f, base.fondo) ? tono : _derivar(tono, base.fondo, f);
 
     return PaletaMarca(
       primario: p,
@@ -108,18 +164,17 @@ class PaletaMarca {
         Color.lerp(p, a, 0.55)!,
         a,
       ],
+      fondo: f,
+      fondoDegradadoInicio: desdeFondo(base.fondoDegradadoInicio),
+      fondoDegradadoMedio: desdeFondo(base.fondoDegradadoMedio),
+      superficie: barra == null
+          ? desdeFondo(base.superficie)
+          : oscurecerComo(barra, base.superficie),
+      textoSobreAccion: textoLegibleSobre(a, preferido: textoSobrePrimario),
     );
   }
 
-  static Color? _color(String? hex) {
-    var texto = hex?.trim() ?? '';
-    if (texto.startsWith('#')) texto = texto.substring(1);
-    if (texto.length == 3) texto = texto.split('').map((c) => '$c$c').join();
-    if (texto.length != 6) return null;
-
-    final valor = int.tryParse(texto, radix: 16);
-    return valor == null ? null : Color(0xFF000000 | valor);
-  }
+  static Color? _color(String? hex) => colorHex(hex);
 
   static bool _igual(Color a, Color b) => a.toARGB32() == b.toARGB32();
 
@@ -144,8 +199,17 @@ class PaletaMarca {
   bool operator ==(Object other) =>
       other is PaletaMarca &&
       _igual(other.primario, primario) &&
-      _igual(other.acento, acento);
+      _igual(other.acento, acento) &&
+      _igual(other.fondo, fondo) &&
+      _igual(other.superficie, superficie) &&
+      _igual(other.textoSobreAccion, textoSobreAccion);
 
   @override
-  int get hashCode => Object.hash(primario.toARGB32(), acento.toARGB32());
+  int get hashCode => Object.hash(
+    primario.toARGB32(),
+    acento.toARGB32(),
+    fondo.toARGB32(),
+    superficie.toARGB32(),
+    textoSobreAccion.toARGB32(),
+  );
 }

@@ -20,7 +20,7 @@ class FondoDegradado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -29,7 +29,7 @@ class FondoDegradado extends StatelessWidget {
             AppColors.fondoDegradadoMedio,
             AppColors.fondo,
           ],
-          stops: [0, 0.47, 1],
+          stops: const [0, 0.47, 1],
         ),
       ),
       child: Stack(
