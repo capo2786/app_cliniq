@@ -84,6 +84,7 @@ arranca con valores inventados.**
 | --- | --- | --- |
 | Nombre, eslogan y logotipo de la clínica | `GET /configuracion/publica` → `clinica.nombre`, `eslogan`, `logo` (la dirección absoluta de `GET /configuracion/logo?v=…`, que sale de MinIO; se baja una vez y queda guardada en el teléfono; de un servidor anterior, un data URL; sin él, el logotipo de marca) | Acceso, arranque, inicio, perfil, legales, cerrar sesión, título |
 | Colores de la marca | `clinica.colorPrimario`, `colorAcento` (sin ellos, los tokens de siempre) | El tema entero (`PaletaMarca`) |
+| Fondo, barra lateral y texto sobre el primario | `clinica.colorFondo`, `colorBarraLateral`, `colorTextoSobrePrimario` (opcionales). La aplicación es oscura: del fondo y de la barra toma el tono con la oscuridad de siempre; el texto va en la acción principal si se lee sobre el acento | `AppColors.fondo`, `superficie`, `textoSobreAccion` y el tema |
 | Teléfono y correo | `clinica.telefono`, `correoContacto` | Cada «comunícate con la clínica», para tocar (`tel:`, `mailto:`) |
 | Número de emergencias | `clinica.telefonoEmergencia` | Consulta nueva |
 | Zona horaria | `clinica.zonaHoraria` | El reloj de la clínica, los instantes y los recordatorios |
@@ -393,7 +394,10 @@ Son las de UCEBell, con los colores de Cliniq:
 Los de la marca (primario, acento y sus tonos) salen de la configuración de
 la clínica (`PaletaMarca`, `lib/core/tema/paleta_marca.dart`) y por eso son
 getters, no constantes; los valores de la tabla son los de siempre, los que
-se usan si la clínica no configuró los suyos. Los demás sí son constantes.
+se usan si la clínica no configuró los suyos. También lo son el fondo, sus
+degradados, la superficie y el texto sobre la acción, que siguen al fondo,
+la barra lateral y el texto sobre el primario de la clínica. Los demás sí
+son constantes.
 
 | Token | Valor | Papel |
 | --- | --- | --- |
@@ -643,6 +647,44 @@ pantalla de páginas web de la aplicación. Queda una copia por documento
 leerlo sin red; un 404 dice «Documento no encontrado» y no enseña la copia
 vieja. Lo usan la aceptación de documentos, el perfil y el registro de
 pacientes.
+
+## Varias clínicas (multiempresa)
+
+Hay una sola aplicación en las tiendas para todas las clínicas de Cliniq, y
+cada clínica tiene su base de datos. La aplicación sabe a cuál va así:
+
+- **La clínica guardada** (`features/clinicas`): código, nombre y marca, en
+  el llavero (`AlmacenDeClinica`). Se lee antes de la primera petición
+  (`main.dart`) y la mantiene `ClinicaCubit`. Cerrar sesión no la borra: el
+  siguiente acceso ya la muestra, con «Cambiar de clínica».
+- **`X-Empresa`** va solo en lo que se pide **sin sesión** (el acceso, el
+  registro, la configuración pública, los catálogos, los legales):
+  `InterceptorDeEmpresa`, después del token. Con sesión manda el token, que
+  ya dice la clínica, y la API no deja cambiarla con una cabecera. Sin
+  clínica guardada no va nada y la API usa su predeterminada, como antes.
+- **Al entrar** se guarda la clínica de la sesión: `empresaSesion` del
+  usuario (ojo: `empresa`, en el perfil, es el empleador del paciente), o
+  `empresaCodigo` del token.
+- **Correo en varias clínicas**: el acceso responde 409 `EMPRESA_AMBIGUA`
+  con la lista; sale la hoja «¿En qué clínica quieres entrar?» (logotipo y
+  nombre) y se reintenta con `empresa` en el cuerpo y en `X-Empresa` (el
+  código de dos pasos, igual).
+- **Código de la clínica**: «Cambiar de clínica», en el acceso y en el
+  registro, pide el código, lo comprueba con `GET /empresas/publica/:codigo`
+  y enseña su logotipo y su nombre antes de usarla. «No sé el código»
+  olvida la guardada (la API la busca entonces por el correo).
+- **Enlace de registro**: `https://<panel>/registro?clinica=CODIGO` abre la
+  aplicación (App Link; también el QR de recepción, que la cámara del
+  teléfono abre como enlace), elige la clínica y abre el registro. Con la
+  sesión abierta solo se avisa. El registro manda la clínica en `X-Empresa`,
+  nunca como `empresa` del cuerpo.
+- **Al cambiar de clínica** se borra lo guardado de la anterior
+  (configuración, catálogos, legales, logotipo) y se vuelven a pedir: la
+  marca, el logotipo y los colores de la nueva entran solos, sin
+  reinstalar, y se refrescan al volver a primer plano como siempre.
+
+Para iOS, la ruta `/registro` tiene que estar también en el
+`apple-app-site-association` del panel (`dashboard-cliniq`).
 
 ## Pantalla de acceso
 
