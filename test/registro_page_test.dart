@@ -134,7 +134,8 @@ void main() {
   }
 
   Future<void> llenarTodo(WidgetTester tester) async {
-    await escribir(tester, 'registro-nombre', '  Ana   María Torres ');
+    await escribir(tester, 'registro-nombres', '  ana   maría ');
+    await escribir(tester, 'registro-apellidos', 'TORRES de la cruz');
     await escribir(tester, 'registro-correo', 'Ana.Torres@Correo.com');
     await escribir(tester, 'registro-telefono', '0991234567');
     await escribir(tester, 'registro-documento', '1710034065');
@@ -165,7 +166,8 @@ void main() {
 
     expect(find.text('Crea tu cuenta'), findsOneWidget);
     for (final rotulo in [
-      'Nombres y apellidos *',
+      'Nombres *',
+      'Apellidos *',
       'Correo electrónico *',
       'Teléfono',
       'Documento *',
@@ -206,7 +208,8 @@ void main() {
     await tocar(tester, find.byKey(const Key('boton-crear-mi-cuenta')));
 
     for (final mensaje in [
-      'Escribe tus nombres y apellidos.',
+      'Escribe tus nombres.',
+      'Escribe tus apellidos.',
       'Escribe tu correo.',
       'Escribe el número de tu documento.',
       'Indica tu fecha de nacimiento.',
@@ -310,7 +313,8 @@ void main() {
 
     expect(servicio.registros, [
       DatosRegistro(
-        nombre: '  Ana   María Torres ',
+        nombres: 'Ana María',
+        apellidos: 'Torres de la Cruz',
         email: 'Ana.Torres@Correo.com',
         telefono: '0991234567',
         tipoDocumento: 'CEDULA',
@@ -321,7 +325,9 @@ void main() {
       ),
     ]);
     expect(servicio.registros.single.aJson(), {
-      'nombre': 'Ana María Torres',
+      'nombres': 'Ana María',
+      'apellidos': 'Torres de la Cruz',
+      'nombre': 'Ana María Torres de la Cruz',
       'email': 'ana.torres@correo.com',
       'telefono': '0991234567',
       'tipoDocumento': 'CEDULA',

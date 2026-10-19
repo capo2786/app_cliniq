@@ -39,7 +39,8 @@ List<Map<String, dynamic>> documentosVigentesJson() => [
 
 DatosRegistro datosDePrueba({String telefono = '', String sexo = ''}) =>
     DatosRegistro(
-      nombre: '  Ana   María  Torres ',
+      nombres: '  ana   maría ',
+      apellidos: ' TORRES de la cruz ',
       email: ' Ana.Torres@Correo.COM ',
       telefono: telefono,
       tipoDocumento: 'PASAPORTE',

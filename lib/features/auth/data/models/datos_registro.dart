@@ -11,7 +11,9 @@ import '../../dominio/registro.dart';
 /// espacios de más, el correo en minúsculas, el documento en mayúsculas y
 /// lo opcional (teléfono, sexo) solo si se escribió.
 class DatosRegistro extends Equatable {
-  final String nombre;
+  /// Por separado; el API arma con ellos `nombre`.
+  final String nombres;
+  final String apellidos;
   final String email;
   final String telefono;
   final String tipoDocumento;
@@ -32,7 +34,8 @@ class DatosRegistro extends Equatable {
   final String? empresa;
 
   const DatosRegistro({
-    required this.nombre,
+    required this.nombres,
+    required this.apellidos,
     required this.email,
     required this.tipoDocumento,
     required this.cedula,
@@ -47,13 +50,19 @@ class DatosRegistro extends Equatable {
   /// enlace a …»).
   String get correo => email.trim().toLowerCase();
 
+  /// «Nombres Apellidos» en Título por palabra, como lo guarda el API.
+  String get nombre =>
+      normalizarNombre('${tituloNombre(nombres)} ${tituloNombre(apellidos)}');
+
   /// El cuerpo de la petición. `aceptaTerminos` va siempre en `true`: la
   /// pantalla no deja enviar sin aceptar los documentos, como el panel.
   Map<String, dynamic> aJson() {
     final telefono = this.telefono.trim();
 
     return {
-      'nombre': normalizarNombre(nombre),
+      'nombres': tituloNombre(nombres),
+      'apellidos': tituloNombre(apellidos),
+      'nombre': nombre,
       'email': correo,
       if (telefono.isNotEmpty) 'telefono': telefono,
       'tipoDocumento': tipoDocumento,
@@ -67,7 +76,8 @@ class DatosRegistro extends Equatable {
 
   @override
   List<Object?> get props => [
-    nombre,
+    nombres,
+    apellidos,
     email,
     telefono,
     tipoDocumento,

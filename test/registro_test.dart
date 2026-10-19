@@ -19,6 +19,27 @@ void main() {
   final hoy = DateTime(2026, 9, 28);
 
   group('Las reglas del formulario (las del panel, con sus mensajes)', () {
+    test('nombres y apellidos: obligatorios, de 2 a 60, y en Título por '
+        'palabra como los guarda el API', () {
+      expect(errorDeNombresRegistro(' '), 'Escribe tus nombres.');
+      expect(errorDeApellidosRegistro(''), 'Escribe tus apellidos.');
+      expect(errorDeNombresRegistro('a'), 'Debe tener al menos 2 caracteres.');
+      expect(errorDeApellidosRegistro('a' * 61), 'Máximo 60 caracteres.');
+      expect(errorDeNombresRegistro('Ana'), isNull);
+
+      expect(
+        tituloNombre('maría fernanda PÉREZ de la torre'),
+        'María Fernanda Pérez de la Torre',
+      );
+      expect(tituloNombre('DE LA CRUZ  y  los ríos'), 'De la Cruz y los Ríos');
+      expect(tituloNombre('ÑUSTA IBÁÑEZ muñoz'), 'Ñusta Ibáñez Muñoz');
+      expect(tituloNombre("maría-josé o'brien"), "María-José O'Brien");
+      expect(
+        tituloNombre('ludwig VAN beethoven von weber da silva e hijos'),
+        'Ludwig van Beethoven von Weber da Silva e Hijos',
+      );
+    });
+
     test('nombres y apellidos: obligatorio, de 3 a 120 caracteres', () {
       expect(errorDeNombreRegistro(''), 'Escribe tus nombres y apellidos.');
       expect(errorDeNombreRegistro('   '), 'Escribe tus nombres y apellidos.');
@@ -192,7 +213,10 @@ void main() {
       final pedido = api.ultimo('POST /auth/registro');
       expect(pedido.extra[rutaPublica], isTrue);
       expect(pedido.data, {
-        'nombre': 'Ana María Torres',
+        // Por separado y en Título; `nombre` es la unión (clientes viejos)
+        'nombres': 'Ana María',
+        'apellidos': 'Torres de la Cruz',
+        'nombre': 'Ana María Torres de la Cruz',
         'email': 'ana.torres@correo.com',
         'telefono': '0991234567',
         'tipoDocumento': 'PASAPORTE',

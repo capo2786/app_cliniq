@@ -75,7 +75,8 @@ class RegistroPage extends StatelessWidget {
 /// Los campos, en el orden en que se revisan: el primero con error es al
 /// que se lleva la pantalla al tocar «Crear mi cuenta».
 enum _Campo {
-  nombre,
+  nombres,
+  apellidos,
   correo,
   telefono,
   documento,
@@ -95,7 +96,8 @@ class _FormularioDeRegistro extends StatefulWidget {
 class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _nombre = TextEditingController();
+  final TextEditingController _nombres = TextEditingController();
+  final TextEditingController _apellidos = TextEditingController();
   final TextEditingController _correo = TextEditingController();
   final TextEditingController _telefono = TextEditingController();
   final TextEditingController _documento = TextEditingController();
@@ -103,6 +105,8 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
   final TextEditingController _contrasena = TextEditingController();
   final TextEditingController _confirmar = TextEditingController();
 
+  final FocusNode _focoNombres = FocusNode();
+  final FocusNode _focoApellidos = FocusNode();
   final FocusNode _focoCorreo = FocusNode();
   final FocusNode _focoTelefono = FocusNode();
   final FocusNode _focoDocumento = FocusNode();
@@ -125,12 +129,25 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
     super.initState();
     // La barra de fortaleza sigue a la contraseña letra por letra.
     _contrasena.addListener(() => setState(() {}));
+    // Al salir del campo, nombres y apellidos en Título por palabra (como
+    // los guarda el API): «maría PÉREZ de la torre» → «María Pérez de la Torre»
+    for (final (foco, campo) in [
+      (_focoNombres, _nombres),
+      (_focoApellidos, _apellidos),
+    ]) {
+      foco.addListener(() {
+        if (foco.hasFocus) return;
+        final titulo = tituloNombre(campo.text);
+        if (titulo != campo.text) campo.text = titulo;
+      });
+    }
   }
 
   @override
   void dispose() {
     for (final c in [
-      _nombre,
+      _nombres,
+      _apellidos,
       _correo,
       _telefono,
       _documento,
@@ -141,6 +158,8 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
       c.dispose();
     }
     for (final f in [
+      _focoNombres,
+      _focoApellidos,
       _focoCorreo,
       _focoTelefono,
       _focoDocumento,
@@ -160,7 +179,8 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
 
   /// El error de cada campo, con las mismas reglas que pintan los campos.
   String? _errorDe(_Campo campo) => switch (campo) {
-    _Campo.nombre => errorDeNombreRegistro(_nombre.text),
+    _Campo.nombres => errorDeNombresRegistro(_nombres.text),
+    _Campo.apellidos => errorDeApellidosRegistro(_apellidos.text),
     _Campo.correo => errorDeCorreoRegistro(_correo.text),
     _Campo.telefono => errorDeTelefono(_telefono.text),
     _Campo.documento => errorDeDocumentoRegistro(
@@ -240,7 +260,8 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
     context.read<RegistroBloc>().add(
       RegistroEnviado(
         DatosRegistro(
-          nombre: _nombre.text,
+          nombres: _nombres.text,
+          apellidos: _apellidos.text,
           email: _correo.text,
           telefono: _telefono.text,
           tipoDocumento: _tipoDocumento,
@@ -356,17 +377,33 @@ class _FormularioDeRegistroState extends State<_FormularioDeRegistro> {
   }
 
   List<Widget> _datosPersonales(bool enviando) => [
-    EtiquetaCampo('Nombres y apellidos *', key: _anclas[_Campo.nombre]),
+    EtiquetaCampo('Nombres *', key: _anclas[_Campo.nombres]),
     CampoCliniq(
-      key: const Key('registro-nombre'),
-      controller: _nombre,
-      pista: 'Ana María Torres Pérez',
+      key: const Key('registro-nombres'),
+      controller: _nombres,
+      foco: _focoNombres,
+      pista: 'Ana María',
       icono: Icons.badge_outlined,
       habilitado: !enviando,
       mayusculas: TextCapitalization.words,
       accion: TextInputAction.next,
-      autofill: const [AutofillHints.name],
-      validator: errorDeNombreRegistro,
+      autofill: const [AutofillHints.givenName],
+      validator: errorDeNombresRegistro,
+      onSubmitted: (_) => _focoApellidos.requestFocus(),
+    ),
+    const SizedBox(height: 14),
+    EtiquetaCampo('Apellidos *', key: _anclas[_Campo.apellidos]),
+    CampoCliniq(
+      key: const Key('registro-apellidos'),
+      controller: _apellidos,
+      foco: _focoApellidos,
+      pista: 'Torres Pérez',
+      icono: Icons.badge_outlined,
+      habilitado: !enviando,
+      mayusculas: TextCapitalization.words,
+      accion: TextInputAction.next,
+      autofill: const [AutofillHints.familyName],
+      validator: errorDeApellidosRegistro,
       onSubmitted: (_) => _focoCorreo.requestFocus(),
     ),
     const SizedBox(height: 14),

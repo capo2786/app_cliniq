@@ -17,6 +17,83 @@ import '../../legal/data/legal_service.dart';
 const int nombreMaximo = 120;
 const int correoMaximo = 120;
 
+/// Largo máximo de los nombres y de los apellidos (cada uno), como el API.
+const int nombresMaximo = 60;
+
+/// Nombres: obligatorio, de 2 a 60 caracteres.
+String? errorDeNombresRegistro(String? valor) {
+  final texto = normalizarNombre(valor ?? '');
+
+  if (texto.isEmpty) return 'Escribe tus nombres.';
+  if (texto.length < 2) return 'Debe tener al menos 2 caracteres.';
+  if (texto.length > nombresMaximo) return 'Máximo $nombresMaximo caracteres.';
+
+  return null;
+}
+
+/// Apellidos: obligatorio, de 2 a 60 caracteres.
+String? errorDeApellidosRegistro(String? valor) {
+  final texto = normalizarNombre(valor ?? '');
+
+  if (texto.isEmpty) return 'Escribe tus apellidos.';
+  if (texto.length < 2) return 'Debe tener al menos 2 caracteres.';
+  if (texto.length > nombresMaximo) return 'Máximo $nombresMaximo caracteres.';
+
+  return null;
+}
+
+/// Las partículas que van en minúscula salvo al inicio.
+const Set<String> particulasNombre = {
+  'de',
+  'del',
+  'la',
+  'las',
+  'los',
+  'y',
+  'e',
+  'da',
+  'van',
+  'von',
+};
+
+String _capital(String parte) {
+  if (parte.isEmpty) return parte;
+  final minuscula = parte.toLowerCase();
+  return minuscula.substring(0, 1).toUpperCase() + minuscula.substring(1);
+}
+
+String _palabraTitulo(String palabra) => palabra
+    .split('-')
+    .map((segmento) {
+      final apostrofo = RegExp(r"^([^'’]{1,2})(['’])(.+)$")
+          .firstMatch(segmento);
+      if (apostrofo == null) return _capital(segmento);
+      return '${_capital(apostrofo.group(1)!)}${apostrofo.group(2)}'
+          '${_capital(apostrofo.group(3)!)}';
+    })
+    .join('-');
+
+/// Título por palabra, como lo guarda el API (`parseNombre`) y el panel:
+/// «maría fernanda PÉREZ de la torre» → «María Fernanda Pérez de la
+/// Torre». Las partículas van en minúscula salvo al inicio; respeta tildes y
+/// la ñ.
+String tituloNombre(String texto) {
+  final palabras = normalizarNombre(texto)
+      .split(' ')
+      .where((p) => p.isNotEmpty);
+  var i = 0;
+  return palabras
+      .map((palabra) {
+        final minuscula = palabra.toLowerCase();
+        final resultado = i > 0 && particulasNombre.contains(minuscula)
+            ? minuscula
+            : _palabraTitulo(palabra);
+        i++;
+        return resultado;
+      })
+      .join(' ');
+}
+
 /// El API no acepta contraseñas de más de 128 caracteres.
 const int contrasenaMaxima = 128;
 

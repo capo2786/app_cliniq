@@ -169,7 +169,8 @@ void main() {
         'del cuerpo, que es el empleador del paciente', () async {
       final api = DioGrabador({'POST /auth/registro': (_) => {}});
       const datos = DatosRegistro(
-        nombre: 'Ana Pérez',
+        nombres: 'Ana',
+        apellidos: 'Pérez',
         email: 'ana@c.ec',
         tipoDocumento: 'CEDULA',
         cedula: '1710034065',
@@ -181,7 +182,8 @@ void main() {
       await AuthService(api.dio).registrar(datos);
       await AuthService(api.dio).registrar(
         DatosRegistro(
-          nombre: datos.nombre,
+          nombres: datos.nombres,
+          apellidos: datos.apellidos,
           email: datos.email,
           tipoDocumento: datos.tipoDocumento,
           cedula: datos.cedula,
